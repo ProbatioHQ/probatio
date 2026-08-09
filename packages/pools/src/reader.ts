@@ -1,9 +1,9 @@
 import type { PoolState } from '@probatio/sim';
 import { LayoutError } from './layout';
 import { PUMP_PROGRAM_ID, bondingCurveAddress, decodeBondingCurve } from './pumpfun';
+import { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 import {
   POOL_OFFSETS,
-  PUMPSWAP_APPROXIMATE_FEE_BPS,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
   decodePumpSwapPool,
@@ -34,17 +34,6 @@ export interface Resolution {
   readonly pool: PoolState | null;
   readonly slot: number;
 }
-
-/**
- * pump.fun's fee is no longer a fixed constant — it is computed per trade by a
- * separate fee program and varies with the token's configuration.
- *
- * This value is therefore an approximation and is explicitly *not* good enough
- * for the fill engine. D9 has to read the real fee rather than inherit this.
- * Carrying it as a named constant with this comment attached is the point: a
- * bare `100` in the code would have been forgotten.
- */
-export const PUMPFUN_APPROXIMATE_FEE_BPS = 100;
 
 export class PoolReader {
   readonly #rpc: RpcClient;
@@ -93,7 +82,7 @@ export class PoolReader {
           // suggests.
           deliverableTokens: curve.realTokenReserves,
           tokenDecimals,
-          feeBps: PUMPFUN_APPROXIMATE_FEE_BPS,
+          fees: PUMPFUN_CURVE_FEES,
           source: 'pumpfun-curve',
           slot: curveAccount.slot,
         },
@@ -198,7 +187,7 @@ export class PoolReader {
       // deliverable. Only a bonding curve splits the two.
       deliverableTokens: base.amount,
       tokenDecimals: decimals,
-      feeBps: PUMPSWAP_APPROXIMATE_FEE_BPS,
+      fees: PUMPSWAP_DEFAULT_FEES,
       source: 'pumpswap',
       slot: baseAccount.slot,
     };

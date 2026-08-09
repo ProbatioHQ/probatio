@@ -16,7 +16,7 @@ function resolution(mint: string, solReserve = 31_000_000_000n): Resolution {
       tokenReserve: 1_000_000_000_000_000n,
       deliverableTokens: 700_000_000_000_000n,
       tokenDecimals: 6,
-      feeBps: 100,
+      fees: { protocolBps: 95, creatorBps: 30, lpBps: 0 },
       source: 'pumpfun-curve',
       slot: 1,
     },

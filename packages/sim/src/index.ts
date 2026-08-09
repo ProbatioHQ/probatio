@@ -25,4 +25,8 @@ export {
 } from './fixed';
 export type { Amount } from './fixed';
 
-export type { PoolSource, PoolState, Side } from './types';
+export { totalFeeBps } from './types';
+export type { FeeSchedule, PoolSource, PoolState, Side } from './types';
+
+export { QuoteError, applyQuote, quoteBuy, quoteSell } from './engine';
+export type { Quote, QuoteErrorCode } from './engine';

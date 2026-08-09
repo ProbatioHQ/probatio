@@ -46,16 +46,6 @@ export const POOL_DISCRIMINATOR = Uint8Array.from([
   0xf1, 0x9a, 0x6d, 0x04, 0x11, 0xb1, 0x6d, 0xbc,
 ]);
 
-/**
- * PumpSwap charges an LP fee, a protocol fee and a creator fee, all configured
- * on a separate account and adjustable.
- *
- * As with the bonding curve, this constant is an approximation and is not good
- * enough for the fill engine. D9 has to read the real values. It is named
- * rather than inlined so it cannot be mistaken for a settled number.
- */
-export const PUMPSWAP_APPROXIMATE_FEE_BPS = 30;
-
 export interface PumpSwapPool {
   readonly poolBump: number;
   readonly index: number;

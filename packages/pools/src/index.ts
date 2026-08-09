@@ -44,7 +44,6 @@ export {
   POOL_DISCRIMINATOR,
   POOL_MIN_BYTES,
   POOL_OFFSETS,
-  PUMPSWAP_APPROXIMATE_FEE_BPS,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
   decodePumpSwapPool,
@@ -60,7 +59,8 @@ export type {
   TransactionLogs,
 } from './rpc';
 
-export { PUMPFUN_APPROXIMATE_FEE_BPS, PoolReader } from './reader';
+export { PoolReader } from './reader';
+export { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 export type { Resolution, Venue } from './reader';
 
 export {
