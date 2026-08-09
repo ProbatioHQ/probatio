@@ -1,0 +1,19 @@
+{
+  "name": "@probatio/pools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Venue account decoding and pool state normalization. Decoders are pure; only the RPC client touches the network.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
+    "@probatio/sim": "*",
+    "bs58": "^6.0.0"
+  }
+}

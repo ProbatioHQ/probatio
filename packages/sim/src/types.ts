@@ -23,6 +23,15 @@ export interface PoolState {
   readonly solReserve: Amount;
   /** Token side of the pool, in the token's base units. */
   readonly tokenReserve: Amount;
+  /**
+   * The most tokens the venue can actually hand over.
+   *
+   * A bonding curve prices against virtual reserves but can only deliver the
+   * real ones, so a large buy is capped below what the curve alone would
+   * suggest. An AMM has no such split and sets this equal to `tokenReserve`.
+   * Collapsing the two would silently overfill every large buy on a curve.
+   */
+  readonly deliverableTokens: Amount;
   /** The token's decimal precision, needed to render amounts but never to compute them. */
   readonly tokenDecimals: number;
   /** Venue fee in basis points. */
