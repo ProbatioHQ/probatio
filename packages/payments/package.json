@@ -1,0 +1,11 @@
+{
+  "name": "@probatio/payments",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Building the transaction a user signs, and verifying what actually landed.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@probatio/pools": "*", "@probatio/sim": "*", "bs58": "^6.0.0" }
+}

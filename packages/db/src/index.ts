@@ -87,6 +87,23 @@ export {
 } from './launches';
 export type { Launch } from './launches';
 
+export {
+  createPaymentIntent,
+  getPaymentIntent,
+  hasEntered,
+  openPaymentIntents,
+  paymentsFor,
+  settlePayment,
+} from './payments';
+export type {
+  PaymentIntentRow,
+  PaymentIntentWrite,
+  PaymentPurpose,
+  PaymentRow,
+  PaymentStatus,
+  Settlement,
+} from './payments';
+
 export { coachReportHistory, latestCoachReport, recordCoachReport } from './coach';
 export type {
   CoachReportWrite,
@@ -100,6 +117,7 @@ export {
   ensureAccount,
   ensureFreePlaySeason,
   isRankedSeason,
+  openRankedSeason,
   openPosition,
   openPositions,
   recordTrade,
@@ -111,6 +129,7 @@ export type {
   PoolSnapshotWrite,
   PositionRow,
   PositionWrite,
+  SeasonRow,
   TradeRow,
   TradeWrite,
 } from './trading';

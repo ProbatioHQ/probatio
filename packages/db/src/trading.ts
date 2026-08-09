@@ -424,3 +424,57 @@ export async function isRankedSeason(db: Client, seasonId: number): Promise<bool
   });
   return Number(result.rows[0]?.['ranked'] ?? 0) === 1;
 }
+
+/**
+ * The ranked season currently accepting entries, if any.
+ *
+ * Entry is a window, not a switch: the A1 spec opens it for the first 48 hours
+ * of a season and late arrivals play free and join the next one. A season that
+ * is running but past its window is not enterable, and the query says so rather
+ * than leaving that to a caller who might forget.
+ */
+export async function openRankedSeason(db: Client, now: number): Promise<SeasonRow | null> {
+  const result = await db.execute({
+    sql: `SELECT * FROM seasons
+          WHERE ranked = 1
+            AND status IN ('entry_open','running')
+            AND (entry_opens_at IS NULL OR entry_opens_at <= ?)
+            AND (entry_closes_at IS NULL OR entry_closes_at > ?)
+          ORDER BY ordinal DESC LIMIT 1`,
+    args: [now, now],
+  });
+  const row = result.rows[0];
+  return row ? toSeasonRow(row as unknown as Record<string, unknown>) : null;
+}
+
+export interface SeasonRow {
+  readonly id: number;
+  readonly ordinal: number;
+  readonly name: string;
+  readonly ranked: boolean;
+  readonly status: string;
+  readonly startsAt: number | null;
+  readonly endsAt: number | null;
+  readonly entryOpensAt: number | null;
+  readonly entryClosesAt: number | null;
+  readonly startingBalance: string;
+  readonly entryCost: string;
+}
+
+function toSeasonRow(row: Record<string, unknown>): SeasonRow {
+  const num = (key: string): number | null =>
+    row[key] === null || row[key] === undefined ? null : Number(row[key]);
+  return {
+    id: Number(row['id']),
+    ordinal: Number(row['ordinal']),
+    name: String(row['name']),
+    ranked: Number(row['ranked']) === 1,
+    status: String(row['status']),
+    startsAt: num('starts_at'),
+    endsAt: num('ends_at'),
+    entryOpensAt: num('entry_opens_at'),
+    entryClosesAt: num('entry_closes_at'),
+    startingBalance: String(row['starting_balance']),
+    entryCost: String(row['entry_cost']),
+  };
+}

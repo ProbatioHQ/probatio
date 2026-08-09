@@ -336,6 +336,75 @@ export class RpcClient {
       value ? toAccountData(value, result.context.slot) : null,
     );
   }
+
+  /**
+   * A blockhash to build a transaction against.
+   *
+   * `lastValidBlockHeight` is returned with it because a transaction built on a
+   * stale blockhash is rejected, and a payment flow that cannot tell a user
+   * "this expired, try again" from "this failed" is a payment flow that loses
+   * money to confusion.
+   */
+  async getLatestBlockhash(): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+    const result = await this.call<
+      WithContext<{ blockhash: string; lastValidBlockHeight: number }>
+    >('getLatestBlockhash', [{ commitment: this.commitment }]);
+    return result.value;
+  }
+
+  /**
+   * A transaction, with the balance changes it caused.
+   *
+   * The balances are the point. An instruction says what it intends to move;
+   * the pre and post balances say what actually moved, after every other
+   * instruction in the transaction had its turn. Crediting a payment on the
+   * former is how you credit a transfer that a later instruction took back.
+   */
+  async getTransaction(
+    signature: string,
+    commitment: 'confirmed' | 'finalized' = 'finalized',
+  ): Promise<ConfirmedTransaction | null> {
+    const result = await this.call<RawFullTransaction | null>('getTransaction', [
+      signature,
+      { maxSupportedTransactionVersion: 0, commitment, encoding: 'json' },
+    ]);
+    if (!result) return null;
+
+    return {
+      signature,
+      slot: result.slot,
+      blockTime: result.blockTime ?? null,
+      err: result.meta?.err ?? null,
+      accountKeys: result.transaction?.message?.accountKeys ?? [],
+      preBalances: (result.meta?.preBalances ?? []).map((value) => BigInt(value)),
+      postBalances: (result.meta?.postBalances ?? []).map((value) => BigInt(value)),
+      logMessages: result.meta?.logMessages ?? [],
+    };
+  }
+}
+
+export interface ConfirmedTransaction {
+  readonly signature: string;
+  readonly slot: number;
+  readonly blockTime: number | null;
+  readonly err: unknown;
+  /** In the transaction's own order, which is what the balance arrays index. */
+  readonly accountKeys: readonly string[];
+  readonly preBalances: readonly bigint[];
+  readonly postBalances: readonly bigint[];
+  readonly logMessages: readonly string[];
+}
+
+interface RawFullTransaction {
+  slot: number;
+  blockTime?: number | null;
+  transaction?: { message?: { accountKeys?: string[] } };
+  meta?: {
+    err?: unknown;
+    preBalances?: number[];
+    postBalances?: number[];
+    logMessages?: string[];
+  } | null;
 }
 
 function toAccountData(value: AccountValue, slot: number): AccountData {

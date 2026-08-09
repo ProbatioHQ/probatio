@@ -110,6 +110,7 @@ describe('migrations', () => {
       '007_launches.sql',
       '008_trade_sequence.sql',
       '009_coach_reports.sql',
+      '010_payment_intents.sql',
     ]);
   });
 

@@ -1,0 +1,138 @@
+'use client';
+
+import { useState } from 'react';
+import { getPhantomSigner, PHANTOM_INSTALL_URL } from '@/lib/phantom';
+
+/**
+ * Paying to enter a ranked season.
+ *
+ * Two steps, and the second one is the one that counts. The wallet returns a
+ * signature; the server reads the chain. Until it has, nothing is claimed —
+ * this component never tells a user they are entered on the strength of the
+ * wallet saying so.
+ */
+
+type Stage = 'idle' | 'building' | 'signing' | 'confirming' | 'entered' | 'error';
+
+interface IntentResponse {
+  reference: string;
+  message: string;
+  lamports: string;
+  season: { ordinal: number; name: string };
+  error?: string;
+}
+
+function sol(lamports: string): string {
+  const value = BigInt(lamports);
+  const whole = value / 1_000_000_000n;
+  const fraction = ((value % 1_000_000_000n) * 1_000n) / 1_000_000_000n;
+  return `${whole}.${fraction.toString().padStart(3, '0')}`;
+}
+
+export function EnterSeason() {
+  const [stage, setStage] = useState<Stage>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function enter(): Promise<void> {
+    const signer = getPhantomSigner();
+    if (!signer) {
+      setStage('error');
+      setMessage('Phantom is not installed.');
+      return;
+    }
+
+    setStage('building');
+    setMessage(null);
+
+    const intentResponse = await fetch('/api/pay/intent', { method: 'POST' });
+    const intent = (await intentResponse.json()) as IntentResponse;
+    if (!intentResponse.ok) {
+      setStage('error');
+      setMessage(intent.error ?? 'Could not start the payment.');
+      return;
+    }
+
+    let signature: string;
+    try {
+      setStage('signing');
+      const result = await signer.request({
+        method: 'signAndSendTransaction',
+        params: { message: intent.message },
+      });
+      signature = result.signature;
+    } catch {
+      // Declining is not a failure worth an error message.
+      setStage('idle');
+      return;
+    }
+
+    setStage('confirming');
+    setMessage('Waiting for the network to finalize it. This takes a few seconds.');
+
+    // Finalization is not instant, and a single check would report "not yet"
+    // as often as it reported success.
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const response = await fetch('/api/pay/confirm', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reference: intent.reference, signature }),
+      });
+      const body = (await response.json()) as { error?: string; settled?: boolean };
+
+      if (response.ok && body.settled) {
+        setStage('entered');
+        setMessage(`You are in ${intent.season.name}.`);
+        return;
+      }
+      if (response.status !== 202) {
+        setStage('error');
+        setMessage(body.error ?? 'The payment could not be confirmed.');
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+
+    // The payment may well have landed. Saying so plainly beats claiming a
+    // failure we have not established.
+    setStage('error');
+    setMessage(
+      'Still waiting on the network. Your payment is not lost — reload in a minute and it will be picked up.',
+    );
+  }
+
+  if (stage === 'entered') {
+    return (
+      <section aria-label="Season entry">
+        <h2>Entered</h2>
+        <p>{message}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Season entry">
+      <h2>Ranked season</h2>
+      <p>
+        Entry is paid once, from your wallet. It goes to the prize pool, and the whole pool is
+        paid back out when the season closes.
+      </p>
+
+      <button type="button" onClick={() => void enter()} disabled={stage !== 'idle' && stage !== 'error'}>
+        {stage === 'building' && 'Preparing…'}
+        {stage === 'signing' && 'Approve in Phantom…'}
+        {stage === 'confirming' && 'Confirming…'}
+        {(stage === 'idle' || stage === 'error') && 'Enter the season'}
+      </button>
+
+      {message && <p role={stage === 'error' ? 'alert' : undefined}>{message}</p>}
+
+      {stage === 'error' && !getPhantomSigner() && (
+        <p>
+          <a href={PHANTOM_INSTALL_URL} target="_blank" rel="noreferrer noopener">
+            Install Phantom
+          </a>
+        </p>
+      )}
+    </section>
+  );
+}

@@ -55,6 +55,7 @@ export type { PumpSwapPool } from './pumpswap';
 export { RpcClient, RpcError } from './rpc';
 export type {
   AccountData,
+  ConfirmedTransaction,
   ProgramAccountFilter,
   RpcOptions,
   SignatureInfo,

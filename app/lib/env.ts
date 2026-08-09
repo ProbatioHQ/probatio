@@ -65,3 +65,14 @@ export function coachApiKey(): string | null {
 export function coachModel(): string | null {
   return process.env['COACH_MODEL'] ?? null;
 }
+
+/**
+ * The address entry fees are paid to.
+ *
+ * Optional, so the app runs without it — but every payment route refuses while
+ * it is unset rather than falling back to anything. There is no sensible
+ * default for where money goes.
+ */
+export function treasuryAddress(): string | null {
+  return process.env['TREASURY_ADDRESS'] ?? null;
+}

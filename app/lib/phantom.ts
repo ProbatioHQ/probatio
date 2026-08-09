@@ -27,3 +27,28 @@ export function getPhantom(): PhantomProvider | null {
   const provider = window.phantom?.solana ?? window.solana;
   return provider?.isPhantom ? provider : null;
 }
+
+/**
+ * The signing half of the provider, kept apart on purpose.
+ *
+ * Reaching this takes a separate, differently named call. Signing in and
+ * moving funds are different acts, and a component that only needs the first
+ * should not be one autocomplete away from the second.
+ *
+ * `request` is used rather than `signAndSendTransaction` because it accepts a
+ * serialized message: the transaction is built and encoded here, so no wallet
+ * library ever enters the bundle.
+ */
+export interface PhantomSigner {
+  request(input: {
+    method: 'signAndSendTransaction';
+    params: { message: string };
+  }): Promise<{ signature: string; publicKey?: string }>;
+}
+
+export function getPhantomSigner(): PhantomSigner | null {
+  const provider = getPhantom() as (PhantomProvider & Partial<PhantomSigner>) | null;
+  return provider && typeof provider.request === 'function'
+    ? (provider as unknown as PhantomSigner)
+    : null;
+}

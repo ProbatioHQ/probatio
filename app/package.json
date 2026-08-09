@@ -21,7 +21,9 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "@probatio/analytics": "*",
-    "@probatio/coach": "*"
+    "@probatio/coach": "*",
+    "@probatio/payments": "*",
+    "@probatio/pools": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
