@@ -3,12 +3,11 @@ import { DEFAULT_RULES, simulateFill, totalFeeBps } from '@probatio/sim';
 import { applyFill, emptyPosition, TradingError, type AccountState } from '@probatio/trading';
 import { hashLeaf, toHex } from '@probatio/commit';
 import {
-  ensureAccount,
-  ensureFreePlaySeason,
   openPosition,
   recordTrade,
 } from '@probatio/db';
 import { db } from '@/lib/db';
+import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 import { rpcEndpoint } from '@/lib/env';
 
@@ -68,8 +67,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const client = await db();
   const now = Date.now();
-  const seasonId = await ensureFreePlaySeason(client, now);
-  const account = await ensureAccount(client, seasonId, user.pubkey, now);
+  const { account, seasonId } = await activeSeason(client, user.pubkey, now);
 
   const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 15_000 });
   const reader = new PoolReader(rpc);

@@ -428,20 +428,26 @@ export async function isRankedSeason(db: Client, seasonId: number): Promise<bool
 /**
  * The ranked season currently accepting entries, if any.
  *
- * Entry is a window, not a switch: the A1 spec opens it for the first 48 hours
- * of a season and late arrivals play free and join the next one. A season that
- * is running but past its window is not enterable, and the query says so rather
- * than leaving that to a caller who might forget.
+ * Decided by the clock, not by the stored status column. That column is a
+ * record of what was last written; the window is a fact about the time. A
+ * season whose status was never advanced by some job would otherwise never open
+ * for entry at all, and the failure would be silent — the season simply never
+ * sells a ticket.
+ *
+ * `finalized` is the one status that overrides the clock, because it is an
+ * event rather than a time: a season whose results are on chain is over
+ * regardless of what its end date says.
  */
 export async function openRankedSeason(db: Client, now: number): Promise<SeasonRow | null> {
   const result = await db.execute({
     sql: `SELECT * FROM seasons
           WHERE ranked = 1
-            AND status IN ('entry_open','running')
-            AND (entry_opens_at IS NULL OR entry_opens_at <= ?)
-            AND (entry_closes_at IS NULL OR entry_closes_at > ?)
+            AND status != 'finalized'
+            AND starts_at IS NOT NULL AND starts_at <= ?
+            AND entry_closes_at IS NOT NULL AND entry_closes_at > ?
+            AND (ends_at IS NULL OR ends_at > ?)
           ORDER BY ordinal DESC LIMIT 1`,
-    args: [now, now],
+    args: [now, now, now],
   });
   const row = result.rows[0];
   return row ? toSeasonRow(row as unknown as Record<string, unknown>) : null;

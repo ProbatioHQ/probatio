@@ -1,6 +1,7 @@
-import { ensureAccount, ensureFreePlaySeason } from '@probatio/db';
+
 import { buildReport } from '@/lib/analytics';
 import { db } from '@/lib/db';
+import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 
 /**
@@ -23,8 +24,7 @@ export async function GET(): Promise<Response> {
 
   const client = await db();
   const now = Date.now();
-  const seasonId = await ensureFreePlaySeason(client, now);
-  const account = await ensureAccount(client, seasonId, user.pubkey, now);
+  const { account, seasonId } = await activeSeason(client, user.pubkey, now);
 
   const report = await buildReport(client, account.id, BigInt(account.startingBalance));
   const { metrics, drawdown, timeOfDay, excursions } = report;

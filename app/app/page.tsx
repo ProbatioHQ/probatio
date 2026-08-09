@@ -1,6 +1,7 @@
 import { Coach } from '@/components/coach';
 import { LaunchFeedList } from '@/components/launch-feed';
 import { Onboarding } from '@/components/onboarding';
+import { Season } from '@/components/season';
 import { SignIn } from '@/components/sign-in';
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
 
       <SignIn />
       <Onboarding />
+      <Season />
       <Coach />
       <LaunchFeedList />
     </main>

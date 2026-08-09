@@ -2,12 +2,11 @@ import { PoolReader, RpcClient } from '@probatio/pools';
 import { PRICE_SCALE, priceFromReserves } from '@probatio/candles';
 import { accountEquity, valuePosition, type ValuedPosition } from '@probatio/trading';
 import {
-  ensureAccount,
-  ensureFreePlaySeason,
   openPositions,
   totalRealizedPnl,
 } from '@probatio/db';
 import { db } from '@/lib/db';
+import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 import { rpcEndpoint } from '@/lib/env';
 
@@ -32,8 +31,7 @@ export async function GET(): Promise<Response> {
 
   const client = await db();
   const now = Date.now();
-  const seasonId = await ensureFreePlaySeason(client, now);
-  const account = await ensureAccount(client, seasonId, user.pubkey, now);
+  const { account, seasonId } = await activeSeason(client, user.pubkey, now);
 
   const positions = await openPositions(client, account.id);
   const realized = await totalRealizedPnl(client, account.id);

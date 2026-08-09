@@ -9,14 +9,12 @@ import {
   type Tier,
 } from '@probatio/coach';
 import {
-  ensureAccount,
-  ensureFreePlaySeason,
-  isRankedSeason,
   latestCoachReport,
   recordCoachReport,
 } from '@probatio/db';
 import { buildReport } from '@/lib/analytics';
 import { db } from '@/lib/db';
+import { activeSeason } from '@/lib/season';
 import { coachApiKey, coachModel } from '@/lib/env';
 import { currentUser } from '@/lib/session';
 
@@ -52,13 +50,14 @@ async function context(): Promise<Context | null> {
 
   const client = await db();
   const now = Date.now();
-  const seasonId = await ensureFreePlaySeason(client, now);
-  const account = await ensureAccount(client, seasonId, user.pubkey, now);
+  const { account, seasonId, ranked } = await activeSeason(client, user.pubkey, now);
 
   return {
     accountId: account.id,
     pubkey: user.pubkey,
-    tier: (await isRankedSeason(client, seasonId)) ? 'ranked' : 'free',
+    // The tier follows the season the trader is actually in, so the
+    // allowance cannot disagree with the account the report is about.
+    tier: ranked ? 'ranked' : 'free',
     startingBalance: BigInt(account.startingBalance),
     seasonId,
   };

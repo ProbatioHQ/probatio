@@ -23,7 +23,8 @@
     "@probatio/analytics": "*",
     "@probatio/coach": "*",
     "@probatio/payments": "*",
-    "@probatio/pools": "*"
+    "@probatio/pools": "*",
+    "@probatio/seasons": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

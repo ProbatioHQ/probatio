@@ -1,5 +1,6 @@
-import { ensureAccount, ensureFreePlaySeason, tradeHistory } from '@probatio/db';
+import { tradeHistory } from '@probatio/db';
 import { db } from '@/lib/db';
+import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 
 /**
@@ -32,8 +33,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const client = await db();
   const now = Date.now();
-  const seasonId = await ensureFreePlaySeason(client, now);
-  const account = await ensureAccount(client, seasonId, user.pubkey, now);
+  const { account, seasonId } = await activeSeason(client, user.pubkey, now);
 
   const trades = await tradeHistory(client, account.id, limit, mint ?? undefined);
 
