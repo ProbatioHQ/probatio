@@ -80,12 +80,30 @@ export async function ensureAccount(
 
   let row = existing.rows[0];
   if (!row) {
+    // ON CONFLICT rather than a bare insert. Selecting and then inserting is a
+    // race, and this runs on every authenticated request — two concurrent
+    // requests from a wallet's first visit both see no account and both try to
+    // create one. Found by load testing; the loser used to get an exception on
+    // a perfectly ordinary first page load.
     const created = await db.execute({
       sql: `INSERT INTO accounts (season_id, user_pubkey, sol_balance, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?) RETURNING *`,
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (season_id, user_pubkey, generation) DO NOTHING
+            RETURNING *`,
       args: [seasonId, userPubkey, String(seasonRow['starting_balance']), now, now],
     });
-    row = created.rows[0]!;
+
+    row = created.rows[0];
+    if (!row) {
+      // Somebody else created it between the select and the insert. Theirs is
+      // the same account this call was about to make.
+      const raced = await db.execute({
+        sql: `SELECT * FROM accounts WHERE season_id = ? AND user_pubkey = ?
+              ORDER BY generation DESC LIMIT 1`,
+        args: [seasonId, userPubkey],
+      });
+      row = raced.rows[0]!;
+    }
   }
 
   return {

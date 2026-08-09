@@ -19,11 +19,104 @@ export function openDatabase(config?: Partial<Config>): Client {
 
   const authToken = config?.authToken ?? process.env['DATABASE_AUTH_TOKEN'];
 
-  return createClient({
+  const client = createClient({
     ...config,
     url,
     ...(authToken ? { authToken } : {}),
   });
+
+  // Local files get their writes serialized. A remote database does its own
+  // concurrency control on the server, and queueing there would serialize
+  // network round trips for nothing.
+  return url.startsWith('file:') || url === ':memory:' ? serializeWrites(client) : client;
+}
+
+/**
+ * One write transaction at a time.
+ *
+ * Found by load testing rather than by reading: 500 concurrent trades against a
+ * local file produced 499 `SQLITE_BUSY` failures and one successful write. The
+ * invariants held, because almost nothing was written — a safe failure and a
+ * useless one.
+ *
+ * `PRAGMA busy_timeout` does not fix it. libsql hands each transaction its own
+ * connection, and the pragma is per connection, so the setting never reaches
+ * the connection that needs it. WAL does not fix it either: WAL allows one
+ * writer alongside many readers, and this is many writers. Measured, both.
+ *
+ * So the queue is the fix, and it is the honest one — SQLite permits a single
+ * writer, and waiting for a turn is what `busy_timeout` would have done had it
+ * been reachable. Serialized, the same 40 writes all succeed.
+ */
+function serializeWrites(client: Client): Client {
+  let tail: Promise<unknown> = Promise.resolve();
+
+  // Patched in place rather than wrapped in a new object. The client is a class
+  // with private fields, and a prototype-chained copy loses access to them —
+  // every call fails with "Receiver must be an instance of".
+  const original = client.transaction.bind(client);
+
+  client.transaction = (async (mode?: unknown) => {
+    let release!: () => void;
+    const mine = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const ahead = tail;
+    tail = tail.then(() => mine, () => mine);
+    await ahead.catch(() => undefined);
+
+    let transaction;
+    try {
+      transaction = await (original as (m?: unknown) => Promise<unknown>)(mode);
+    } catch (error) {
+      // Never leave the queue holding a lock nobody owns.
+      release();
+      throw error;
+    }
+
+    const tx = transaction as {
+      commit(): Promise<void>;
+      rollback(): Promise<void>;
+      close(): void;
+    };
+    const commit = tx.commit.bind(tx);
+    const rollback = tx.rollback.bind(tx);
+    const close = tx.close.bind(tx);
+
+    let released = false;
+    const releaseOnce = (): void => {
+      if (released) return;
+      released = true;
+      release();
+    };
+
+    tx.commit = async () => {
+      try {
+        await commit();
+      } finally {
+        releaseOnce();
+      }
+    };
+    tx.rollback = async () => {
+      try {
+        await rollback();
+      } finally {
+        releaseOnce();
+      }
+    };
+    tx.close = () => {
+      try {
+        close();
+      } finally {
+        releaseOnce();
+      }
+    };
+
+    return transaction;
+  }) as Client['transaction'];
+
+  return client;
 }
 
 /**
