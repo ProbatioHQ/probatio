@@ -1,0 +1,15 @@
+{
+  "name": "@probatio/feed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Demand-driven polling. Nothing is read from chain unless somebody is looking at it or holding it.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@probatio/candles": "*",
+    "@probatio/pools": "*",
+    "@probatio/sim": "*"
+  }
+}
