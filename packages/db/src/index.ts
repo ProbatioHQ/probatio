@@ -58,3 +58,16 @@ export {
   suspendedTokens,
 } from './drift';
 export type { DriftHistoryEntry, DriftObservation, DriftSeverity } from './drift';
+
+export {
+  commitHistory,
+  discardIntent,
+  lastConfirmedCommit,
+  markAttempted,
+  markConfirmed,
+  markFailed,
+  pendingCommits,
+  recordIntent,
+  uncommittedTrades,
+} from './commits';
+export type { CommitIntent, PendingTrade, StoredCommit } from './commits';
