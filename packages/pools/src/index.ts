@@ -52,7 +52,22 @@ export {
 export type { PumpSwapPool } from './pumpswap';
 
 export { RpcClient, RpcError } from './rpc';
-export type { AccountData, ProgramAccountFilter, RpcOptions } from './rpc';
+export type {
+  AccountData,
+  ProgramAccountFilter,
+  RpcOptions,
+  SignatureInfo,
+  TransactionLogs,
+} from './rpc';
 
 export { PUMPFUN_APPROXIMATE_FEE_BPS, PoolReader } from './reader';
 export type { Resolution, Venue } from './reader';
+
+export {
+  TRADE_EVENT_DISCRIMINATOR,
+  TRADE_EVENT_MIN_BYTES,
+  TRADE_EVENT_OFFSETS,
+  decodeTradeEvent,
+  extractTradeEvents,
+} from './events';
+export type { TradeEvent } from './events';

@@ -1,0 +1,20 @@
+{
+  "name": "@probatio/candles",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OHLCV aggregation and historical reconstruction. Prices come from the same reserves the fill engine quotes against.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@probatio/pools": "*",
+    "@probatio/sim": "*"
+  },
+  "devDependencies": {
+    "bs58": "^6.0.0"
+  }
+}

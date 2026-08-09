@@ -45,3 +45,6 @@ export type {
   OffchainMetadataWrite,
   OnchainMetadataWrite,
 } from './metadata';
+
+export { getBackfill, readCandles, recordBackfill, writeCandles } from './candles';
+export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';

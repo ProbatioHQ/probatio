@@ -100,7 +100,12 @@ describe('migrations', () => {
 
   it('records what it applied', async () => {
     const applied = await appliedMigrations(db);
-    expect(applied.map((m) => m.name)).toEqual(['001_init.sql', '002_auth_nonces.sql', '003_token_metadata.sql']);
+    expect(applied.map((m) => m.name)).toEqual([
+      '001_init.sql',
+      '002_auth_nonces.sql',
+      '003_token_metadata.sql',
+      '004_candles.sql',
+    ]);
   });
 
   it('is a no-op the second time', async () => {

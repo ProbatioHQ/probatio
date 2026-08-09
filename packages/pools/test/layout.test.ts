@@ -167,3 +167,14 @@ describe('decodeMintDecimals', () => {
     expect(() => decodeMintDecimals(new Uint8Array(81))).toThrow(LayoutError);
   });
 });
+
+describe('discriminatorMatches on short input', () => {
+  const disc = Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8);
+
+  it('returns false rather than throwing', () => {
+    // Found against mainnet: a three-byte `Program data:` line threw here and
+    // took down the whole log scan. "Not this" is the ordinary answer.
+    expect(discriminatorMatches(Uint8Array.of(1, 2, 3), disc)).toBe(false);
+    expect(discriminatorMatches(new Uint8Array(0), disc)).toBe(false);
+  });
+});

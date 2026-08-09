@@ -35,6 +35,24 @@ export interface RpcOptions {
   readonly commitment?: 'processed' | 'confirmed' | 'finalized';
   readonly fetchImpl?: typeof fetch;
   readonly timeoutMs?: number;
+  /** Retries for rate limits and transient server errors. */
+  readonly maxRetries?: number;
+  /** Base delay for backoff, doubled each attempt. */
+  readonly retryBaseMs?: number;
+  /** Injected in tests so backoff does not actually sleep. */
+  readonly sleepImpl?: (ms: number) => Promise<void>;
+}
+
+const DEFAULT_MAX_RETRIES = 4;
+const DEFAULT_RETRY_BASE_MS = 400;
+
+/** Rate limiting, and the server-side errors that are worth another attempt. */
+function isRetryable(status: number): boolean {
+  return status === 429 || status === 502 || status === 503 || status === 504;
+}
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface RpcResponse<T> {
@@ -51,6 +69,36 @@ interface AccountValue {
 interface WithContext<T> {
   context: { slot: number };
   value: T;
+}
+
+interface RawSignatureInfo {
+  signature: string;
+  slot: number;
+  blockTime?: number | null;
+  err?: unknown;
+}
+
+interface RawTransaction {
+  slot: number;
+  blockTime?: number | null;
+  meta?: { err?: unknown; logMessages?: string[] } | null;
+}
+
+export interface SignatureInfo {
+  readonly signature: string;
+  readonly slot: number;
+  /** Unix seconds, or null for very old transactions the cluster no longer stamps. */
+  readonly blockTime: number | null;
+  /** Non-null when the transaction failed. Failed trades never moved a price. */
+  readonly err: unknown;
+}
+
+export interface TransactionLogs {
+  readonly signature: string;
+  readonly slot: number;
+  readonly blockTime: number | null;
+  readonly err: unknown;
+  readonly logMessages: readonly string[];
 }
 
 export type ProgramAccountFilter =
@@ -78,42 +126,125 @@ export class RpcClient {
     return this.#options.commitment ?? 'confirmed';
   }
 
+  /**
+   * One JSON-RPC call, retrying rate limits and transient server errors.
+   *
+   * Every provider rate-limits, and a backfill walking a token's history will
+   * hit that ceiling on any plan worth paying for. Retrying with backoff here
+   * is what makes a cheap endpoint usable instead of forcing an expensive one.
+   *
+   * `Retry-After` is honoured when the server sends it — it is the server
+   * telling us exactly how long to wait, and guessing shorter only makes things
+   * worse for everyone.
+   */
   private async call<T>(method: string, params: unknown[]): Promise<T> {
     const doFetch = this.#options.fetchImpl ?? fetch;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.#options.timeoutMs ?? 15_000);
+    const sleep = this.#options.sleepImpl ?? defaultSleep;
+    const maxRetries = this.#options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    const baseMs = this.#options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
 
-    let response: Response;
-    try {
-      response = await doFetch(this.#options.endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: this.#nextId++, method, params }),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new RpcError(`${method} could not reach the RPC endpoint: ${reason}`);
-    } finally {
-      clearTimeout(timeout);
+    let lastError: RpcError | undefined;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      if (attempt > 0) {
+        const backoff = baseMs * 2 ** (attempt - 1);
+        // Jitter so concurrent workers do not all retry on the same tick and
+        // reproduce the burst that got them limited.
+        await sleep(backoff + Math.floor(Math.random() * baseMs));
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.#options.timeoutMs ?? 15_000);
+
+      let response: Response;
+      try {
+        response = await doFetch(this.#options.endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: this.#nextId++, method, params }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        lastError = new RpcError(`${method} could not reach the RPC endpoint: ${reason}`);
+        continue;
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!response.ok) {
+        lastError = new RpcError(`${method} returned HTTP ${response.status}`, response.status);
+        if (!isRetryable(response.status) || attempt === maxRetries) throw lastError;
+
+        const retryAfter = Number(response.headers.get('retry-after'));
+        if (Number.isFinite(retryAfter) && retryAfter > 0) {
+          await sleep(Math.min(retryAfter * 1000, 30_000));
+        }
+        continue;
+      }
+
+      const body = (await response.json()) as RpcResponse<T>;
+      if (body.error) {
+        throw new RpcError(`${method} failed: ${body.error.message}`, body.error.code);
+      }
+      if (body.result === undefined) {
+        throw new RpcError(`${method} returned no result`);
+      }
+      return body.result;
     }
 
-    if (!response.ok) {
-      throw new RpcError(`${method} returned HTTP ${response.status}`, response.status);
-    }
-
-    const body = (await response.json()) as RpcResponse<T>;
-    if (body.error) {
-      throw new RpcError(`${method} failed: ${body.error.message}`, body.error.code);
-    }
-    if (body.result === undefined) {
-      throw new RpcError(`${method} returned no result`);
-    }
-    return body.result;
+    throw lastError ?? new RpcError(`${method} failed after ${maxRetries} retries`);
   }
 
   async getSlot(): Promise<number> {
     return this.call<number>('getSlot', [{ commitment: this.commitment }]);
+  }
+
+  /**
+   * Transaction signatures touching an address, newest first.
+   *
+   * `before` walks backwards through history a page at a time — the only way
+   * to reach anything older than the most recent thousand.
+   */
+  async getSignatures(
+    address: string,
+    options: { limit?: number; before?: string; until?: string } = {},
+  ): Promise<SignatureInfo[]> {
+    const params: Record<string, unknown> = {
+      limit: Math.min(options.limit ?? 100, 1000),
+      commitment: this.commitment,
+    };
+    if (options.before) params['before'] = options.before;
+    if (options.until) params['until'] = options.until;
+
+    const result = await this.call<RawSignatureInfo[]>('getSignaturesForAddress', [
+      address,
+      params,
+    ]);
+
+    return result.map((entry) => ({
+      signature: entry.signature,
+      slot: entry.slot,
+      blockTime: entry.blockTime ?? null,
+      err: entry.err ?? null,
+    }));
+  }
+
+  /** A transaction's log messages, or null when it is missing or unparseable. */
+  async getTransactionLogs(signature: string): Promise<TransactionLogs | null> {
+    const result = await this.call<RawTransaction | null>('getTransaction', [
+      signature,
+      { maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
+    ]);
+    if (!result) return null;
+
+    return {
+      signature,
+      slot: result.slot,
+      blockTime: result.blockTime ?? null,
+      err: result.meta?.err ?? null,
+      logMessages: result.meta?.logMessages ?? [],
+    };
   }
 
   async getAccount(address: string): Promise<AccountData | null> {

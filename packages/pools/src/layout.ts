@@ -72,11 +72,18 @@ export function readDiscriminator(data: Uint8Array): Uint8Array {
   return data.subarray(0, DISCRIMINATOR_BYTES);
 }
 
+/**
+ * Whether the data begins with this discriminator.
+ *
+ * A buffer too short to hold one simply does not match. This is asked while
+ * sifting through log lines and account types, where "not this" is the ordinary
+ * answer — throwing would turn one unrelated three-byte log line into a failure
+ * of the entire scan.
+ */
 export function discriminatorMatches(data: Uint8Array, expected: Uint8Array): boolean {
-  const actual = readDiscriminator(data);
-  if (actual.length !== expected.length) return false;
+  if (data.length < expected.length) return false;
   for (let i = 0; i < expected.length; i += 1) {
-    if (actual[i] !== expected[i]) return false;
+    if (data[i] !== expected[i]) return false;
   }
   return true;
 }
