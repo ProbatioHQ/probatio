@@ -10,6 +10,12 @@
 export { DEFAULT_MAX_BATCH, planBatches } from './plan';
 export type { Batch } from './plan';
 
+export { NO_RECORD, auditRecords } from './audit';
+export type { AuditFinding, AuditResult, AuditVerdict } from './audit';
+
+export { KeeperIdentityError, checkIdentity } from './identity';
+export type { IdentityCheck, SeasonKeeper } from './identity';
+
 export { GatewayError } from './gateway';
 export type { ChainGateway, CommitReceipt, OnChainRecord } from './gateway';
 
