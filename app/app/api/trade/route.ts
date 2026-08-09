@@ -163,8 +163,9 @@ export async function POST(request: Request): Promise<Response> {
 
   const nextPosition = applied.account.position ?? emptyPosition(mint);
 
-  const leaf = {
-    sequence: 0,
+  // Everything about the leaf except its sequence, which is only settled
+  // inside the write transaction.
+  const leafBase = {
     seasonOrdinal: account.seasonOrdinal,
     trader: user.pubkey,
     mint,
@@ -186,7 +187,7 @@ export async function POST(request: Request): Promise<Response> {
     createdAt: now,
   };
 
-  const tradeId = await recordTrade(client, {
+  const recorded = await recordTrade(client, {
     snapshot: {
       mint,
       solReserve: pool.solReserve.toString(),
@@ -212,7 +213,6 @@ export async function POST(request: Request): Promise<Response> {
       filledAtSlot: pool.slot,
       latencyMs: account.latencyMs,
       engineVersion: outcome.quote.engineVersion,
-      leafHash: toHex(hashLeaf(leaf)),
     },
     position: {
       accountId: account.id,
@@ -223,12 +223,14 @@ export async function POST(request: Request): Promise<Response> {
       closed: applied.closed,
     },
     newBalance: applied.account.solBalance.toString(),
+    leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
     now,
   });
 
   return Response.json({
     status: 'filled',
-    tradeId,
+    tradeId: recorded.id,
+    sequence: recorded.sequence,
     // Both figures are returned so the interface can show the haircut rather
     // than quietly presenting the fill as though it were the quote.
     expected: {

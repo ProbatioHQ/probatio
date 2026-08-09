@@ -98,3 +98,6 @@ export type {
   TradeRow,
   TradeWrite,
 } from './trading';
+
+export { createTestDatabase } from './testing';
+export type { TestDatabase } from './testing';

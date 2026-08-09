@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Client } from '@libsql/client';
-import { migrate, openDatabase, pendingCommits, commitHistory } from '@probatio/db';
+import { createTestDatabase, pendingCommits, commitHistory, type TestDatabase } from '@probatio/db';
 import { EMPTY_ACCUMULATOR, extendChain, fromHex, toHex } from '@probatio/commit';
 import { Keeper, KeeperHalt, predictAccumulator } from '../src/keeper';
 import type { ChainGateway, CommitReceipt, OnChainRecord } from '../src/gateway';
@@ -70,6 +70,7 @@ class FakeChain implements ChainGateway {
 }
 
 let db: Client;
+let temp: TestDatabase;
 let chain: FakeChain;
 let keeper: Keeper;
 
@@ -122,10 +123,12 @@ async function seedSeason(tradesEach = 20): Promise<number> {
         sql: `INSERT INTO trades (
                 account_id, season_id, user_pubkey, mint, side, sol_amount, token_amount,
                 fee, price_impact_bps, partial, pool_source, clicked_at_slot, filled_at_slot,
-                latency_ms, engine_version, pool_snapshot_id, leaf_hash, created_at
+                latency_ms, engine_version, pool_snapshot_id, leaf_hash, sequence, created_at
               ) VALUES (?, ?, ?, 'mint', 'buy', '1000000', '1000', '100', 10, 0,
-                        'pumpfun-curve', 1, 2, 600, 1, ?, ?, ?)`,
-        args: [accountId, seasonId, trader, snapshotId, `leaf${trader}${i}`, now + i],
+                        'pumpfun-curve', 1, 2, 600, 1, ?, ?, ?, ?)`,
+        // A real sequence: the unique index refuses two trades sharing one,
+        // which is the whole reason it exists.
+        args: [accountId, seasonId, trader, snapshotId, `leaf${trader}${i}`, i + 1, now + i],
       });
     }
   }
@@ -161,10 +164,14 @@ function request(
 }
 
 beforeEach(async () => {
-  db = openDatabase({ url: ':memory:' });
-  await migrate(db);
+  temp = await createTestDatabase();
+  db = temp.db;
   chain = new FakeChain();
   keeper = new Keeper(db, chain);
+});
+
+afterEach(() => {
+  temp.cleanup();
 });
 
 describe('committing', () => {

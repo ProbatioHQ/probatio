@@ -13,5 +13,11 @@ export type { Batch } from './plan';
 export { GatewayError } from './gateway';
 export type { ChainGateway, CommitReceipt, OnChainRecord } from './gateway';
 
+export { LeafMismatchError, leavesFor, loadTrades, toLeaf } from './leaves';
+export type { StoredTrade } from './leaves';
+
+export { rootFor, runOnce } from './runner';
+export type { RunResult, RunnerOptions } from './runner';
+
 export { Keeper, KeeperHalt, predictAccumulator } from './keeper';
 export type { CommitRequest, CycleResult, Health } from './keeper';

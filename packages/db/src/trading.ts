@@ -176,12 +176,20 @@ export async function recordTrade(
   db: Client,
   input: {
     readonly snapshot: PoolSnapshotWrite;
-    readonly trade: Omit<TradeWrite, 'poolSnapshotId'>;
+    readonly trade: Omit<TradeWrite, 'poolSnapshotId' | 'leafHash'>;
     readonly position: PositionWrite;
     readonly newBalance: string;
+    /**
+     * Produces the leaf hash once the sequence is known.
+     *
+     * A callback rather than a value because the sequence is only settled
+     * inside this transaction, and the leaf commits to it. Hashing beforehand
+     * would mean hashing a number that had not been decided.
+     */
+    readonly leafHashFor: (sequence: number) => string;
     readonly now: number;
   },
-): Promise<number> {
+): Promise<{ id: number; sequence: number }> {
   const tx = await db.transaction('write');
 
   try {
@@ -207,12 +215,20 @@ export async function recordTrade(
     });
     const snapshotId = Number(snapshot.rows[0]!['id']);
 
+    // Settled here, inside the transaction, so it cannot be read by two
+    // trades at once. The unique index enforces that if it ever were.
+    const last = await tx.execute({
+      sql: 'SELECT COALESCE(MAX(sequence), 0) AS last FROM trades WHERE account_id = ?',
+      args: [input.trade.accountId],
+    });
+    const sequence = Number(last.rows[0]!['last']) + 1;
+
     const trade = await tx.execute({
       sql: `INSERT INTO trades (
               account_id, season_id, user_pubkey, mint, side, sol_amount, token_amount,
               fee, price_impact_bps, partial, pool_source, clicked_at_slot, filled_at_slot,
-              latency_ms, engine_version, pool_snapshot_id, leaf_hash, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              latency_ms, engine_version, pool_snapshot_id, leaf_hash, sequence, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id`,
       args: [
         input.trade.accountId,
@@ -231,7 +247,8 @@ export async function recordTrade(
         input.trade.latencyMs,
         input.trade.engineVersion,
         snapshotId,
-        input.trade.leafHash,
+        input.leafHashFor(sequence),
+        sequence,
         input.now,
       ],
     });
@@ -279,7 +296,7 @@ export async function recordTrade(
     }
 
     await tx.commit();
-    return Number(trade.rows[0]!['id']);
+    return { id: Number(trade.rows[0]!['id']), sequence };
   } catch (error) {
     await tx.rollback();
     throw error;
@@ -328,6 +345,7 @@ export async function totalRealizedPnl(db: Client, accountId: number): Promise<s
 
 export interface TradeRow {
   readonly id: number;
+  readonly sequence: number;
   readonly mint: string;
   readonly side: 'buy' | 'sell';
   readonly solAmount: string;
@@ -363,6 +381,7 @@ export async function tradeHistory(
 
   return result.rows.map((row) => ({
     id: Number(row['id']),
+    sequence: Number(row['sequence']),
     mint: String(row['mint']),
     side: String(row['side']) as 'buy' | 'sell',
     solAmount: String(row['sol_amount']),
