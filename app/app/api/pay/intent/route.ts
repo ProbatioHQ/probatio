@@ -4,7 +4,14 @@ import {
   createIntent,
   DEFAULT_TTL_MS,
 } from '@probatio/payments';
-import { createPaymentIntent, hasEntered, openRankedSeason } from '@probatio/db';
+import {
+  createPaymentIntent,
+  entriesFromFunder,
+  hasEntered,
+  openRankedSeason,
+  recordIntentEvidence,
+} from '@probatio/db';
+import { DEFAULT_RULES, assess, explainRefusal, gatherEvidence } from '@probatio/sybil';
 import { db } from '@/lib/db';
 import { rpcEndpoint, treasuryAddress } from '@/lib/env';
 import { currentUser } from '@/lib/session';
@@ -50,6 +57,31 @@ export async function POST(): Promise<Response> {
     );
   }
 
+  // Read the wallet before asking for money. An entry that would be refused
+  // should be refused before it is paid for, not after — and the evidence is
+  // kept either way, because the attack worth defending against is not winning
+  // this pot, it is presenting a survivor wallet as a track record later.
+  let evidence;
+  try {
+    const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 20_000, minIntervalMs: 60 });
+    evidence = await gatherEvidence(rpc, user.pubkey, now);
+  } catch {
+    return Response.json({ error: 'could not reach the network. Try again.' }, { status: 502 });
+  }
+
+  const siblings =
+    evidence.funder === null
+      ? 0
+      : await entriesFromFunder(client, season.id, evidence.funder, now);
+
+  const verdict = assess({ evidence, siblingEntries: siblings, now });
+  if (!verdict.allowed) {
+    return Response.json(
+      { error: explainRefusal(verdict.refusal!, DEFAULT_RULES), refusal: verdict.refusal },
+      { status: 403 },
+    );
+  }
+
   const intent = createIntent({
     payer: user.pubkey,
     recipient: treasury,
@@ -82,6 +114,13 @@ export async function POST(): Promise<Response> {
     },
     now,
   );
+
+  await recordIntentEvidence(client, intent.reference, {
+    funder: evidence.funder,
+    walletFirstSeenAt: evidence.firstSeenAt,
+    walletSignatureCount: evidence.signatureCount,
+    flags: verdict.flags,
+  });
 
   return Response.json({
     reference: intent.reference,

@@ -25,7 +25,8 @@
     "@probatio/payments": "*",
     "@probatio/pools": "*",
     "@probatio/seasons": "*",
-    "@probatio/scoring": "*"
+    "@probatio/scoring": "*",
+    "@probatio/sybil": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

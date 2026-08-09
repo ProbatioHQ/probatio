@@ -13,6 +13,7 @@ import {
   statusAt,
   timeUntilEntryCloses,
 } from '@probatio/seasons';
+import { DEFAULT_RULES } from '@probatio/sybil';
 import { db } from '@/lib/db';
 import { currentUser } from '@/lib/session';
 
@@ -101,6 +102,12 @@ export async function GET(): Promise<Response> {
       // The hash recorded when the season was created, not one computed now.
       // Recomputing would let a later change to the rules quietly rewrite what
       // a running season published.
+      eligibility: {
+        maxEntriesPerFunder: DEFAULT_RULES.maxEntriesPerFunder,
+        note:
+          'One entry per wallet. Entries funded from the same source are limited, ' +
+          'and every entry records what the chain said about its wallet at the time.',
+      },
       rulesetHash: season.rulesetHash,
       // What today's code produces for this ordinal. Equal to the above unless
       // the rules have been edited since, in which case saying so is the point.

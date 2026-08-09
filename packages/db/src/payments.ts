@@ -198,12 +198,18 @@ export async function settlePayment(
     if (input.purpose === 'season_entry' && input.seasonId !== null) {
       // ON CONFLICT DO NOTHING rather than an error: a user already entered is
       // a user already entered, and their payment still needs recording.
+      // The evidence follows the intent onto the entry. Re-gathering it here
+      // would read a wallet that has had time to change since it was checked.
       const entry = await tx.execute({
-        sql: `INSERT INTO entries (season_id, user_pubkey, payment_id, entered_at)
-              VALUES (?, ?, ?, ?)
+        sql: `INSERT INTO entries
+                (season_id, user_pubkey, payment_id, entered_at,
+                 funder, wallet_first_seen_at, wallet_signature_count, evidence_flags)
+              SELECT ?, ?, ?, ?, funder, wallet_first_seen_at, wallet_signature_count,
+                     COALESCE(evidence_flags, '[]')
+              FROM payment_intents WHERE reference = ?
               ON CONFLICT (season_id, user_pubkey) DO NOTHING
               RETURNING id`,
-        args: [input.seasonId, input.userPubkey, payment.id, input.now],
+        args: [input.seasonId, input.userPubkey, payment.id, input.now, input.reference],
       });
       entryId = entry.rows[0] ? Number(entry.rows[0]['id']) : null;
     }
@@ -257,4 +263,105 @@ export async function hasEntered(
     args: [seasonId, userPubkey],
   });
   return result.rows.length > 0;
+}
+
+export interface EvidenceWrite {
+  readonly funder: string | null;
+  readonly walletFirstSeenAt: number | null;
+  readonly walletSignatureCount: number;
+  readonly flags: readonly string[];
+}
+
+/**
+ * How many entries in this season trace back to one funding source.
+ *
+ * Counts settled entries and outstanding intents together. Counting only
+ * entries would let somebody open fifty intents in the same second, each seeing
+ * no siblings, and pay them all — the limit would be enforced against nobody.
+ *
+ * Expired intents are excluded: an abandoned request should not hold a slot
+ * against a source forever.
+ */
+export async function entriesFromFunder(
+  db: Client,
+  seasonId: number,
+  funder: string,
+  now: number,
+): Promise<number> {
+  const settled = await db.execute({
+    sql: 'SELECT COUNT(*) AS n FROM entries WHERE season_id = ? AND funder = ?',
+    args: [seasonId, funder],
+  });
+
+  const pending = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM payment_intents
+          WHERE season_id = ? AND funder = ? AND payment_id IS NULL AND expires_at > ?`,
+    args: [seasonId, funder, now],
+  });
+
+  return Number(settled.rows[0]?.['n'] ?? 0) + Number(pending.rows[0]?.['n'] ?? 0);
+}
+
+/** Attach the evidence gathered when this intent was created. */
+export async function recordIntentEvidence(
+  db: Client,
+  reference: string,
+  evidence: EvidenceWrite,
+): Promise<void> {
+  await db.execute({
+    sql: `UPDATE payment_intents
+          SET funder = ?, wallet_first_seen_at = ?, wallet_signature_count = ?, evidence_flags = ?
+          WHERE reference = ?`,
+    args: [
+      evidence.funder,
+      evidence.walletFirstSeenAt,
+      evidence.walletSignatureCount,
+      JSON.stringify(evidence.flags),
+      reference,
+    ],
+  });
+}
+
+export interface EntryEvidence {
+  readonly userPubkey: string;
+  readonly funder: string | null;
+  readonly walletFirstSeenAt: number | null;
+  readonly walletSignatureCount: number | null;
+  readonly flags: readonly string[];
+  readonly enteredAt: number;
+}
+
+/**
+ * The evidence recorded against every entry in a season.
+ *
+ * Read when somebody asks whether a record is worth backing. It is the only
+ * place the nineteen discarded wallets are still visible.
+ */
+export async function seasonEvidence(db: Client, seasonId: number): Promise<EntryEvidence[]> {
+  const result = await db.execute({
+    sql: `SELECT user_pubkey, funder, wallet_first_seen_at, wallet_signature_count,
+                 evidence_flags, entered_at
+          FROM entries WHERE season_id = ?`,
+    args: [seasonId],
+  });
+
+  return result.rows.map((row) => {
+    let flags: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(String(row['evidence_flags'] ?? '[]'));
+      if (Array.isArray(parsed)) flags = parsed as string[];
+    } catch {
+      // Unreadable flags are no flags. The entry still happened.
+    }
+    return {
+      userPubkey: String(row['user_pubkey']),
+      funder: row['funder'] === null ? null : String(row['funder']),
+      walletFirstSeenAt:
+        row['wallet_first_seen_at'] === null ? null : Number(row['wallet_first_seen_at']),
+      walletSignatureCount:
+        row['wallet_signature_count'] === null ? null : Number(row['wallet_signature_count']),
+      flags,
+      enteredAt: Number(row['entered_at']),
+    };
+  });
 }

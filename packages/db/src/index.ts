@@ -104,13 +104,18 @@ export type {
 
 export {
   createPaymentIntent,
+  entriesFromFunder,
   getPaymentIntent,
   hasEntered,
   openPaymentIntents,
   paymentsFor,
+  recordIntentEvidence,
+  seasonEvidence,
   settlePayment,
 } from './payments';
 export type {
+  EntryEvidence,
+  EvidenceWrite,
   PaymentIntentRow,
   PaymentIntentWrite,
   PaymentPurpose,
