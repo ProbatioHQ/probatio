@@ -18,5 +18,8 @@ export type { Reason, RegistryOptions } from './registry';
 export { RequestBudget } from './budget';
 export type { BudgetOptions } from './budget';
 
+export { LaunchFeed } from './launches';
+export type { LogNotification, ObservedLaunch } from './launches';
+
 export { PoolPoller } from './poller';
 export type { PollerOptions, TickResult } from './poller';

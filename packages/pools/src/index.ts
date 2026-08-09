@@ -64,10 +64,13 @@ export { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 export type { Resolution, Venue } from './reader';
 
 export {
+  CREATE_EVENT_DISCRIMINATOR,
+  decodeCreateEvent,
+  extractCreateEvents,
   TRADE_EVENT_DISCRIMINATOR,
   TRADE_EVENT_MIN_BYTES,
   TRADE_EVENT_OFFSETS,
   decodeTradeEvent,
   extractTradeEvents,
 } from './events';
-export type { TradeEvent } from './events';
+export type { CreateEvent, TradeEvent } from './events';

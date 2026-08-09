@@ -107,6 +107,7 @@ describe('migrations', () => {
       '004_candles.sql',
       '005_drift.sql',
       '006_commit_intent.sql',
+      '007_launches.sql',
     ]);
   });
 

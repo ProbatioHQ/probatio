@@ -146,3 +146,141 @@ export function extractTradeEvents(logMessages: readonly string[]): TradeEvent[]
 
   return events;
 }
+
+/**
+ * The pump.fun CreateEvent, emitted once when a token is launched.
+ *
+ * Unlike TradeEvent this is variable-length: the name, symbol and URI are
+ * Borsh strings, so everything after them has to be walked rather than read at
+ * a fixed offset.
+ *
+ *   0    discriminator   8
+ *   8    name            String
+ *        symbol          String
+ *        uri             String
+ *        mint            Pubkey
+ *        bonding_curve   Pubkey
+ *        user            Pubkey
+ *        creator         Pubkey
+ *        timestamp       i64
+ *
+ * Later fields exist and are ignored, since the event has grown over time and
+ * a launch feed needs none of them.
+ */
+export const CREATE_EVENT_DISCRIMINATOR = Uint8Array.from([
+  0x1b, 0x72, 0xa9, 0x4d, 0xde, 0xeb, 0x63, 0x76,
+]);
+
+/** Generous ceilings that still refuse to allocate against a corrupt length. */
+const MAX_NAME_BYTES = 256;
+const MAX_URI_BYTES = 1024;
+
+export interface CreateEvent {
+  readonly name: string;
+  readonly symbol: string;
+  readonly uri: string;
+  readonly mint: string;
+  readonly bondingCurve: string;
+  readonly user: string;
+  readonly creator: string;
+  /** Unix seconds. */
+  readonly timestamp: number;
+}
+
+function readU32LE(data: Uint8Array, offset: number): number {
+  if (offset + 4 > data.length) {
+    throw new LayoutError(`cannot read a string length at offset ${offset}`);
+  }
+  return (
+    (data[offset]! | (data[offset + 1]! << 8) | (data[offset + 2]! << 16)) +
+    data[offset + 3]! * 0x1000000
+  );
+}
+
+function readBorshString(
+  data: Uint8Array,
+  offset: number,
+  maxBytes: number,
+  what: string,
+): { value: string; next: number } {
+  const length = readU32LE(data, offset);
+  if (length > maxBytes) {
+    throw new LayoutError(`${what} claims ${length} bytes — the layout is probably wrong`);
+  }
+  const start = offset + 4;
+  if (start + length > data.length) {
+    throw new LayoutError(`${what} runs past the end of the event`);
+  }
+  return {
+    value: new TextDecoder('utf-8', { fatal: false })
+      .decode(data.subarray(start, start + length))
+      .replace(/\0+$/, '')
+      .trim(),
+    next: start + length,
+  };
+}
+
+export function decodeCreateEvent(data: Uint8Array): CreateEvent {
+  if (!discriminatorMatches(data, CREATE_EVENT_DISCRIMINATOR)) {
+    throw new LayoutError('event discriminator is not CreateEvent');
+  }
+
+  const name = readBorshString(data, 8, MAX_NAME_BYTES, 'name');
+  const symbol = readBorshString(data, name.next, MAX_NAME_BYTES, 'symbol');
+  const uri = readBorshString(data, symbol.next, MAX_URI_BYTES, 'uri');
+
+  let cursor = uri.next;
+  const mint = readPubkey(data, cursor);
+  cursor += 32;
+  const bondingCurve = readPubkey(data, cursor);
+  cursor += 32;
+  const user = readPubkey(data, cursor);
+  cursor += 32;
+  const creator = readPubkey(data, cursor);
+  cursor += 32;
+
+  const timestamp = Number(readU64(data, cursor));
+
+  // A launch is never dated before pump.fun existed, and never far ahead of
+  // now. A wrong offset shows up here rather than as a plausible-looking
+  // token.
+  if (timestamp < 1_600_000_000 || timestamp > 4_000_000_000) {
+    throw new LayoutError(`implausible launch timestamp ${timestamp} — the layout is wrong`);
+  }
+
+  return {
+    name: name.value,
+    symbol: symbol.value,
+    uri: uri.value,
+    mint,
+    bondingCurve,
+    user,
+    creator,
+    timestamp,
+  };
+}
+
+/** Pull every CreateEvent out of a transaction's logs. */
+export function extractCreateEvents(logMessages: readonly string[]): CreateEvent[] {
+  const events: CreateEvent[] = [];
+
+  for (const line of logMessages) {
+    if (!line.startsWith(PROGRAM_DATA_PREFIX)) continue;
+
+    let payload: Uint8Array;
+    try {
+      payload = Uint8Array.from(Buffer.from(line.slice(PROGRAM_DATA_PREFIX.length), 'base64'));
+    } catch {
+      continue;
+    }
+    if (!discriminatorMatches(payload, CREATE_EVENT_DISCRIMINATOR)) continue;
+
+    try {
+      events.push(decodeCreateEvent(payload));
+    } catch {
+      // One malformed event must not cost the feed everything else in the block.
+    }
+  }
+
+  return events;
+}
