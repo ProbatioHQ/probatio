@@ -35,6 +35,16 @@ export interface RpcOptions {
   readonly commitment?: 'processed' | 'confirmed' | 'finalized';
   readonly fetchImpl?: typeof fetch;
   readonly timeoutMs?: number;
+  /**
+   * Minimum gap between requests, in milliseconds.
+   *
+   * Retrying a rate limit is recovery; pacing is avoidance. A backfill or a
+   * replay makes thousands of calls in a burst, and no amount of backoff makes
+   * that pleasant for a shared endpoint — it just converts refusals into
+   * waiting. Spacing the requests out in the first place is what makes a cheap
+   * endpoint usable at all.
+   */
+  readonly minIntervalMs?: number;
   /** Retries for rate limits and transient server errors. */
   readonly maxRetries?: number;
   /** Base delay for backoff, doubled each attempt. */
@@ -114,6 +124,11 @@ function toRpcFilter(filter: ProgramAccountFilter): unknown {
 export class RpcClient {
   readonly #options: RpcOptions;
   #nextId = 1;
+  /**
+   * When the next request may go out. Shared across concurrent callers, so
+   * pacing holds however many workers are running.
+   */
+  #nextSlotAt = 0;
 
   constructor(options: RpcOptions) {
     if (!options.endpoint) {
@@ -144,6 +159,16 @@ export class RpcClient {
     const baseMs = this.#options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
 
     let lastError: RpcError | undefined;
+
+    // Claim a slot in the outgoing queue before doing anything else, so
+    // concurrent workers space out rather than all firing at once.
+    const minInterval = this.#options.minIntervalMs ?? 0;
+    if (minInterval > 0) {
+      const now = Date.now();
+      const readyAt = Math.max(now, this.#nextSlotAt);
+      this.#nextSlotAt = readyAt + minInterval;
+      if (readyAt > now) await sleep(readyAt - now);
+    }
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       if (attempt > 0) {
