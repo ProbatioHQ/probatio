@@ -1,6 +1,18 @@
+import type { Metadata } from 'next';
 import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
 import { currentUser } from '@/lib/session';
+import { shortMint, tokenName } from '@/lib/token-name';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ mint: string }>;
+}): Promise<Metadata> {
+  const { mint } = await params;
+  const token = await tokenName(mint);
+  return { title: token.known ? `${token.symbol ?? token.name} — Probatio` : 'Probatio' };
+}
 
 export default async function TokenPage({
   params,
@@ -8,13 +20,15 @@ export default async function TokenPage({
   params: Promise<{ mint: string }>;
 }) {
   const { mint } = await params;
-  const user = await currentUser();
+  const [user, token] = await Promise.all([currentUser(), tokenName(mint)]);
 
   return (
     <main>
       <h1>
-        {mint.slice(0, 4)}…{mint.slice(-4)}
+        {token.symbol ?? token.name}
+        {token.symbol && token.name !== token.symbol && <span> {token.name}</span>}
       </h1>
+      <p>{shortMint(mint)}</p>
       <p>Market cap, in SOL</p>
       {/* Compact here: someone on a token page has already found one. */}
       <Onboarding compact />

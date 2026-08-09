@@ -18,6 +18,9 @@ export type { Reason, RegistryOptions } from './registry';
 export { RequestBudget } from './budget';
 export type { BudgetOptions } from './budget';
 
+export { LogSubscription, toWebSocketUrl } from './subscription';
+export type { SubscriptionOptions, SubscriptionStatus, WebSocketLike } from './subscription';
+
 export { LaunchFeed } from './launches';
 export type { LogNotification, ObservedLaunch } from './launches';
 
