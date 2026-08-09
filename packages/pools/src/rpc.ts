@@ -53,6 +53,16 @@ interface WithContext<T> {
   value: T;
 }
 
+export type ProgramAccountFilter =
+  | { readonly kind: 'dataSize'; readonly bytes: number }
+  | { readonly kind: 'memcmp'; readonly offset: number; readonly base58: string };
+
+function toRpcFilter(filter: ProgramAccountFilter): unknown {
+  return filter.kind === 'dataSize'
+    ? { dataSize: filter.bytes }
+    : { memcmp: { offset: filter.offset, bytes: filter.base58 } };
+}
+
 export class RpcClient {
   readonly #options: RpcOptions;
   #nextId = 1;
@@ -112,6 +122,40 @@ export class RpcClient {
       { encoding: 'base64', commitment: this.commitment },
     ]);
     return result.value ? toAccountData(result.value, result.context.slot) : null;
+  }
+
+  /**
+   * Find program accounts matching fixed-size filters.
+   *
+   * This is how a pool is located from a mint: a PumpSwap pool's address is
+   * derived from its creator, which is not known in advance, so the mint has to
+   * be matched inside the account data instead.
+   *
+   * Many public endpoints disable this method for large programs because it is
+   * expensive to serve. A provider that supports it is required.
+   */
+  async getProgramAccounts(
+    programId: string,
+    filters: readonly ProgramAccountFilter[],
+  ): Promise<{ address: string; account: AccountData }[]> {
+    const result = await this.call<{ pubkey: string; account: AccountValue }[]>(
+      'getProgramAccounts',
+      [
+        programId,
+        {
+          encoding: 'base64',
+          commitment: this.commitment,
+          filters: filters.map(toRpcFilter),
+        },
+      ],
+    );
+
+    // getProgramAccounts returns no context slot, so the reads are stamped with
+    // 0 and callers that need a slot re-read the specific accounts.
+    return result.map((entry) => ({
+      address: entry.pubkey,
+      account: toAccountData(entry.account, 0),
+    }));
   }
 
   /**

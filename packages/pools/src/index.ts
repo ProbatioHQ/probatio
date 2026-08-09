@@ -40,8 +40,19 @@ export {
 } from './token';
 export type { TokenAccount, TokenAccountState } from './token';
 
+export {
+  POOL_DISCRIMINATOR,
+  POOL_MIN_BYTES,
+  POOL_OFFSETS,
+  PUMPSWAP_APPROXIMATE_FEE_BPS,
+  PUMPSWAP_PROGRAM_ID,
+  WSOL_MINT,
+  decodePumpSwapPool,
+} from './pumpswap';
+export type { PumpSwapPool } from './pumpswap';
+
 export { RpcClient, RpcError } from './rpc';
-export type { AccountData, RpcOptions } from './rpc';
+export type { AccountData, ProgramAccountFilter, RpcOptions } from './rpc';
 
 export { PUMPFUN_APPROXIMATE_FEE_BPS, PoolReader } from './reader';
 export type { Resolution, Venue } from './reader';

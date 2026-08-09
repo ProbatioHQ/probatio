@@ -32,6 +32,8 @@ const RPC_URL = process.env['RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
 
 // Live pump.fun mints. Any of these may graduate over time, which the reader
 // handles as a first-class outcome rather than a failure.
+const GRADUATED_MINT = 'J5reXJehdCV86HPHg2ewbeGYfMkxQT2YmLcg4DVfpump';
+
 const MINTS = [
   '5CKuyx8kqzwHVZKoRMstBih9wteTv4XoSBq48j7Zpump',
   '3SPyj7fHQ6TKGR5Agua1gPdCnb2oWHF8Zi8bY33bpump',
@@ -87,23 +89,47 @@ describe.skipIf(!ENABLED)('decoders against mainnet', () => {
   });
 
   it.each(MINTS)('resolves %s through the reader', async (mint) => {
-    const resolution = await reader.readPumpFun(mint);
+    const resolution = await reader.resolve(mint);
     expect(resolution.slot).toBeGreaterThan(0);
 
-    if (resolution.venue.kind === 'graduated') {
-      // A graduated curve must never hand back a pool. Quoting its final
-      // reserves would price a market that has stopped trading.
+    if (resolution.venue.kind === 'unlisted') {
+      // Graduated with no successor pool found. Nothing is quotable, and the
+      // reader says so rather than pricing a dead curve.
       expect(resolution.pool).toBeNull();
       return;
     }
 
-    expect(resolution.pool).not.toBeNull();
-    expect(resolution.pool!.tokenDecimals).toBe(6);
-    expect(resolution.pool!.source).toBe('pumpfun-curve');
-    expect(resolution.pool!.solReserve).toBeGreaterThan(0n);
+    const pool = resolution.pool!;
+    expect(pool).not.toBeNull();
+    expect(pool.tokenDecimals).toBe(6);
+    expect(pool.solReserve).toBeGreaterThan(0n);
+    expect(pool.tokenReserve).toBeGreaterThan(0n);
 
-    // The cap that separates a curve from an AMM.
-    expect(resolution.pool!.deliverableTokens).toBeLessThanOrEqual(resolution.pool!.tokenReserve);
+    if (resolution.venue.kind === 'pumpfun-curve') {
+      expect(pool.source).toBe('pumpfun-curve');
+      // A curve can deliver less than it prices against.
+      expect(pool.deliverableTokens).toBeLessThanOrEqual(pool.tokenReserve);
+    } else {
+      // Graduated tokens must follow through to the live AMM rather than
+      // returning the drained curve.
+      expect(resolution.venue.graduated).toBe(true);
+      expect(pool.source).toBe('pumpswap');
+      // An AMM holds its reserves outright, so everything is deliverable.
+      expect(pool.deliverableTokens).toBe(pool.tokenReserve);
+    }
+  });
+
+  it('follows a known graduated token through to its PumpSwap pool', async () => {
+    const resolution = await reader.resolve(GRADUATED_MINT);
+    expect(resolution.venue.kind).toBe('pumpswap');
+    expect(resolution.pool!.source).toBe('pumpswap');
+    expect(resolution.pool!.solReserve).toBeGreaterThan(0n);
+  });
+
+  it('finds the PumpSwap pool for a graduated mint', async () => {
+    const pools = await reader.findPumpSwapPools(GRADUATED_MINT);
+    expect(pools.length).toBeGreaterThan(0);
+    expect(pools[0]!.pool.baseMint).toBe(GRADUATED_MINT);
   });
 
   it('reports a slot', async () => {
