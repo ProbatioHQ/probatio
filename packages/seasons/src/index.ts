@@ -45,3 +45,13 @@ export {
   tradingOpen,
 } from './lifecycle';
 export type { Schedule, SeasonStatus, SeasonTiming } from './lifecycle';
+
+export {
+  DEFAULT_VOID_POLICY,
+  VoidError,
+  assessVoid,
+  explainCondition,
+  refunds,
+  voidableNow,
+} from './void';
+export type { Refund, VoidCondition, VoidMeasurements, VoidPolicy, VoidVerdict } from './void';

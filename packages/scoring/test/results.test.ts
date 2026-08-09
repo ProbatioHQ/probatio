@@ -3,6 +3,7 @@ import { buildProof, buildTree, computeRoot, equalHashes, toHex } from '@probati
 import { distribute, rulesetFor } from '@probatio/seasons';
 import {
   RESULT_LEAF_BYTES,
+  VOID_SEASON_ROOT,
   ResultError,
   encodeResultLeaf,
   hashResultLeaf,
@@ -153,5 +154,17 @@ describe('the committed root', () => {
 
   it('tells an empty season from one with entrants', () => {
     expect(resultsRootHex(leaves)).not.toBe(resultsRootHex([]));
+  });
+
+  it('keeps the three endings distinct', () => {
+    // Nobody entered, everybody refunded, and not yet finalized are three
+    // different things and must not encode alike.
+    const roots = new Set([
+      toHex(VOID_SEASON_ROOT),
+      resultsRootHex([]),
+      resultsRootHex(leaves),
+      '0'.repeat(64),
+    ]);
+    expect(roots.size).toBe(4);
   });
 });

@@ -154,6 +154,20 @@ export function resultLeaves(
  */
 export const EMPTY_SEASON_ROOT = sha256(new TextEncoder().encode('probatio:empty-season:v1'));
 
+/**
+ * The root of a season that did not count.
+ *
+ * A void season still finalizes. It has to: an unfinalized season is one that
+ * could still be voided, and leaving a ruined season in that state forever
+ * means the question is never closed. Finalizing with this root closes it and
+ * says what happened, which is that the season was unwound and entries were
+ * returned.
+ *
+ * Distinct from both the empty root and from zero. Nobody entering is not the
+ * same as everybody being refunded, and neither is the same as unfinalized.
+ */
+export const VOID_SEASON_ROOT = sha256(new TextEncoder().encode('probatio:void-season:v1'));
+
 /** The 32 bytes `finalize_season` records. */
 export function resultsRoot(leaves: readonly ResultLeaf[]): Uint8Array {
   if (leaves.length === 0) return EMPTY_SEASON_ROOT;

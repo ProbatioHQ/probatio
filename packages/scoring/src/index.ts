@@ -20,5 +20,6 @@ export {
   resultLeaves,
   resultsRoot,
   resultsRootHex,
+  VOID_SEASON_ROOT,
 } from './results';
 export type { ResultLeaf } from './results';

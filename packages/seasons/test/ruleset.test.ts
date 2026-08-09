@@ -66,6 +66,21 @@ describe('what changes the hash', () => {
     ).not.toBe(base);
   });
 
+  it('changes when a void threshold moves', () => {
+    // The moment a void threshold matters is the moment somebody would want to
+    // edit it. In the hash, it cannot be edited without that being visible.
+    expect(
+      rulesetHashHex(
+        rules({ voidPolicy: { ...rulesetFor(1).voidPolicy, maxFeedOutageMinutes: 121 } }),
+      ),
+    ).not.toBe(base);
+    expect(
+      rulesetHashHex(
+        rules({ voidPolicy: { ...rulesetFor(1).voidPolicy, maxUncommittedTrades: 1 } }),
+      ),
+    ).not.toBe(base);
+  });
+
   it('changes when a band threshold moves', () => {
     const moved = rules().bands.map((band, index) =>
       index === 1 ? { ...band, minPotLamports: band.minPotLamports + 1n } : band,
@@ -134,6 +149,14 @@ describe('rules that make no sense', () => {
     ).toThrow(/zero/);
   });
 
+  it('refuses a negative void threshold', () => {
+    expect(() =>
+      validateRuleset(
+        rules({ voidPolicy: { ...rulesetFor(1).voidPolicy, maxChainHaltMinutes: -1 } }),
+      ),
+    ).toThrow(RulesetError);
+  });
+
   it('refuses a house cut over a hundred percent', () => {
     expect(() => validateRuleset(rules({ houseBps: 10_001 }))).toThrow(RulesetError);
   });
@@ -157,6 +180,13 @@ describe('the locked spec', () => {
   it('starts everybody with ten SOL and charges 0.05', () => {
     expect(rulesetFor(1).startingBalance).toBe(10_000_000_000n);
     expect(rulesetFor(1).entryCost).toBe(50_000_000n);
+  });
+
+  it('will not tolerate one unverifiable trade', () => {
+    // Zero, deliberately. A trade nobody can rebuild means the engine and the
+    // record disagree, and there is no way to tell which is wrong.
+    expect(rulesetFor(1).voidPolicy.maxUncommittedTrades).toBe(0);
+    expect(rulesetFor(1).voidPolicy.maxIrreproducibleTrades).toBe(0);
   });
 
   it('scores on return alone', () => {

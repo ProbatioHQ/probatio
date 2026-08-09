@@ -14,6 +14,7 @@ import {
   timeUntilEntryCloses,
 } from '@probatio/seasons';
 import { DEFAULT_RULES } from '@probatio/sybil';
+import { explainCondition } from '@probatio/seasons';
 import { db } from '@/lib/db';
 import { currentUser } from '@/lib/session';
 
@@ -108,6 +109,23 @@ export async function GET(): Promise<Response> {
           'One entry per wallet. Entries funded from the same source are limited, ' +
           'and every entry records what the chain said about its wallet at the time.',
       },
+      // Published with the season, and hashed into its ruleset. A season can
+      // only be voided before its results are on chain.
+      voidPolicy: {
+        ...rules.voidPolicy,
+        conditions: (
+          [
+            'feed_outage',
+            'chain_halt',
+            'uncommitted_trades',
+            'irreproducible_trades',
+            'engine_changed',
+          ] as const
+        ).map((condition) => ({ condition, why: explainCondition(condition) })),
+        refund: 'Every entrant is refunded exactly what they paid. No house cut.',
+        finalIsFinal: 'Once results are on chain the season cannot be voided.',
+      },
+
       rulesetHash: season.rulesetHash,
       // What today's code produces for this ordinal. Equal to the above unless
       // the rules have been edited since, in which case saying so is the point.

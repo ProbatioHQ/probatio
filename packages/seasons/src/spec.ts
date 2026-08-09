@@ -1,4 +1,5 @@
 import type { Ruleset } from './ruleset';
+import { DEFAULT_VOID_POLICY } from './void';
 
 /**
  * The locked ruleset.
@@ -70,6 +71,7 @@ export function rulesetFor(ordinal: number): Ruleset {
     engineVersion: ENGINE_VERSION,
     scoring: 'highest_return',
     tiebreak: 'entered_then_pubkey',
+    voidPolicy: DEFAULT_VOID_POLICY,
     bands: PAYOUT_BANDS.map((band) => ({
       minPotLamports: band.minPotLamports,
       sharesBps: [...band.sharesBps],

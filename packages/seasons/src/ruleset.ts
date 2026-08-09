@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha2.js';
+import type { VoidPolicy } from './void';
 
 /**
  * A season's rules, pinned.
@@ -56,6 +57,15 @@ export interface Ruleset {
   /** Identifies the scoring rule in words the published page also uses. */
   readonly scoring: ScoringRule;
   readonly tiebreak: Tiebreak;
+  /**
+   * When the season does not count.
+   *
+   * In the hash because these thresholds decide whether a pot is paid at all.
+   * A void policy that could be edited once a season is running is not a
+   * policy, it is an intention — and the moment it matters is exactly the
+   * moment somebody would want to edit it.
+   */
+  readonly voidPolicy: VoidPolicy;
   readonly bands: readonly PayoutBand[];
 }
 
@@ -103,6 +113,17 @@ export function validateRuleset(ruleset: Ruleset): void {
   if (ruleset.houseBps < 0 || ruleset.houseBps > 10_000) {
     throw new RulesetError(`house cut out of range: ${ruleset.houseBps}`);
   }
+  for (const [name, value] of [
+    ['maxFeedOutageMinutes', ruleset.voidPolicy.maxFeedOutageMinutes],
+    ['maxChainHaltMinutes', ruleset.voidPolicy.maxChainHaltMinutes],
+    ['maxUncommittedTrades', ruleset.voidPolicy.maxUncommittedTrades],
+    ['maxIrreproducibleTrades', ruleset.voidPolicy.maxIrreproducibleTrades],
+  ] as const) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new RulesetError(`${name} must be a whole number of at least zero`);
+    }
+  }
+
   if (ruleset.bands.length === 0) throw new RulesetError('a season needs at least one payout band');
   if (ruleset.bands.length > MAX_BANDS) throw new RulesetError(`at most ${MAX_BANDS} bands`);
 
@@ -156,6 +177,10 @@ export const RULESET_BYTES =
   4 + // engineVersion
   1 + // scoring
   1 + // tiebreak
+  4 + // maxFeedOutageMinutes
+  4 + // maxChainHaltMinutes
+  4 + // maxUncommittedTrades
+  4 + // maxIrreproducibleTrades
   1 + // band count
   MAX_BANDS * (AMOUNT_BYTES + 1 + MAX_SHARES * 2);
 
@@ -192,6 +217,15 @@ export function encodeRuleset(ruleset: Ruleset): Uint8Array {
   offset += 1;
   view.setUint8(offset, TIEBREAK_CODES[ruleset.tiebreak]);
   offset += 1;
+
+  view.setUint32(offset, ruleset.voidPolicy.maxFeedOutageMinutes);
+  offset += 4;
+  view.setUint32(offset, ruleset.voidPolicy.maxChainHaltMinutes);
+  offset += 4;
+  view.setUint32(offset, ruleset.voidPolicy.maxUncommittedTrades);
+  offset += 4;
+  view.setUint32(offset, ruleset.voidPolicy.maxIrreproducibleTrades);
+  offset += 4;
 
   view.setUint8(offset, ruleset.bands.length);
   offset += 1;
