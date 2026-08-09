@@ -26,3 +26,12 @@ export type { MerkleTree, ProofStep } from './merkle';
 
 export { EMPTY_ACCUMULATOR, extendChain, replayChain } from './chain';
 export type { Batch } from './chain';
+
+export { explainVerification, verifyTrade } from './verify';
+export type {
+  CommittedBatch,
+  VerificationInput,
+  VerificationResult,
+  VerificationStatus,
+  VerificationStep,
+} from './verify';
