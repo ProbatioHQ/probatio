@@ -415,3 +415,12 @@ export async function allTrades(db: Client, accountId: number): Promise<TradeRow
   });
   return result.rows.map((row) => toTradeRow(row as unknown as Record<string, unknown>));
 }
+
+/** Whether a season is ranked. Decides which coaching allowance applies. */
+export async function isRankedSeason(db: Client, seasonId: number): Promise<boolean> {
+  const result = await db.execute({
+    sql: 'SELECT ranked FROM seasons WHERE id = ?',
+    args: [seasonId],
+  });
+  return Number(result.rows[0]?.['ranked'] ?? 0) === 1;
+}

@@ -20,7 +20,8 @@
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "@probatio/analytics": "*"
+    "@probatio/analytics": "*",
+    "@probatio/coach": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

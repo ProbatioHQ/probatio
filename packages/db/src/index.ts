@@ -87,10 +87,19 @@ export {
 } from './launches';
 export type { Launch } from './launches';
 
+export { coachReportHistory, latestCoachReport, recordCoachReport } from './coach';
+export type {
+  CoachReportWrite,
+  ReportKind,
+  StoredCoachReport,
+  StoredObservation,
+} from './coach';
+
 export {
   allTrades,
   ensureAccount,
   ensureFreePlaySeason,
+  isRankedSeason,
   openPosition,
   openPositions,
   recordTrade,

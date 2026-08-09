@@ -49,3 +49,19 @@ export function appUri(): string {
 export function rpcEndpoint(): string {
   return process.env['RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
 }
+
+/**
+ * The key the coach calls with.
+ *
+ * Optional, unlike the rest. The simulator, the chart and the on-chain record
+ * all work without it — the coach is the one feature that degrades to "not
+ * configured" rather than taking the server down at boot.
+ */
+export function coachApiKey(): string | null {
+  return process.env['ANTHROPIC_API_KEY'] ?? null;
+}
+
+/** Overrides the coach's model. Unset uses the package default. */
+export function coachModel(): string | null {
+  return process.env['COACH_MODEL'] ?? null;
+}
