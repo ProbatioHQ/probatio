@@ -1,5 +1,6 @@
 import { recentLaunches, searchLaunches } from '@probatio/db';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 
 /**
  * The launch feed, and search over it.
@@ -12,6 +13,9 @@ import { db } from '@/lib/db';
 const MAX_LIMIT = 100;
 
 export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const url = new URL(request.url);
   const query = url.searchParams.get('q')?.trim() ?? '';
 

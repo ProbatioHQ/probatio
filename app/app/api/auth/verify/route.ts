@@ -1,6 +1,7 @@
 import { AuthError, verifySignIn } from '@probatio/auth';
 import { consumeChallenge, upsertUser } from '@probatio/db';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { startSession } from '@/lib/session';
 
 /**
@@ -12,6 +13,9 @@ import { startSession } from '@/lib/session';
  * for one that lands.
  */
 export async function POST(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'auth');
+  if (throttled.response) return throttled.response;
+
   let body: unknown;
   try {
     body = await request.json();

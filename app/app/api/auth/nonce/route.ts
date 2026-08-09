@@ -6,6 +6,7 @@ import {
 } from '@probatio/auth';
 import { pruneExpiredChallenges, storeChallenge } from '@probatio/db';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { appDomain, appUri } from '@/lib/env';
 
 /**
@@ -16,6 +17,9 @@ import { appDomain, appUri } from '@/lib/env';
  * rebuilds the message from the stored challenge.
  */
 export async function POST(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'auth');
+  if (throttled.response) return throttled.response;
+
   let body: unknown;
   try {
     body = await request.json();

@@ -16,6 +16,7 @@ import {
 import { DEFAULT_RULES } from '@probatio/sybil';
 import { explainCondition } from '@probatio/seasons';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
 
 /**
@@ -30,7 +31,10 @@ import { currentUser } from '@/lib/session';
  * checked is a promise.
  */
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const client = await db();
   const now = Date.now();
 

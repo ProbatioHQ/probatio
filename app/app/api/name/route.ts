@@ -1,6 +1,7 @@
 import { activeName, claimName, clearName, nameRecord } from '@probatio/db';
 import { DEFAULT_NAME_RULES, checkName } from '@probatio/profile';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
 
 /**
@@ -11,7 +12,10 @@ import { currentUser } from '@/lib/session';
  * without a single record moving.
  */
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'write');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) return Response.json({ error: 'sign in to manage your name' }, { status: 401 });
 
@@ -26,6 +30,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'write');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) return Response.json({ error: 'sign in to set a name' }, { status: 401 });
 
@@ -57,7 +64,10 @@ export async function POST(request: Request): Promise<Response> {
   return Response.json({ name: checked.name, outcome });
 }
 
-export async function DELETE(): Promise<Response> {
+export async function DELETE(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'write');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) return Response.json({ error: 'sign in to remove your name' }, { status: 401 });
 

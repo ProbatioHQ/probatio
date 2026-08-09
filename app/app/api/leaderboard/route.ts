@@ -1,6 +1,7 @@
 import { currentRankedSeason, ensureFreePlaySeason, seasonTotals } from '@probatio/db';
 import { distribute, rulesetFor, statusAt } from '@probatio/seasons';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { seasonBoard } from '@/lib/leaderboard';
 import { currentUser } from '@/lib/session';
 
@@ -19,6 +20,9 @@ import { currentUser } from '@/lib/session';
 const PAGE = 50;
 
 export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const client = await db();
   const now = Date.now();
   const url = new URL(request.url);

@@ -9,6 +9,7 @@ import {
 import { computeMetrics, reconstruct } from '@probatio/analytics';
 import { shortAddress } from '@probatio/profile';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { toLoggedTrade } from '@/lib/analytics';
 
 /**
@@ -24,6 +25,9 @@ import { toLoggedTrade } from '@/lib/analytics';
  */
 
 export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const url = new URL(request.url);
   const trader = url.searchParams.get('trader');
 

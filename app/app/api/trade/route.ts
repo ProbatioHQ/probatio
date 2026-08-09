@@ -7,6 +7,7 @@ import {
   recordTrade,
 } from '@probatio/db';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 import { rpcEndpoint } from '@/lib/env';
@@ -32,6 +33,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'trade');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) {
     return Response.json({ error: 'sign in to trade' }, { status: 401 });

@@ -14,6 +14,7 @@ import {
 } from '@probatio/db';
 import { buildReport } from '@/lib/analytics';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { activeSeason } from '@/lib/season';
 import { coachApiKey, coachModel } from '@/lib/env';
 import { currentUser } from '@/lib/session';
@@ -79,7 +80,10 @@ function serialize(report: {
   };
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'paid');
+  if (throttled.response) return throttled.response;
+
   const ctx = await context();
   if (!ctx) return Response.json({ error: 'sign in to see your coach report' }, { status: 401 });
 
@@ -109,7 +113,10 @@ export async function GET(): Promise<Response> {
   });
 }
 
-export async function POST(): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'paid');
+  if (throttled.response) return throttled.response;
+
   const ctx = await context();
   if (!ctx) return Response.json({ error: 'sign in to get a coach report' }, { status: 401 });
 

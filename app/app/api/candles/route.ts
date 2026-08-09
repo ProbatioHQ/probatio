@@ -2,6 +2,7 @@ import { readCandles } from '@probatio/db';
 import { TIMEFRAMES, type Timeframe } from '@probatio/candles';
 import { PUMPFUN_TOKEN_DECIMALS, PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 
 /**
  * Candles for a chart.
@@ -17,6 +18,9 @@ const MAX_CANDLES = 1_000;
 const MINT_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const url = new URL(request.url);
   const mint = url.searchParams.get('mint');
   const timeframe = (url.searchParams.get('timeframe') ?? 'm1') as Timeframe;

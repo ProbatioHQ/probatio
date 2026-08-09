@@ -1,5 +1,6 @@
 import { tradeHistory } from '@probatio/db';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 
@@ -15,6 +16,9 @@ const MAX_LIMIT = 500;
 const MINT_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) {
     return Response.json({ error: 'sign in to see your trades' }, { status: 401 });

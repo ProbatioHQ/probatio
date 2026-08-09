@@ -28,7 +28,8 @@
     "@probatio/scoring": "*",
     "@probatio/sybil": "*",
     "@probatio/profile": "*",
-    "@probatio/keeper": "*"
+    "@probatio/keeper": "*",
+    "@probatio/limits": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

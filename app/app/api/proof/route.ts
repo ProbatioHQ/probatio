@@ -1,6 +1,7 @@
 import { commitHistory, ensureFreePlaySeason, seasonByOrdinal } from '@probatio/db';
 import { leavesFor, loadTrades } from '@probatio/keeper';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 
 /**
  * Everything a stranger needs to check a trader's record without us.
@@ -15,6 +16,9 @@ import { db } from '@/lib/db';
  */
 
 export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'chainRead');
+  if (throttled.response) return throttled.response;
+
   const url = new URL(request.url);
   const trader = url.searchParams.get('trader');
   const ordinal = url.searchParams.get('season');

@@ -6,6 +6,7 @@ import {
   totalRealizedPnl,
 } from '@probatio/db';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 import { rpcEndpoint } from '@/lib/env';
@@ -23,7 +24,10 @@ import { rpcEndpoint } from '@/lib/env';
  * failed would show a trader a wipeout that never happened.
  */
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'chainRead');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) {
     return Response.json({ error: 'sign in to see your positions' }, { status: 401 });

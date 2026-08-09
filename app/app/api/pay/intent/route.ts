@@ -13,6 +13,7 @@ import {
 } from '@probatio/db';
 import { DEFAULT_RULES, assess, explainRefusal, gatherEvidence } from '@probatio/sybil';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { rpcEndpoint, treasuryAddress } from '@/lib/env';
 import { currentUser } from '@/lib/session';
 
@@ -29,7 +30,10 @@ import { currentUser } from '@/lib/session';
  * a ruleset.
  */
 
-export async function POST(): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'money');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) return Response.json({ error: 'sign in to enter' }, { status: 401 });
 

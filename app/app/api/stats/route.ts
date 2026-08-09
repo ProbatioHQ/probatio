@@ -1,6 +1,7 @@
 
 import { buildReport } from '@/lib/analytics';
 import { db } from '@/lib/db';
+import { rateLimit } from '@/lib/rate-limit';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 
@@ -16,7 +17,10 @@ import { currentUser } from '@/lib/session';
  * project follows.
  */
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const throttled = await rateLimit(request, 'read');
+  if (throttled.response) return throttled.response;
+
   const user = await currentUser();
   if (!user) {
     return Response.json({ error: 'sign in to see your stats' }, { status: 401 });
