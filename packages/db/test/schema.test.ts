@@ -114,6 +114,7 @@ describe('migrations', () => {
       '011_wallet_evidence.sql',
       '012_display_names.sql',
       '013_availability.sql',
+      '014_activity.sql',
     ]);
   });
 

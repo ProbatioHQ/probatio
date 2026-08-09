@@ -30,7 +30,8 @@
     "@probatio/profile": "*",
     "@probatio/keeper": "*",
     "@probatio/limits": "*",
-    "@probatio/health": "*"
+    "@probatio/health": "*",
+    "@probatio/retention": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

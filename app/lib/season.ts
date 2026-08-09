@@ -8,6 +8,7 @@ import {
 } from '@probatio/db';
 import { tradingOpen } from '@probatio/seasons';
 import type { Client } from '@libsql/client';
+import { noteActivity } from './activity';
 
 /**
  * Which season a trader's actions count toward.
@@ -35,6 +36,11 @@ export async function activeSeason(
   pubkey: string,
   now: number,
 ): Promise<ActiveSeason> {
+  // Every authenticated action resolves a season, which makes this the one
+  // place a wallet's presence is reliably known. Best-effort and awaited
+  // deliberately: it is a single upsert at most once a day per wallet.
+  await noteActivity(client, pubkey, false, now);
+
   const ranked = await currentRankedSeason(client, now);
 
   if (ranked && ranked.startsAt !== null && ranked.endsAt !== null) {

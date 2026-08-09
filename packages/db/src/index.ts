@@ -134,6 +134,9 @@ export {
 } from './names';
 export type { ClaimOutcome, DisplayName } from './names';
 
+export { activeOn, allActivity, recordActivity } from './activity';
+export type { ActivityRow } from './activity';
+
 export { closeOutage, openOutage, openOutages, outagesBetween } from './outages';
 export type { OutageRow } from './outages';
 

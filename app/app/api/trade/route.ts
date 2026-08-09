@@ -8,6 +8,7 @@ import {
 } from '@probatio/db';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
+import { noteActivity } from '@/lib/activity';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 import { rpcEndpoint } from '@/lib/env';
@@ -260,6 +261,10 @@ export async function POST(request: Request): Promise<Response> {
     leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
     now,
   });
+
+  // Recorded after the fill landed, so activation means a trade that happened
+  // rather than one that was attempted.
+  await noteActivity(client, user.pubkey, true, now);
 
   return Response.json({
     status: 'filled',
