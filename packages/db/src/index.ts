@@ -80,3 +80,18 @@ export {
   searchLaunches,
 } from './launches';
 export type { Launch } from './launches';
+
+export {
+  ensureAccount,
+  ensureFreePlaySeason,
+  openPosition,
+  openPositions,
+  recordTrade,
+} from './trading';
+export type {
+  AccountRow,
+  PoolSnapshotWrite,
+  PositionRow,
+  PositionWrite,
+  TradeWrite,
+} from './trading';

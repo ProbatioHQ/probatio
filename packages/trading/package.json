@@ -1,0 +1,11 @@
+{
+  "name": "@probatio/trading",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Applying fills to balances and positions. Pure integer arithmetic.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@probatio/sim": "*" }
+}

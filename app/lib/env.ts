@@ -39,3 +39,13 @@ export function appDomain(): string {
 export function appUri(): string {
   return required('APP_URI');
 }
+
+/**
+ * The Solana endpoint every chain read goes through.
+ *
+ * Falls back to the public cluster so a fresh checkout runs, but that endpoint
+ * rate-limits hard and is not suitable for anything beyond trying the app out.
+ */
+export function rpcEndpoint(): string {
+  return process.env['RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+}
