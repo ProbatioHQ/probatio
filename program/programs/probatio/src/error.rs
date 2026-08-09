@@ -37,4 +37,27 @@ pub enum ProbatioError {
 
     #[msg("this trader did not enter this season")]
     NotEntered,
+
+    #[msg("the season has not been finalized")]
+    SeasonNotFinalized,
+    #[msg("this entry belongs to a different season")]
+    EntrySeasonMismatch,
+    #[msg("this entry belongs to a different trader")]
+    EntryTraderMismatch,
+    #[msg("this prize has already been claimed")]
+    AlreadyClaimed,
+    #[msg("the claim is not well formed")]
+    InvalidClaim,
+    #[msg("this result was not awarded a prize")]
+    NothingToClaim,
+    #[msg("the proof is longer than any real tree")]
+    ProofTooLong,
+    #[msg("the proof does not lead to the published results root")]
+    ProofDoesNotMatchResults,
+    #[msg("the vault does not hold enough to pay this claim")]
+    VaultUnderfunded,
+    #[msg("the season has not ended yet")]
+    SeasonNotOver,
+    #[msg("the entry window has not closed yet")]
+    EntryWindowStillOpen,
 }

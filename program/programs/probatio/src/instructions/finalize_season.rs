@@ -36,8 +36,16 @@ pub fn handle_finalize_season(ctx: Context<FinalizeSeason>, results_root: [u8; 3
         ProbatioError::InvalidStatusTransition
     );
 
+    // The season has to be over. Without this the authority could finalize the
+    // moment the standings suited them — and since a finalized season can never
+    // be voided or added to, that would be the end of the argument. Found by
+    // review: the published policy leaned on finalization being the terminal
+    // act, and nothing on chain required it to be the last one.
+    let now = Clock::get()?.unix_timestamp;
+    require!(now >= season.ends_at, ProbatioError::SeasonNotOver);
+
     season.results_root = results_root;
-    season.finalized_at = Clock::get()?.unix_timestamp;
+    season.finalized_at = now;
     season.status = SeasonStatus::Finalized;
 
     Ok(())

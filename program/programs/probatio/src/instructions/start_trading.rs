@@ -25,6 +25,14 @@ pub fn handle_start_trading(ctx: Context<StartTrading>) -> Result<()> {
         ProbatioError::InvalidStatusTransition
     );
 
+    // Not before the window the season published. Otherwise the authority
+    // could take entries and then shut the door early, which is a different
+    // season from the one people paid to join.
+    require!(
+        Clock::get()?.unix_timestamp >= season.entry_closes_at,
+        ProbatioError::EntryWindowStillOpen
+    );
+
     season.status = SeasonStatus::Running;
     Ok(())
 }

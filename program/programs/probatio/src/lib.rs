@@ -59,4 +59,18 @@ pub mod probatio {
     pub fn finalize_season(ctx: Context<FinalizeSeason>, results_root: [u8; 32]) -> Result<()> {
         instructions::finalize_season::handle_finalize_season(ctx, results_root)
     }
+
+    /// Take a prize out of the vault, against the published results.
+    pub fn claim_prize(
+        ctx: Context<ClaimPrize>,
+        claim: ResultClaim,
+        proof: Vec<ProofStep>,
+    ) -> Result<()> {
+        instructions::claim_prize::handle_claim_prize(ctx, claim, proof)
+    }
+
+    /// Replace the keeper key.
+    pub fn set_keeper(ctx: Context<SetKeeper>, keeper: Pubkey) -> Result<()> {
+        instructions::set_keeper::handle_set_keeper(ctx, keeper)
+    }
 }

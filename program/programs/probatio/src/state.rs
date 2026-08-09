@@ -76,6 +76,10 @@ pub struct Entry {
     pub trader: Pubkey,
     pub paid: u64,
     pub entered_at: i64,
+    /// Set when a prize has been taken. The entry is the record that it was
+    /// paid, so a second proof for the same trader finds it already claimed.
+    pub claimed: bool,
+    pub claimed_at: i64,
     pub bump: u8,
 }
 

@@ -107,6 +107,7 @@ fn moves_forward_through_its_lifecycle() {
     harness.open_entries(&season).unwrap();
     assert_eq!(harness.season(&season).status, SeasonStatus::EntryOpen);
 
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
     assert_eq!(harness.season(&season).status, SeasonStatus::Running);
 }
@@ -118,6 +119,7 @@ fn cannot_reopen_entries_once_trading_has_begun() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
     // The cohort is fixed once trading starts. A late entrant competes over a
@@ -217,6 +219,7 @@ fn refuses_entries_once_trading_has_started() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
     let trader = harness.fund(10_000_000_000);
@@ -462,6 +465,7 @@ fn commits_while_trading_is_running() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
     let trader = harness.fund(10_000_000_000);
@@ -482,8 +486,10 @@ fn publishes_results_and_closes_the_season() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
+    harness.after_season_end();
     harness.finalize(&season, [42u8; 32], None).unwrap();
 
     let state = harness.season(&season);
@@ -499,8 +505,10 @@ fn refuses_an_empty_results_root() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
+    harness.after_season_end();
     assert!(harness.finalize(&season, [0u8; 32], None).is_err());
 }
 
@@ -511,11 +519,14 @@ fn cannot_finalize_twice() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
+    harness.after_season_end();
     harness.finalize(&season, [42u8; 32], None).unwrap();
 
     // Republishing would let a result be rewritten after people had acted on
     // it.
+    harness.after_season_end();
     assert!(harness.finalize(&season, [43u8; 32], None).is_err());
     assert_eq!(harness.season(&season).results_root, [42u8; 32]);
 }
@@ -527,11 +538,13 @@ fn only_the_authority_may_finalize() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
     let keeper = harness.keeper.insecure_clone();
     // Not even the keeper. It signs constantly and is the likeliest key to be
     // compromised, so publishing results is kept out of its reach.
+    harness.after_season_end();
     assert!(harness.finalize(&season, [42u8; 32], Some(&keeper)).is_err());
 }
 
@@ -542,6 +555,7 @@ fn nothing_can_be_committed_after_finalization() {
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
     harness.open_entries(&season).unwrap();
+    harness.after_entry_window();
     harness.start_trading(&season).unwrap();
 
     let trader = harness.fund(10_000_000_000);
@@ -550,6 +564,7 @@ fn nothing_can_be_committed_after_finalization() {
         .unwrap();
     let frozen = harness.record(&harness.record_pda(&season, &trader.pubkey())).accumulator;
 
+    harness.after_season_end();
     harness.finalize(&season, [42u8; 32], None).unwrap();
 
     // The records the results were computed from have to be frozen as they
@@ -570,5 +585,6 @@ fn cannot_finalize_a_season_that_never_opened() {
     let season = harness
         .init_season(default_params(1, harness.keeper.pubkey()))
         .unwrap();
+    harness.after_season_end();
     assert!(harness.finalize(&season, [42u8; 32], None).is_err());
 }

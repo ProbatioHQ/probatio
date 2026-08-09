@@ -85,6 +85,19 @@ impl Harness {
         self.svm.set_sysvar(&clock);
     }
 
+    /// Move to a point where the entry window has closed.
+    ///
+    /// The program now refuses to start trading early, so a test that wants a
+    /// running season has to reach the moment the season said it would begin.
+    pub fn after_entry_window(&mut self) {
+        self.set_time(1_000 + 48 * 60 * 60);
+    }
+
+    /// Move past the end of the season, where finalizing becomes legal.
+    pub fn after_season_end(&mut self) {
+        self.set_time(1_000 + 7 * 24 * 60 * 60 + 1);
+    }
+
     pub fn fund(&mut self, lamports: u64) -> Keypair {
         let account = Keypair::new();
         self.svm.airdrop(&account.pubkey(), lamports).unwrap();
@@ -229,6 +242,61 @@ impl Harness {
             .to_account_metas(None),
         );
         self.send(instruction, &[signer], &signer.pubkey())
+    }
+
+    pub fn set_keeper(
+        &mut self,
+        season: &Pubkey,
+        keeper: Pubkey,
+        signer: Option<&Keypair>,
+    ) -> Result<(), FailedTransactionMetadata> {
+        let authority = self.authority.insecure_clone();
+        let signer = signer.unwrap_or(&authority);
+
+        let instruction = Instruction::new_with_bytes(
+            self.program_id,
+            &probatio::instruction::SetKeeper { keeper }.data(),
+            probatio::accounts::SetKeeper {
+                authority: signer.pubkey(),
+                season: *season,
+            }
+            .to_account_metas(None),
+        );
+        let signer = signer.insecure_clone();
+        self.send(instruction, &[&signer], &signer.pubkey())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn claim_prize(
+        &mut self,
+        season: &Pubkey,
+        trader: &Pubkey,
+        claim: probatio::ResultClaim,
+        proof: Vec<probatio::ProofStep>,
+    ) -> Result<(), FailedTransactionMetadata> {
+        let entry = self.entry_pda(season, trader);
+        let vault = self.vault_pda(season);
+
+        let instruction = Instruction::new_with_bytes(
+            self.program_id,
+            &probatio::instruction::ClaimPrize { claim, proof }.data(),
+            probatio::accounts::ClaimPrize {
+                payer: self.authority.pubkey(),
+                season: *season,
+                entry,
+                trader: *trader,
+                vault,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        );
+
+        let authority = self.authority.insecure_clone();
+        self.send(instruction, &[&authority], &authority.pubkey())
+    }
+
+    pub fn balance(&self, address: &Pubkey) -> u64 {
+        self.svm.get_account(address).map(|a| a.lamports).unwrap_or(0)
     }
 
     pub fn finalize(

@@ -41,6 +41,7 @@ pub struct InitSeason<'info> {
     /// Holds entry fees until the season pays out. A bare system account, so
     /// the program owns no token logic it does not need.
     #[account(
+        mut,
         seeds = [VAULT_SEED, season.key().as_ref()],
         bump
     )]
@@ -86,6 +87,28 @@ pub fn handle_init_season(ctx: Context<InitSeason>, params: SeasonParams) -> Res
 
     season.bump = ctx.bumps.season;
     season.vault_bump = ctx.bumps.vault;
+
+    // The authority funds the vault's rent, not the entrants.
+    //
+    // A system account has to keep a rent-exempt balance or it disappears, so
+    // paying prizes out of the entry fees alone would leave the last winner
+    // short by exactly that much — the pot would be unpayable in full, and the
+    // shortfall would come out of somebody's prize. Found by writing the test
+    // that pays a winner: the proof verified and the transfer failed.
+    let rent = Rent::get()?.minimum_balance(0);
+    let held = ctx.accounts.vault.lamports();
+    if held < rent {
+        anchor_lang::system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.key(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.authority.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                },
+            ),
+            rent - held,
+        )?;
+    }
 
     Ok(())
 }
