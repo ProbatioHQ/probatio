@@ -77,6 +77,16 @@ npm test          # vitest, all packages
 npm run typecheck
 ```
 
+Bring a local database to life with a real token's history:
+
+```
+cd app && cp .env.example .env.local   # fill in SESSION_SECRET
+cd .. && npx tsx scripts/seed-candles.mts <mint>
+cd app && npm run dev
+```
+
+Then open `/t/<mint>`.
+
 The app:
 
 ```

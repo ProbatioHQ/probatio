@@ -24,6 +24,8 @@ export type { DerivedAddress } from './pda';
 export {
   BONDING_CURVE_MIN_BYTES,
   BONDING_CURVE_OFFSETS,
+  PUMPFUN_TOKEN_DECIMALS,
+  PUMPFUN_TOKEN_TOTAL_SUPPLY,
   PUMP_PROGRAM_ID,
   bondingCurveAddress,
   decodeBondingCurve,
