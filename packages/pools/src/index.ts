@@ -52,6 +52,14 @@ export {
 } from './pumpswap';
 export type { PumpSwapPool } from './pumpswap';
 
+export {
+  BPF_UPGRADEABLE_LOADER,
+  LOADER_VARIANTS,
+  decodeProgramData,
+  programDataAddress,
+} from './upgradeable';
+export type { ProgramDataAccount } from './upgradeable';
+
 export { RpcClient, RpcError } from './rpc';
 export type {
   AccountData,

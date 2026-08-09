@@ -79,7 +79,7 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
       </ol>
       <p>
         Free, and nothing here risks real money. Your record is written to the chain as you
-        trade, so it can be checked later by anyone.
+        trade, so it can be checked later by anyone — including against us.
       </p>
     </aside>
   );

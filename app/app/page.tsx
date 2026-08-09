@@ -13,7 +13,8 @@ export default function Home() {
       <p>
         Trade live Solana markets with practice money, against fills that model real slippage and
         real delay. Every trade is written to the chain as you make it, so your record cannot be
-        edited afterwards.
+        edited without replacing the program on chain — which is a public act anyone can see.{' '}
+        <a href="/trust">What that means, exactly</a>.
       </p>
 
       <SignIn />
