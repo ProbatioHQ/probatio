@@ -13,6 +13,15 @@ export type { Batch } from './plan';
 export { NO_RECORD, auditRecords } from './audit';
 export type { AuditFinding, AuditResult, AuditVerdict } from './audit';
 
+export {
+  RECORD_RENT_LAMPORTS,
+  SIGNATURE_FEE_LAMPORTS,
+  checkTreasury,
+  coversItsCosts,
+  estimateSeasonCost,
+} from './treasury';
+export type { CostEstimate, SeasonShape, TreasuryCheck, TreasuryInput, TreasuryVerdict } from './treasury';
+
 export { KeeperIdentityError, checkIdentity } from './identity';
 export type { IdentityCheck, SeasonKeeper } from './identity';
 
