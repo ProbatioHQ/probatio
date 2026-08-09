@@ -1,0 +1,42 @@
+[package]
+name = "probatio"
+version = "0.1.0"
+description = "Season conditions and unfakeable trade records for Probatio"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "probatio"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+
+[dependencies]
+# init-if-needed is enabled for commit_root: the keeper should not have to
+# make a separate call the first time it commits for a trader. The
+# re-initialisation footgun does not apply here — the record is a PDA derived
+# from (season, trader), and the handler only writes its initial fields when
+# commit_count is zero, so an existing record is appended to and never reset.
+anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
+solana-sha256-hasher = "3.0"
+
+[dev-dependencies]
+litesvm = "0.10.0"
+solana-message = "3.0.1"
+solana-transaction = "3.0.2"
+solana-signer = "3.0.0"
+solana-keypair = "3.0.1"
+solana-clock = "3.0"
+
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
