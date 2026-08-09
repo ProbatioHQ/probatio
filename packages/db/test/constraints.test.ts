@@ -20,11 +20,11 @@ beforeEach(async () => {
   const season = await db.execute({
     sql: `INSERT INTO seasons (
             ordinal, name, ranked, status, starting_balance, entry_cost,
-            min_trades, min_distinct_tokens, house_bps, house_threshold,
+            house_bps, house_threshold,
             latency_ms, max_price_impact_bps, engine_version,
             scoring_formula_hash, created_at
           ) VALUES (1, 'S1', 1, 'pending', '10000000000', '50000000',
-                    30, 20, 1000, '1000000000', 500, 5000, 1, 'h', ?)
+                    1000, '1000000000', 500, 5000, 1, 'h', ?)
           RETURNING id`,
     args: [now],
   });

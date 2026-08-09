@@ -44,9 +44,6 @@ pub struct Season {
     pub starting_balance: u64,
     pub entry_cost: u64,
 
-    pub min_trades: u16,
-    pub min_distinct_tokens: u16,
-
     pub house_bps: u16,
     pub house_threshold: u64,
 

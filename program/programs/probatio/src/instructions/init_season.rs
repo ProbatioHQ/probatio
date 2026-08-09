@@ -14,8 +14,6 @@ pub struct SeasonParams {
     pub entry_closes_at: i64,
     pub starting_balance: u64,
     pub entry_cost: u64,
-    pub min_trades: u16,
-    pub min_distinct_tokens: u16,
     pub house_bps: u16,
     pub house_threshold: u64,
     pub latency_ms: u32,
@@ -72,8 +70,6 @@ pub fn handle_init_season(ctx: Context<InitSeason>, params: SeasonParams) -> Res
 
     season.starting_balance = params.starting_balance;
     season.entry_cost = params.entry_cost;
-    season.min_trades = params.min_trades;
-    season.min_distinct_tokens = params.min_distinct_tokens;
     season.house_bps = params.house_bps;
     season.house_threshold = params.house_threshold;
 

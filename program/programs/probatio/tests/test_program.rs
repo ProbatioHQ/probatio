@@ -26,8 +26,6 @@ fn records_every_condition_that_could_change_a_result() {
     assert_eq!(state.scoring_formula_hash, params.scoring_formula_hash);
     assert_eq!(state.starting_balance, params.starting_balance);
     assert_eq!(state.entry_cost, params.entry_cost);
-    assert_eq!(state.min_trades, params.min_trades);
-    assert_eq!(state.min_distinct_tokens, params.min_distinct_tokens);
     assert_eq!(state.house_bps, params.house_bps);
     assert_eq!(state.house_threshold, params.house_threshold);
 }

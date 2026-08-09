@@ -33,8 +33,6 @@ pub fn default_params(ordinal: i16, keeper: Pubkey) -> SeasonParams {
         entry_closes_at: 1_000 + 48 * 60 * 60,
         starting_balance: 10_000_000_000,
         entry_cost: ENTRY_COST,
-        min_trades: 30,
-        min_distinct_tokens: 20,
         house_bps: 1_000,
         house_threshold: 1_000_000_000,
         latency_ms: 600,

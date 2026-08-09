@@ -26,11 +26,11 @@ async function seed(): Promise<{ seasonId: number; accountId: number; snapshotId
   const season = await db.execute({
     sql: `INSERT INTO seasons (
             ordinal, name, ranked, status, starting_balance, entry_cost,
-            min_trades, min_distinct_tokens, house_bps, house_threshold,
+            house_bps, house_threshold,
             latency_ms, max_price_impact_bps, engine_version,
             scoring_formula_hash, created_at
           ) VALUES (1, 'Season 1', 1, 'pending', '10000000000', '50000000',
-                    30, 20, 1000, '1000000000', 500, 5000, 1, 'abc123', ?)
+                    1000, '1000000000', 500, 5000, 1, 'abc123', ?)
           RETURNING id`,
     args: [now],
   });
@@ -257,21 +257,20 @@ describe('block P history', () => {
     const ids = await seed();
     await db.execute({
       sql: `INSERT INTO entries
-              (season_id, user_pubkey, entered_at, qualified, trade_count,
+              (season_id, user_pubkey, entered_at, trade_count,
                distinct_token_count, score, rank, percentile)
-            VALUES (?, ?, ?, 1, 42, 27, '1.83', 3, 0.94)`,
+            VALUES (?, ?, ?, 42, 27, '1.83', 3, 0.94)`,
       args: [ids.seasonId, PUBKEY, Date.now()],
     });
 
     const result = await db.execute({
-      sql: 'SELECT trade_count, distinct_token_count, percentile, qualified FROM entries WHERE season_id = ?',
+      sql: 'SELECT trade_count, distinct_token_count, percentile FROM entries WHERE season_id = ?',
       args: [ids.seasonId],
     });
     const row = result.rows[0]!;
     expect(Number(row['trade_count'])).toBe(42);
     expect(Number(row['distinct_token_count'])).toBe(27);
     expect(Number(row['percentile'])).toBeCloseTo(0.94);
-    expect(Number(row['qualified'])).toBe(1);
   });
 });
 

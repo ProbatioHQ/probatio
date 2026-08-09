@@ -69,10 +69,6 @@ CREATE TABLE seasons (
   starting_balance      TEXT    NOT NULL CHECK (starting_balance = '0' OR (length(starting_balance) > 0 AND starting_balance NOT GLOB '*[^0-9]*' AND starting_balance NOT GLOB '0*')),
   entry_cost            TEXT    NOT NULL CHECK (entry_cost = '0' OR (length(entry_cost) > 0 AND entry_cost NOT GLOB '*[^0-9]*' AND entry_cost NOT GLOB '0*')),
 
-  -- A1 spec: 30 closed trades across at least 20 distinct tokens.
-  min_trades            INTEGER NOT NULL,
-  min_distinct_tokens   INTEGER NOT NULL,
-
   -- A1 spec: 10% house, but only once the pot exceeds house_threshold.
   house_bps             INTEGER NOT NULL CHECK (house_bps BETWEEN 0 AND 10000),
   house_threshold       TEXT    NOT NULL CHECK (house_threshold = '0' OR (length(house_threshold) > 0 AND house_threshold NOT GLOB '*[^0-9]*' AND house_threshold NOT GLOB '0*')),
@@ -145,10 +141,9 @@ CREATE INDEX payments_user_idx ON payments (user_pubkey, season_id);
 -- A user's registration in a ranked season, and their result once it closes.
 --
 -- percentile, trade_count and distinct_token_count are carried here for block P.
--- Capital allocation eventually asks "three ranked seasons finishing top 10%
--- with trade minimums met" — a question that can only be answered if it was
--- being recorded from the very first season. It is not needed for years. It is
--- stored from day one anyway.
+-- Capital allocation eventually asks "three ranked seasons finishing top 10%" —
+-- a question that can only be answered if it was being recorded from the very
+-- first season. It is not needed for years. It is stored from day one anyway.
 
 CREATE TABLE entries (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,7 +152,9 @@ CREATE TABLE entries (
   payment_id            INTEGER REFERENCES payments (id),
   entered_at            INTEGER NOT NULL,
 
-  qualified             INTEGER CHECK (qualified IN (0, 1)),
+  -- Kept as analytics, not as a gate. There is no minimum trade count: one
+  -- good call can win a season, which is deliberate. The coach reads these and
+  -- block P looks at them when deciding who has a track record worth backing.
   trade_count           INTEGER,
   distinct_token_count  INTEGER,
   score                 TEXT,
