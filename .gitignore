@@ -22,3 +22,8 @@ npm-debug.log*
 *.json.key
 keypair*.json
 id.json
+
+# Local development database
+*.db
+*.db-shm
+*.db-wal

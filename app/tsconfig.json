@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    // ES2022 rather than the create-next-app default of ES2017: the workspace
+    // packages use bigint literals for every monetary amount, and those need
+    // ES2020 at minimum. Browser support is well past this — Next 16 already
+    // requires Chrome 111+.
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

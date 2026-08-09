@@ -21,3 +21,11 @@ export {
 } from './amount';
 
 export { FREE_PLAY_ORDINAL } from './constants';
+
+export {
+  consumeChallenge,
+  pruneExpiredChallenges,
+  storeChallenge,
+  upsertUser,
+} from './nonces';
+export type { StoredChallenge } from './nonces';
