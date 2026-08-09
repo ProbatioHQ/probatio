@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@probatio/analytics": "*",
-    "@probatio/seasons": "*"
+    "@probatio/seasons": "*",
+    "@probatio/scoring": "*"
   }
 }

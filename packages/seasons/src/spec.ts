@@ -69,6 +69,7 @@ export function rulesetFor(ordinal: number): Ruleset {
     maxPriceImpactBps: MAX_PRICE_IMPACT_BPS,
     engineVersion: ENGINE_VERSION,
     scoring: 'highest_return',
+    tiebreak: 'entered_then_pubkey',
     bands: PAYOUT_BANDS.map((band) => ({
       minPotLamports: band.minPotLamports,
       sharesBps: [...band.sharesBps],

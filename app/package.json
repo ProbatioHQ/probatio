@@ -24,7 +24,8 @@
     "@probatio/coach": "*",
     "@probatio/payments": "*",
     "@probatio/pools": "*",
-    "@probatio/seasons": "*"
+    "@probatio/seasons": "*",
+    "@probatio/scoring": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -98,8 +98,13 @@ export async function GET(): Promise<Response> {
               ),
             },
 
-      // Recompute this from the published rules and compare.
-      rulesetHash: rulesetHashHex(rules),
+      // The hash recorded when the season was created, not one computed now.
+      // Recomputing would let a later change to the rules quietly rewrite what
+      // a running season published.
+      rulesetHash: season.rulesetHash,
+      // What today's code produces for this ordinal. Equal to the above unless
+      // the rules have been edited since, in which case saying so is the point.
+      rulesetHashNow: rulesetHashHex(rules),
       entered,
     },
     freePlay: { open: true, startingBalance: '10000000000' },

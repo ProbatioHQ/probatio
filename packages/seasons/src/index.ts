@@ -15,7 +15,7 @@ export {
   rulesetHashHex,
   validateRuleset,
 } from './ruleset';
-export type { PayoutBand, Ruleset, ScoringRule } from './ruleset';
+export type { PayoutBand, Ruleset, ScoringRule, Tiebreak } from './ruleset';
 
 export {
   ENGINE_VERSION,

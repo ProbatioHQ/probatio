@@ -1,0 +1,17 @@
+{
+  "name": "@probatio/scoring",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ranking a season, and committing the result so it can be checked.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@noble/hashes": "^1.6.0",
+    "@probatio/commit": "*",
+    "@probatio/seasons": "*",
+    "@probatio/sim": "*",
+    "bs58": "^6.0.0"
+  }
+}

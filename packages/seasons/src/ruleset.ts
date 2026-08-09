@@ -55,6 +55,7 @@ export interface Ruleset {
 
   /** Identifies the scoring rule in words the published page also uses. */
   readonly scoring: ScoringRule;
+  readonly tiebreak: Tiebreak;
   readonly bands: readonly PayoutBand[];
 }
 
@@ -68,7 +69,23 @@ export interface Ruleset {
  */
 export type ScoringRule = 'highest_return';
 
+/**
+ * How a tie is broken.
+ *
+ * In the hash because it decides who gets paid. Two traders finishing on the
+ * same return is not a curiosity to be settled later by whoever is running the
+ * season — with a pot on the line it is the most contestable moment there is,
+ * so the rule is published up front and cannot move afterwards.
+ *
+ * `entered_then_pubkey`: the earlier entrant wins, and if they entered in the
+ * same millisecond, the lower public key. The last step is arbitrary and says
+ * so; it exists so that the ordering is total, because a ranking that can
+ * report two firsts cannot pay one.
+ */
+export type Tiebreak = 'entered_then_pubkey';
+
 const SCORING_CODES: Record<ScoringRule, number> = { highest_return: 0 };
+const TIEBREAK_CODES: Record<Tiebreak, number> = { entered_then_pubkey: 0 };
 
 const AMOUNT_BYTES = 16;
 /** Bands are fixed-width so the encoding has no length-dependent boundaries. */
@@ -138,6 +155,7 @@ export const RULESET_BYTES =
   2 + // maxPriceImpactBps
   4 + // engineVersion
   1 + // scoring
+  1 + // tiebreak
   1 + // band count
   MAX_BANDS * (AMOUNT_BYTES + 1 + MAX_SHARES * 2);
 
@@ -171,6 +189,8 @@ export function encodeRuleset(ruleset: Ruleset): Uint8Array {
   view.setUint32(offset, ruleset.engineVersion);
   offset += 4;
   view.setUint8(offset, SCORING_CODES[ruleset.scoring]);
+  offset += 1;
+  view.setUint8(offset, TIEBREAK_CODES[ruleset.tiebreak]);
   offset += 1;
 
   view.setUint8(offset, ruleset.bands.length);

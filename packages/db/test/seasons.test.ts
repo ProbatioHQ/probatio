@@ -62,6 +62,20 @@ describe('creating a ranked season', () => {
     expect(season?.ranked).toBe(true);
     expect(season?.entryCost).toBe('50000000');
     expect(season?.startingBalance).toBe('10000000000');
+    expect(season?.rulesetHash).toBe(rulesetHashHex(rulesetFor(1)));
+  });
+
+  it('keeps the hash it was created with, whatever the code says later', async () => {
+    // The season a trader entered published a hash. If reading it recomputed
+    // from current code, editing the rules would silently rewrite what a
+    // running season promised — the exact thing the hash exists to prevent.
+    await openSeason(1);
+    await harness.db.execute({
+      sql: 'UPDATE seasons SET scoring_formula_hash = ? WHERE ordinal = 1',
+      args: ['a'.repeat(64)],
+    });
+
+    expect((await seasonByOrdinal(harness.db, 1))?.rulesetHash).toBe('a'.repeat(64));
   });
 
   it('gives entrants the season starting balance, not free play money', async () => {

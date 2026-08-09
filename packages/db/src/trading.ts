@@ -465,6 +465,14 @@ export interface SeasonRow {
   readonly entryClosesAt: number | null;
   readonly startingBalance: string;
   readonly entryCost: string;
+  /**
+   * The ruleset hash recorded when the season was created.
+   *
+   * Read, never recomputed. Recomputing it from today's code would mean a
+   * future change to the rules silently rewrites the hash a running season
+   * published — which is the exact thing the hash exists to prevent.
+   */
+  readonly rulesetHash: string;
 }
 
 function toSeasonRow(row: Record<string, unknown>): SeasonRow {
@@ -482,5 +490,6 @@ function toSeasonRow(row: Record<string, unknown>): SeasonRow {
     entryClosesAt: num('entry_closes_at'),
     startingBalance: String(row['starting_balance']),
     entryCost: String(row['entry_cost']),
+    rulesetHash: String(row['scoring_formula_hash']),
   };
 }

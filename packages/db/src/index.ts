@@ -91,10 +91,16 @@ export {
   createRankedSeason,
   currentRankedSeason,
   highestRankedOrdinal,
+  leaderboardRows,
   seasonByOrdinal,
   seasonTotals,
 } from './seasons';
-export type { CreateSeasonInput, SeasonTotals } from './seasons';
+export type {
+  CreateSeasonInput,
+  LeaderboardPosition,
+  LeaderboardRow,
+  SeasonTotals,
+} from './seasons';
 
 export {
   createPaymentIntent,
