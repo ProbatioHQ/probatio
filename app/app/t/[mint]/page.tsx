@@ -1,10 +1,6 @@
-import { PriceChart } from '@/components/price-chart';
-import { TradePanel } from '@/components/trade-panel';
+import { TokenView } from '@/components/token-view';
 import { currentUser } from '@/lib/session';
 
-/**
- * A token's page: the chart, and the panel that trades against it.
- */
 export default async function TokenPage({
   params,
 }: {
@@ -19,8 +15,7 @@ export default async function TokenPage({
         {mint.slice(0, 4)}…{mint.slice(-4)}
       </h1>
       <p>Market cap, in SOL</p>
-      <PriceChart mint={mint} timeframe="m1" unit="market-cap" />
-      <TradePanel mint={mint} signedIn={user !== null} />
+      <TokenView mint={mint} signedIn={user !== null} />
     </main>
   );
 }

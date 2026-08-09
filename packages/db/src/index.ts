@@ -87,11 +87,14 @@ export {
   openPosition,
   openPositions,
   recordTrade,
+  totalRealizedPnl,
+  tradeHistory,
 } from './trading';
 export type {
   AccountRow,
   PoolSnapshotWrite,
   PositionRow,
   PositionWrite,
+  TradeRow,
   TradeWrite,
 } from './trading';

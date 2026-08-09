@@ -66,9 +66,12 @@ const REJECTION_TEXT: Record<string, string> = {
 export function TradePanel({
   mint,
   signedIn,
+  onTraded,
 }: {
   mint: string;
   signedIn: boolean;
+  /** Called after a fill so the positions beside this can refresh. */
+  onTraded?: () => void;
 }) {
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [slippageBps, setSlippageBps] = useState(1_000);
@@ -100,6 +103,7 @@ export function TradePanel({
         if (body.status === 'filled') {
           setBalance(body.balance);
           setHeld(body.position.tokenAmount);
+          onTraded?.();
         }
       } catch {
         setResult({
@@ -111,7 +115,7 @@ export function TradePanel({
         setWorking(false);
       }
     },
-    [mint, signedIn, slippageBps, working],
+    [mint, onTraded, signedIn, slippageBps, working],
   );
 
   const buyPreset = useCallback(

@@ -303,3 +303,76 @@ export async function openPositions(db: Client, accountId: number): Promise<Posi
     openedAt: Number(row['opened_at']),
   }));
 }
+
+/**
+ * Realized profit and loss across every position the account has ever held.
+ *
+ * Includes closed ones deliberately. A trader who bought well, sold and moved
+ * on has realized that money, and a total drawn only from open positions would
+ * show them having made nothing.
+ */
+export async function totalRealizedPnl(db: Client, accountId: number): Promise<string> {
+  const result = await db.execute({
+    sql: 'SELECT realized_pnl FROM positions WHERE account_id = ?',
+    args: [accountId],
+  });
+
+  // Summed in bigint rather than SQL, because these are digit strings and
+  // SQLite would coerce them through a float to add them.
+  const total = result.rows.reduce(
+    (sum, row) => sum + BigInt(String(row['realized_pnl'])),
+    0n,
+  );
+  return total.toString();
+}
+
+export interface TradeRow {
+  readonly id: number;
+  readonly mint: string;
+  readonly side: 'buy' | 'sell';
+  readonly solAmount: string;
+  readonly tokenAmount: string;
+  readonly fee: string;
+  readonly priceImpactBps: number;
+  readonly partial: boolean;
+  readonly latencyMs: number;
+  readonly engineVersion: number;
+  readonly leafHash: string;
+  readonly createdAt: number;
+}
+
+/** The trade log, newest first. Append-only, so this is the whole story. */
+export async function tradeHistory(
+  db: Client,
+  accountId: number,
+  limit = 100,
+  mint?: string,
+): Promise<TradeRow[]> {
+  const result = await db.execute(
+    mint
+      ? {
+          sql: `SELECT * FROM trades WHERE account_id = ? AND mint = ?
+                ORDER BY id DESC LIMIT ?`,
+          args: [accountId, mint, limit],
+        }
+      : {
+          sql: 'SELECT * FROM trades WHERE account_id = ? ORDER BY id DESC LIMIT ?',
+          args: [accountId, limit],
+        },
+  );
+
+  return result.rows.map((row) => ({
+    id: Number(row['id']),
+    mint: String(row['mint']),
+    side: String(row['side']) as 'buy' | 'sell',
+    solAmount: String(row['sol_amount']),
+    tokenAmount: String(row['token_amount']),
+    fee: String(row['fee']),
+    priceImpactBps: Number(row['price_impact_bps']),
+    partial: Number(row['partial']) === 1,
+    latencyMs: Number(row['latency_ms']),
+    engineVersion: Number(row['engine_version']),
+    leafHash: String(row['leaf_hash']),
+    createdAt: Number(row['created_at']),
+  }));
+}

@@ -19,3 +19,6 @@ export type {
   Position,
   TradingErrorCode,
 } from './apply';
+
+export { accountEquity, valuePosition } from './equity';
+export type { Equity, ValuedPosition } from './equity';
