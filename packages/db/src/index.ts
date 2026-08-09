@@ -46,7 +46,13 @@ export type {
   OnchainMetadataWrite,
 } from './metadata';
 
-export { getBackfill, readCandles, recordBackfill, writeCandles } from './candles';
+export {
+  getBackfill,
+  priceRange,
+  readCandles,
+  recordBackfill,
+  writeCandles,
+} from './candles';
 export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';
 
 export {
@@ -82,6 +88,7 @@ export {
 export type { Launch } from './launches';
 
 export {
+  allTrades,
   ensureAccount,
   ensureFreePlaySeason,
   openPosition,

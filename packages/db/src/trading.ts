@@ -379,7 +379,11 @@ export async function tradeHistory(
         },
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row) => toTradeRow(row as unknown as Record<string, unknown>));
+}
+
+function toTradeRow(row: Record<string, unknown>): TradeRow {
+  return {
     id: Number(row['id']),
     sequence: Number(row['sequence']),
     mint: String(row['mint']),
@@ -393,5 +397,21 @@ export async function tradeHistory(
     engineVersion: Number(row['engine_version']),
     leafHash: String(row['leaf_hash']),
     createdAt: Number(row['created_at']),
-  }));
+  };
+}
+
+/**
+ * Every trade an account has made, oldest first.
+ *
+ * Separate from `tradeHistory`, which pages backwards for a UI. Analytics has
+ * to replay from the beginning — starting halfway through a log means starting
+ * mid-position, and every statistic after that is drawn from a position whose
+ * cost basis was never established.
+ */
+export async function allTrades(db: Client, accountId: number): Promise<TradeRow[]> {
+  const result = await db.execute({
+    sql: 'SELECT * FROM trades WHERE account_id = ? ORDER BY sequence ASC, id ASC',
+    args: [accountId],
+  });
+  return result.rows.map((row) => toTradeRow(row as unknown as Record<string, unknown>));
 }

@@ -164,3 +164,44 @@ export async function getBackfill(db: Client, mint: string): Promise<BackfillRec
     completedAt: Number(row['completed_at']),
   };
 }
+
+/**
+ * The high and low over a span, from the candles the chart already uses.
+ *
+ * Analytics asks how well an entry or exit was timed, which only means
+ * something against the range the market actually offered. Reading it from the
+ * same table the chart is drawn from is deliberate: a trader who is told they
+ * sold near the low can look at the chart and see the same low.
+ *
+ * Returns null when no candle covers the span — a position held inside a gap
+ * in the backfill has no range to be judged against, and inventing one would
+ * produce a confident number about nothing.
+ */
+export async function priceRange(
+  db: Client,
+  mint: string,
+  timeframe: string,
+  fromSeconds: number,
+  toSeconds: number,
+): Promise<{ high: bigint; low: bigint } | null> {
+  // Compared in JavaScript as bigints rather than by SQL MAX/MIN. Prices are
+  // stored as digit strings, and text comparison orders '900' below '90' —
+  // which would understate the high on any token whose price gained a digit
+  // during the hold, quietly and without ever looking wrong.
+  const result = await db.execute({
+    sql: `SELECT high, low FROM candles
+          WHERE mint = ? AND timeframe = ? AND open_time >= ? AND open_time <= ?`,
+    args: [mint, timeframe, fromSeconds, toSeconds],
+  });
+
+  let high: bigint | null = null;
+  let low: bigint | null = null;
+  for (const candle of result.rows) {
+    const candleHigh = BigInt(String(candle['high']));
+    const candleLow = BigInt(String(candle['low']));
+    if (high === null || candleHigh > high) high = candleHigh;
+    if (low === null || candleLow < low) low = candleLow;
+  }
+
+  return high === null || low === null ? null : { high, low };
+}

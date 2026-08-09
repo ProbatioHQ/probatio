@@ -1,9 +1,9 @@
 {
-  "name": "@probatio/db",
+  "name": "@probatio/analytics",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Schema and data access. Storage only \u2014 all arithmetic happens in @probatio/sim.",
+  "description": "What a trade log says about the trader. Pure integer arithmetic.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
@@ -11,9 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.15"
-  },
-  "devDependencies": {
-    "@probatio/analytics": "*"
+    "@probatio/sim": "*",
+    "@probatio/trading": "*",
+    "@probatio/candles": "*"
   }
 }
