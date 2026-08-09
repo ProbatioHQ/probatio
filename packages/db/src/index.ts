@@ -29,3 +29,19 @@ export {
   upsertUser,
 } from './nonces';
 export type { StoredChallenge } from './nonces';
+
+export {
+  displayName,
+  displaySymbol,
+  getManyTokenMetadata,
+  getTokenMetadata,
+  recordOffchainFailure,
+  recordOffchainMetadata,
+  staleOffchainMints,
+  upsertOnchainMetadata,
+} from './metadata';
+export type {
+  CachedTokenMetadata,
+  OffchainMetadataWrite,
+  OnchainMetadataWrite,
+} from './metadata';
