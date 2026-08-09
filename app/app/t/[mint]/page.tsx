@@ -1,3 +1,4 @@
+import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
 import { currentUser } from '@/lib/session';
 
@@ -15,6 +16,8 @@ export default async function TokenPage({
         {mint.slice(0, 4)}…{mint.slice(-4)}
       </h1>
       <p>Market cap, in SOL</p>
+      {/* Compact here: someone on a token page has already found one. */}
+      <Onboarding compact />
       <TokenView mint={mint} signedIn={user !== null} />
     </main>
   );

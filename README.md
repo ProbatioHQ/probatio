@@ -77,15 +77,17 @@ npm test          # vitest, all packages
 npm run typecheck
 ```
 
-Bring a local database to life with a real token's history:
+Bring a local database to life with real tokens:
 
 ```
 cd app && cp .env.example .env.local   # fill in SESSION_SECRET
-cd .. && npx tsx scripts/seed-candles.mts <mint>
+cd ..
+npx tsx scripts/seed-launches.mts <mint> [mint...]   # names and symbols
+npx tsx scripts/seed-candles.mts <mint>              # a token's chart
 cd app && npm run dev
 ```
 
-Then open `/t/<mint>`.
+Open `/` for the feed, or `/t/<mint>` for a token.
 
 The app:
 
