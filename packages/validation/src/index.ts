@@ -13,3 +13,6 @@ export { combine, isConsecutive, replay } from './replay';
 export type { OrderedEvent, Sample, SkipReason, ValidationReport } from './replay';
 
 export { formatReport } from './format';
+
+export { DEFAULT_THRESHOLDS, assessDrift, assessToken } from './drift';
+export type { DriftAssessment, DriftSeverity, DriftThresholds, TokenDrift } from './drift';

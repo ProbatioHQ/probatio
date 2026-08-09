@@ -31,6 +31,16 @@ export interface Sample {
   readonly side: 'buy' | 'sell';
   /** Absolute relative error, in basis points. */
   readonly errorBps: number;
+  /**
+   * The same error, signed.
+   *
+   * Positive means the engine gave the trader *more* than the chain did. That
+   * direction is the dangerous one: a simulator that is systematically generous
+   * on some token is a free money printer for anyone who notices, and they will
+   * trade nothing else. Negative is merely unfair to the trader, which is a bug
+   * but not an exploit.
+   */
+  readonly signedErrorBps: number;
   readonly expected: bigint;
   readonly actual: bigint;
   readonly slot: number;
@@ -51,6 +61,8 @@ export interface ValidationReport {
   readonly exactMatches: number;
   readonly exactRate: number;
   readonly worst: readonly Sample[];
+  /** Every sample, for the drift monitor to assess direction. */
+  readonly allSamples: readonly Sample[];
 }
 
 function stateAfter(event: TradeEvent, mint: string): PoolState {
@@ -95,10 +107,13 @@ export function isConsecutive(previous: TradeEvent, current: TradeEvent): boolea
   );
 }
 
-function errorBps(mine: bigint, actual: bigint): number {
+/** Signed relative error in bps. Positive means the engine was generous. */
+function signedErrorBps(mine: bigint, actual: bigint): number {
   if (actual === 0n) return mine === 0n ? 0 : 10_000;
-  const difference = mine > actual ? mine - actual : actual - mine;
-  return Number((difference * 10_000n) / actual);
+  const difference = mine - actual;
+  const magnitude = difference < 0n ? -difference : difference;
+  const bps = Number((magnitude * 10_000n) / actual);
+  return difference < 0n ? -bps : bps;
 }
 
 function percentile(sorted: readonly number[], fraction: number): number {
@@ -147,9 +162,11 @@ export function replay(
         const gross =
           (event.solAmount * 10_125n + 9_999n) / 10_000n + 1n;
         const quote = quoteBuy(before, gross);
+        const signed = signedErrorBps(quote.tokenAmount, event.tokenAmount);
         samples.push({
           side: 'buy',
-          errorBps: errorBps(quote.tokenAmount, event.tokenAmount),
+          errorBps: Math.abs(signed),
+          signedErrorBps: signed,
           expected: event.tokenAmount,
           actual: quote.tokenAmount,
           slot: current.slot,
@@ -157,9 +174,11 @@ export function replay(
       } else {
         const quote = quoteSell(before, event.tokenAmount);
         const gross = quote.solAmount + quote.feeLamports;
+        const signed = signedErrorBps(gross, event.solAmount);
         samples.push({
           side: 'sell',
-          errorBps: errorBps(gross, event.solAmount),
+          errorBps: Math.abs(signed),
+          signedErrorBps: signed,
           expected: event.solAmount,
           actual: gross,
           slot: current.slot,
@@ -188,6 +207,7 @@ export function replay(
     exactMatches,
     exactRate: samples.length ? exactMatches / samples.length : 0,
     worst: [...samples].sort((a, b) => b.errorBps - a.errorBps).slice(0, 5),
+    allSamples: samples,
   };
 }
 
@@ -233,5 +253,6 @@ export function combine(mint: string, reports: readonly ValidationReport[]): Val
     exactMatches,
     exactRate: totalSamples ? exactMatches / totalSamples : 0,
     worst: all.sort((a, b) => b.errorBps - a.errorBps).slice(0, 5),
+    allSamples: reports.flatMap((report) => report.allSamples),
   };
 }

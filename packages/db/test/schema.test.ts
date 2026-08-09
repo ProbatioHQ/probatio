@@ -105,6 +105,7 @@ describe('migrations', () => {
       '002_auth_nonces.sql',
       '003_token_metadata.sql',
       '004_candles.sql',
+      '005_drift.sql',
     ]);
   });
 

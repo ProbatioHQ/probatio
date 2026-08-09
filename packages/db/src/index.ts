@@ -48,3 +48,13 @@ export type {
 
 export { getBackfill, readCandles, recordBackfill, writeCandles } from './candles';
 export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';
+
+export {
+  driftHistory,
+  isSuspended,
+  liftSuspension,
+  recordDrift,
+  suspendToken,
+  suspendedTokens,
+} from './drift';
+export type { DriftHistoryEntry, DriftObservation, DriftSeverity } from './drift';
