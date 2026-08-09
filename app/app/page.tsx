@@ -1,6 +1,7 @@
 import { Coach } from '@/components/coach';
 import { LaunchFeedList } from '@/components/launch-feed';
 import { Leaderboard } from '@/components/leaderboard';
+import { NameClaim } from '@/components/name-claim';
 import { Onboarding } from '@/components/onboarding';
 import { Season } from '@/components/season';
 import { SignIn } from '@/components/sign-in';
@@ -20,7 +21,11 @@ export default function Home() {
       <Season />
       <Leaderboard />
       <Coach />
+      <NameClaim />
       <LaunchFeedList />
+      <p>
+        <a href="/verify">Check any record yourself</a>
+      </p>
     </main>
   );
 }

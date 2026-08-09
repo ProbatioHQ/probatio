@@ -124,6 +124,16 @@ export type {
   Settlement,
 } from './payments';
 
+export {
+  activeName,
+  claimName,
+  clearName,
+  nameHistory,
+  nameRecord,
+  namesFor,
+} from './names';
+export type { ClaimOutcome, DisplayName } from './names';
+
 export { coachReportHistory, latestCoachReport, recordCoachReport } from './coach';
 export type {
   CoachReportWrite,

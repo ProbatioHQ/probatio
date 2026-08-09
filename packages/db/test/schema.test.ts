@@ -112,6 +112,7 @@ describe('migrations', () => {
       '009_coach_reports.sql',
       '010_payment_intents.sql',
       '011_wallet_evidence.sql',
+      '012_display_names.sql',
     ]);
   });
 
