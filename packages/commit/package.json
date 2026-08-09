@@ -1,0 +1,15 @@
+{
+  "name": "@probatio/commit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Canonical trade encoding, merkle trees and proofs. What makes a record checkable by someone who does not trust us.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "@probatio/sim": "*",
+    "bs58": "^6.0.0"
+  }
+}

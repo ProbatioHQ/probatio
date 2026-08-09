@@ -29,7 +29,7 @@ pub fn default_params(ordinal: i16, keeper: Pubkey) -> SeasonParams {
         ordinal,
         keeper,
         starts_at: 1_000,
-        ends_at: 1_000 + 14 * 24 * 60 * 60,
+        ends_at: 1_000 + 7 * 24 * 60 * 60, // season 1 runs a week
         entry_closes_at: 1_000 + 48 * 60 * 60,
         starting_balance: 10_000_000_000,
         entry_cost: ENTRY_COST,
