@@ -3,6 +3,7 @@ import { LaunchFeed, LogSubscription, toWebSocketUrl } from '@probatio/feed';
 import { PUMP_PROGRAM_ID } from '@probatio/pools';
 import { recordLaunches } from '@probatio/db';
 import { db } from './db';
+import { reportFeedRunning, reportFeedState } from './health';
 import { rpcEndpoint } from './env';
 
 /**
@@ -54,6 +55,9 @@ export function startLiveFeed(): void {
     endpoint: toWebSocketUrl(rpcEndpoint()),
     mentions: PUMP_PROGRAM_ID,
     onStatus: (status, detail) => {
+      // Reported so an outage is recorded rather than only logged. The void
+      // policy asks how long the feed was down, and a log cannot answer it.
+      reportFeedState(status === 'subscribed' || status === 'open');
       if (status === 'subscribed') console.log('[feed] live');
       else if (status === 'closed' && detail) console.warn(`[feed] ${detail}, reconnecting`);
     },
@@ -67,6 +71,7 @@ export function startLiveFeed(): void {
   // Never the reason the process stays alive.
   timer.unref?.();
 
+  reportFeedRunning();
   subscription.start();
 }
 

@@ -6,8 +6,13 @@
  */
 export async function register(): Promise<void> {
   if (process.env['NEXT_RUNTIME'] !== 'nodejs') return;
-  if (process.env['PROBATIO_DISABLE_FEED'] === '1') return;
+  if (process.env['PROBATIO_DISABLE_FEED'] !== '1') {
+    const { startLiveFeed } = await import('./lib/live-feed');
+    startLiveFeed();
+  }
 
-  const { startLiveFeed } = await import('./lib/live-feed');
-  startLiveFeed();
+  // Probing runs even when the feed is disabled: knowing the chain is
+  // unreachable matters more than the feed does.
+  const { startProbing } = await import('./lib/health');
+  startProbing();
 }

@@ -76,7 +76,23 @@ export async function POST(request: Request): Promise<Response> {
   const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 15_000 });
   const reader = new PoolReader(rpc);
 
-  const atClickResolution = await reader.resolve(mint);
+  // Reading the chain is not optional here. A fill quoted against a cached
+  // pool is a fabricated fill, so when the chain cannot be read the trade is
+  // refused rather than estimated. This is the one thing that never degrades.
+  let atClickResolution;
+  try {
+    atClickResolution = await reader.resolve(mint);
+  } catch {
+    return Response.json(
+      {
+        error:
+          'Live prices cannot be read right now, so trading is off. Nothing was ' +
+          'charged and no position changed.',
+        degraded: true,
+      },
+      { status: 503 },
+    );
+  }
   if (!atClickResolution.pool) {
     return Response.json(
       { error: 'this token has no live market — it may have graduated with no pool' },
@@ -87,7 +103,23 @@ export async function POST(request: Request): Promise<Response> {
   // The wait that makes the fill honest.
   await sleep(account.latencyMs);
 
-  const atFillResolution = await reader.resolve(mint);
+  let atFillResolution;
+  try {
+    atFillResolution = await reader.resolve(mint);
+  } catch {
+    // The click was priced and the fill could not be. Refusing is the only
+    // honest outcome: filling at the click price would hand the trader the
+    // delay-free execution the whole engine exists to deny them.
+    return Response.json(
+      {
+        error:
+          'Live prices became unreadable while the trade was in flight, so it was ' +
+          'not filled. Nothing changed.',
+        degraded: true,
+      },
+      { status: 503 },
+    );
+  }
   if (!atFillResolution.pool) {
     return Response.json(
       { status: 'rejected', reason: 'no_liquidity', detail: 'the market disappeared mid-trade' },

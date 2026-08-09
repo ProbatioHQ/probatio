@@ -17,6 +17,7 @@
     "@probatio/analytics": "*",
     "@probatio/seasons": "*",
     "@probatio/scoring": "*",
-    "@probatio/profile": "*"
+    "@probatio/profile": "*",
+    "@probatio/health": "*"
   }
 }

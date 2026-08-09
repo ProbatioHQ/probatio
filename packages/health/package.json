@@ -1,0 +1,11 @@
+{
+  "name": "@probatio/health",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "What is working, what is not, and how long it has been down.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {}
+}

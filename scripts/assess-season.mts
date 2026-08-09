@@ -13,7 +13,14 @@
  *
  *   DATABASE_URL=file:./app/probatio.db npx tsx scripts/assess-season.mts <ordinal>
  */
-import { migrate, openDatabase, seasonByOrdinal, uncommittedTrades } from '@probatio/db';
+import {
+  migrate,
+  openDatabase,
+  outagesBetween,
+  seasonByOrdinal,
+  uncommittedTrades,
+} from '@probatio/db';
+import { outageMinutes } from '@probatio/health';
 import { assessVoid, explainCondition, rulesetFor, voidableNow } from '@probatio/seasons';
 
 const url = process.env['DATABASE_URL'] ?? 'file:./app/probatio.db';
@@ -33,8 +40,6 @@ function minutesFrom(name: string): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-const feedOutageMinutes = minutesFrom('FEED_OUTAGE_MINUTES');
-const chainHaltMinutes = minutesFrom('CHAIN_HALT_MINUTES');
 const unmeasured: string[] = [];
 
 const db = openDatabase({ url });
@@ -58,16 +63,46 @@ const versions = await db.execute({
   args: [season.id],
 });
 
+// Feed and chain availability come from the recorded outage intervals rather
+// than from somebody's recollection. An override is still accepted for an
+// incident the probe slept through.
+const seasonFrom = season.startsAt ?? 0;
+const seasonTo = Math.min(season.endsAt ?? Date.now(), Date.now());
+const recorded = (await outagesBetween(db, seasonFrom, seasonTo)).map((row) => ({
+  dependency: row.dependency,
+  startedAt: row.startedAt,
+  endedAt: row.endedAt,
+  detail: row.detail,
+}));
+
+const measure = (dependency: 'feed' | 'rpc'): number =>
+  outageMinutes(
+    recorded.filter((row) => row.dependency === dependency),
+    seasonFrom,
+    seasonTo,
+    Date.now(),
+  );
+
+const overrodeFeed = minutesFrom('FEED_OUTAGE_MINUTES');
+const overrodeChain = minutesFrom('CHAIN_HALT_MINUTES');
+const feedOutageMinutes = overrodeFeed ?? measure('feed');
+const chainHaltMinutes = overrodeChain ?? measure('rpc');
+
 // Irreproducible trades are what the verifier answers, and it needs the pool
 // snapshots rebuilt per trade. Reported as unmeasured rather than assumed zero.
 unmeasured.push('irreproducible_trades');
-if (feedOutageMinutes === null) unmeasured.push('feed_outage');
-if (chainHaltMinutes === null) unmeasured.push('chain_halt');
+
+// No recorded probes at all is not the same as no outages. It is a season
+// nobody watched, and saying otherwise would declare it clean on no evidence.
+if (recorded.length === 0) {
+  if (overrodeFeed === null) unmeasured.push('feed_outage');
+  if (overrodeChain === null) unmeasured.push('chain_halt');
+}
 
 const verdict = assessVoid(
   {
-    feedOutageMinutes: feedOutageMinutes ?? 0,
-    chainHaltMinutes: chainHaltMinutes ?? 0,
+    feedOutageMinutes,
+    chainHaltMinutes,
     uncommittedTrades: pending.length,
     irreproducibleTrades: 0,
     engineVersions: versions.rows.map((row) => Number(row['v'])),
