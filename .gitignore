@@ -1,0 +1,24 @@
+node_modules/
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+target/
+test-ledger/
+.anchor/
+
+.DS_Store
+*.log
+npm-debug.log*
+
+# Never commit a keypair. Not in dev, not "just for testing".
+*.json.key
+keypair*.json
+id.json
