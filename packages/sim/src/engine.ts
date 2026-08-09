@@ -118,18 +118,55 @@ export function quoteBuy(pool: PoolState, solIn: Amount): Quote {
   // A bonding curve prices against virtual reserves but can only hand over the
   // real ones. An AMM sets deliverableTokens to its whole balance, so this is a
   // no-op there.
-  const tokenAmount = uncapped > pool.deliverableTokens ? pool.deliverableTokens : uncapped;
-  if (tokenAmount === 0n) {
+  if (pool.deliverableTokens === 0n) {
     throw new QuoteError('the venue has no tokens left to sell', 'no_liquidity');
   }
 
+  if (uncapped <= pool.deliverableTokens) {
+    return {
+      side: 'buy',
+      solAmount: solIn,
+      tokenAmount: uncapped,
+      feeLamports,
+      priceImpactBps: impactBps(afterFee, uncapped, pool.solReserve, pool.tokenReserve),
+      partial: false,
+      engineVersion: ENGINE_VERSION,
+    };
+  }
+
+  // Capped. The trader does not pay the full amount for a reduced number of
+  // tokens — the unspent SOL simply never leaves their balance, exactly as a
+  // real partial fill returns it. Charging the whole input here would overpay
+  // wildly and make the price impact figure meaningless.
+  const tokenAmount = pool.deliverableTokens;
+
+  // Invert the curve for the capped size: from
+  //   tokens = in * tokenReserve / (solReserve + in)
+  // it follows that
+  //   in = tokens * solReserve / (tokenReserve - tokens)
+  // Rounded up, so any remainder stays with the pool.
+  const requiredAfterFee = mulDivCeil(
+    tokenAmount,
+    pool.solReserve,
+    pool.tokenReserve - tokenAmount,
+  );
+  const requiredGross = mulDivCeil(
+    requiredAfterFee,
+    BPS_DENOMINATOR + feeBps,
+    BPS_DENOMINATOR,
+  ) + 1n;
+
+  // Never charge more than the trader offered.
+  const spent = requiredGross > solIn ? solIn : requiredGross;
+  const spentAfterFee = requiredAfterFee > afterFee ? afterFee : requiredAfterFee;
+
   return {
     side: 'buy',
-    solAmount: solIn,
+    solAmount: spent,
     tokenAmount,
-    feeLamports,
-    priceImpactBps: impactBps(afterFee, tokenAmount, pool.solReserve, pool.tokenReserve),
-    partial: tokenAmount < uncapped,
+    feeLamports: spent - spentAfterFee,
+    priceImpactBps: impactBps(spentAfterFee, tokenAmount, pool.solReserve, pool.tokenReserve),
+    partial: true,
     engineVersion: ENGINE_VERSION,
   };
 }

@@ -69,6 +69,31 @@ describe('quoteBuy', () => {
     expect(quote.partial).toBe(true);
   });
 
+  it('does not charge the full offer for a capped fill', () => {
+    // The trader offered 1000 SOL and the curve could hand over a thousand
+    // base units. Taking the whole offer would be robbery, and it also made
+    // the price impact figure meaningless. The unspent SOL never leaves the
+    // balance, exactly as a real partial fill returns it.
+    const offered = 1_000_000_000_000n;
+    const quote = quoteBuy(pool({ deliverableTokens: 1_000n }), offered);
+
+    expect(quote.solAmount).toBeLessThan(offered / 1_000n);
+    expect(quote.feeLamports).toBeLessThan(quote.solAmount);
+  });
+
+  it('keeps the price impact of a capped fill sane', () => {
+    const quote = quoteBuy(pool({ deliverableTokens: 1_000_000n }), 5_000_000_000n);
+    // Charging the full offer produced impacts in the billions of basis
+    // points, which made every capped trade look like a market-destroying one.
+    expect(quote.priceImpactBps).toBeLessThan(10_000);
+  });
+
+  it('never charges more than the trader offered', () => {
+    const offered = 1_000n;
+    const quote = quoteBuy(pool({ deliverableTokens: 500_000_000_000_000n }), offered);
+    expect(quote.solAmount).toBeLessThanOrEqual(offered);
+  });
+
   it('is not partial when the curve can fill it', () => {
     expect(quoteBuy(pool(), 1_000_000n).partial).toBe(false);
   });

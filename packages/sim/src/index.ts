@@ -30,3 +30,13 @@ export type { FeeSchedule, PoolSource, PoolState, Side } from './types';
 
 export { QuoteError, applyQuote, quoteBuy, quoteSell } from './engine';
 export type { Quote, QuoteErrorCode } from './engine';
+
+export { DEFAULT_RULES, simulateFill } from './execution';
+export type {
+  ExecutionRules,
+  FillOutcome,
+  FillRequest,
+  FilledOutcome,
+  RejectReason,
+  RejectedOutcome,
+} from './execution';
