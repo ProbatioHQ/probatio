@@ -29,9 +29,33 @@ function sol(lamports: string): string {
   return `${whole}.${fraction.toString().padStart(3, '0')}`;
 }
 
-export function EnterSeason() {
+export function EnterSeason({ free = false }: { free?: boolean }) {
   const [stage, setStage] = useState<Stage>('idle');
   const [message, setMessage] = useState<string | null>(null);
+
+  /**
+   * A season that costs nothing has no transaction to sign.
+   *
+   * Walking somebody through a wallet prompt for a zero-lamport transfer would
+   * be asking for a signature to move nothing, which is the sort of thing that
+   * teaches people to approve prompts without reading them.
+   */
+  async function enterFree(): Promise<void> {
+    setStage('confirming');
+    setMessage(null);
+
+    const response = await fetch('/api/season/enter', { method: 'POST' });
+    const body = (await response.json()) as { error?: string; entered?: boolean; seasonName?: string };
+
+    if (!response.ok || !body.entered) {
+      setStage('error');
+      setMessage(body.error ?? 'Could not enter.');
+      return;
+    }
+
+    setStage('entered');
+    setMessage(`You are in ${body.seasonName ?? 'the season'}.`);
+  }
 
   async function enter(): Promise<void> {
     const signer = getPhantomSigner();
@@ -113,20 +137,28 @@ export function EnterSeason() {
     <section aria-label="Season entry">
       <h2>Ranked season</h2>
       <p>
-        Entry is paid once, from your wallet. It goes to the prize pool, and the whole pool is
-        paid back out when the season closes.
+        {free
+          ? 'Free to enter. The prize is put up rather than paid for by entries, so nothing ' +
+            'leaves your wallet and there is nothing to sign.'
+          : 'Entry is paid once, from your wallet. It goes to the prize pool, and the whole ' +
+            'pool is paid back out when the season closes.'}
       </p>
 
-      <button type="button" onClick={() => void enter()} disabled={stage !== 'idle' && stage !== 'error'}>
+      <button
+        type="button"
+        onClick={() => void (free ? enterFree() : enter())}
+        disabled={stage !== 'idle' && stage !== 'error'}
+      >
         {stage === 'building' && 'Preparing…'}
         {stage === 'signing' && 'Approve in Phantom…'}
-        {stage === 'confirming' && 'Confirming…'}
-        {(stage === 'idle' || stage === 'error') && 'Enter the season'}
+        {stage === 'confirming' && (free ? 'Entering…' : 'Confirming…')}
+        {(stage === 'idle' || stage === 'error') &&
+          (free ? 'Enter — free' : 'Enter the season')}
       </button>
 
       {message && <p role={stage === 'error' ? 'alert' : undefined}>{message}</p>}
 
-      {stage === 'error' && !getPhantomSigner() && (
+      {stage === 'error' && !free && !getPhantomSigner() && (
         <p>
           <a href={PHANTOM_INSTALL_URL} target="_blank" rel="noreferrer noopener">
             Install Phantom

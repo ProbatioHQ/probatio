@@ -365,3 +365,66 @@ export async function seasonEvidence(db: Client, seasonId: number): Promise<Entr
     };
   });
 }
+
+/**
+ * Enter a season that costs nothing.
+ *
+ * A separate path from `settlePayment`, deliberately. That one exists to credit
+ * a transaction that happened on chain; there is no transaction here, and
+ * routing a free entry through a function whose whole job is verifying payment
+ * would mean inventing a payment to satisfy it.
+ *
+ * The wallet evidence is still gathered and still recorded. It matters more
+ * here than anywhere: with no entry cost, the funding-source limit is the only
+ * thing standing between one person and fifty entries.
+ */
+export async function enterFreeSeason(
+  db: Client,
+  input: {
+    readonly seasonId: number;
+    readonly userPubkey: string;
+    readonly evidence: EvidenceWrite;
+    readonly now: number;
+  },
+): Promise<{ entryId: number | null; alreadyEntered: boolean }> {
+  const existing = await db.execute({
+    sql: 'SELECT id FROM entries WHERE season_id = ? AND user_pubkey = ?',
+    args: [input.seasonId, input.userPubkey],
+  });
+  if (existing.rows[0]) {
+    return { entryId: Number(existing.rows[0]['id']), alreadyEntered: true };
+  }
+
+  const result = await db.execute({
+    sql: `INSERT INTO entries
+            (season_id, user_pubkey, payment_id, entered_at,
+             funder, wallet_first_seen_at, wallet_signature_count, evidence_flags)
+          VALUES (?, ?, NULL, ?, ?, ?, ?, ?)
+          ON CONFLICT (season_id, user_pubkey) DO NOTHING
+          RETURNING id`,
+    args: [
+      input.seasonId,
+      input.userPubkey,
+      input.now,
+      input.evidence.funder,
+      input.evidence.walletFirstSeenAt,
+      input.evidence.walletSignatureCount,
+      JSON.stringify(input.evidence.flags),
+    ],
+  });
+
+  // Nothing returned means somebody else inserted between the check and the
+  // write. Theirs is the same entry.
+  if (!result.rows[0]) {
+    const raced = await db.execute({
+      sql: 'SELECT id FROM entries WHERE season_id = ? AND user_pubkey = ?',
+      args: [input.seasonId, input.userPubkey],
+    });
+    return {
+      entryId: raced.rows[0] ? Number(raced.rows[0]['id']) : null,
+      alreadyEntered: true,
+    };
+  }
+
+  return { entryId: Number(result.rows[0]['id']), alreadyEntered: false };
+}

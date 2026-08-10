@@ -46,7 +46,9 @@ export async function GET(request: Request): Promise<Response> {
 
   const board = await seasonBoard(client, season.id, now);
   const totals = await seasonTotals(client, season.id);
-  const split = distribute(rulesetFor(season.ordinal), totals.potLamports, totals.entrants);
+  const split = distribute(rulesetFor(season.ordinal), totals.potLamports, totals.entrants, {
+    houseBaseLamports: totals.entriesLamports,
+  });
   const payoutByPlace = new Map(split.payouts.map((payout) => [payout.place, payout.lamports]));
 
   const limit = Math.min(Number(url.searchParams.get('limit') ?? PAGE) || PAGE, 200);

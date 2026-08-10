@@ -82,7 +82,10 @@ export function Season() {
 
       <dl>
         <dt>Prize pool</dt>
-        <dd>{sol(season.potLamports)} SOL</dd>
+        <dd>
+          {sol(season.potLamports)} SOL
+          {BigInt(season.entryCost) === 0n && <span> · put up, not paid for by entries</span>}
+        </dd>
         <dt>Entrants</dt>
         <dd>{season.entrants}</dd>
         {season.entryClosesInMs !== null && (
@@ -121,7 +124,7 @@ export function Season() {
       {season.entered ? (
         <p>You are entered.</p>
       ) : season.status === 'entry_open' ? (
-        <EnterSeason />
+        <EnterSeason free={BigInt(season.entryCost) === 0n} />
       ) : (
         !closed && <p>Entries are closed for this season. Free play is always open.</p>
       )}

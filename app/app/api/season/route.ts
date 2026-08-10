@@ -60,7 +60,12 @@ export async function GET(request: Request): Promise<Response> {
   const totals = await seasonTotals(client, season.id);
   const rules = rulesetFor(season.ordinal);
 
-  const projection = distribute(rules, totals.potLamports, totals.entrants);
+  // The cut applies to what entrants paid, not to a sponsored prize — taking
+  // a tenth of money somebody put up as the prize would advertise more than
+  // the season pays.
+  const projection = distribute(rules, totals.potLamports, totals.entrants, {
+    houseBaseLamports: totals.entriesLamports,
+  });
   const upcoming = nextBand(rules, totals.potLamports);
 
   const user = await currentUser();
@@ -83,6 +88,10 @@ export async function GET(request: Request): Promise<Response> {
 
       entrants: totals.entrants,
       potLamports: totals.potLamports.toString(),
+      // Kept apart because they mean different things if the season voids:
+      // entries are owed back, a sponsored prize was never the entrants'.
+      entriesLamports: totals.entriesLamports.toString(),
+      sponsorLamports: totals.sponsorLamports.toString(),
 
       // What the pot would pay right now, and what the next band would add.
       paidPlaces: projection.paidPlaces,
@@ -92,8 +101,11 @@ export async function GET(request: Request): Promise<Response> {
       })),
       houseLamports: projection.house.toString(),
       currentBandPlaces: bandFor(rules, totals.potLamports).sharesBps.length,
+      // No next band on a free season. The pot is put up rather than paid for
+      // by entries, so more entrants do not grow it — and asking how many
+      // entries away the next band is divides by an entry cost of zero.
       nextBand:
-        upcoming === null
+        upcoming === null || BigInt(season.entryCost) === 0n
           ? null
           : {
               atPotLamports: upcoming.minPotLamports.toString(),

@@ -192,7 +192,12 @@ describe('the pot', () => {
 
   it('is empty before anybody enters', async () => {
     const seasonId = await openSeason(1);
-    expect(await seasonTotals(harness.db, seasonId)).toEqual({ entrants: 0, potLamports: 0n });
+    expect(await seasonTotals(harness.db, seasonId)).toEqual({
+      entrants: 0,
+      potLamports: 0n,
+      entriesLamports: 0n,
+      sponsorLamports: 0n,
+    });
   });
 
   it('grows with each verified entry', async () => {
@@ -203,6 +208,8 @@ describe('the pot', () => {
     expect(await seasonTotals(harness.db, seasonId)).toEqual({
       entrants: 2,
       potLamports: 100_000_000n,
+      entriesLamports: 100_000_000n,
+      sponsorLamports: 0n,
     });
   });
 

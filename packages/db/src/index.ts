@@ -104,6 +104,7 @@ export type {
 
 export {
   createPaymentIntent,
+  enterFreeSeason,
   entriesFromFunder,
   getPaymentIntent,
   hasEntered,

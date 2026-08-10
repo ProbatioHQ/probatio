@@ -111,3 +111,33 @@ describe('splitting the pot', () => {
     expect(() => distribute(rules, -1n, 1)).toThrow();
   });
 });
+
+describe('a sponsored prize', () => {
+  it('is not taxed', () => {
+    // Taking a tenth of money somebody put up as the prize is the sponsor
+    // paying themselves, and it advertises a prize larger than the season
+    // pays.
+    const result = distribute(rules, 2n * LAMPORTS_PER_SOL, 4, { houseBaseLamports: 0n });
+
+    expect(result.house).toBe(0n);
+    const paid = result.payouts.reduce((sum, payout) => sum + payout.lamports, 0n);
+    expect(paid).toBe(2n * LAMPORTS_PER_SOL);
+  });
+
+  it('still taxes the part the entrants paid', () => {
+    // A season with both: entries are taxed, the sponsored part is not.
+    const entries = 2n * LAMPORTS_PER_SOL;
+    const result = distribute(rules, 3n * LAMPORTS_PER_SOL, 40, { houseBaseLamports: entries });
+
+    expect(result.house).toBe(entries / 10n);
+    const paid = result.payouts.reduce((sum, payout) => sum + payout.lamports, 0n);
+    expect(paid + result.house).toBe(3n * LAMPORTS_PER_SOL);
+  });
+
+  it('taxes the whole pot when nothing says otherwise', () => {
+    // The default is unchanged: an ordinary season has no sponsor and the pot
+    // is what the entrants paid.
+    const result = distribute(rules, 2n * LAMPORTS_PER_SOL, 40);
+    expect(result.house).toBe(LAMPORTS_PER_SOL / 5n);
+  });
+});

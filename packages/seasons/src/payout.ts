@@ -41,13 +41,24 @@ export function bandFor(ruleset: Ruleset, pot: bigint): PayoutBand {
  * Taken only above the threshold, and taken on the whole pot rather than on the
  * amount above it — the threshold decides whether there is a cut, not what it
  * applies to.
+ *
+ * `base` is what the cut applies to, which is not always the pot. A sponsored
+ * prize is money somebody put up *as* the prize, and taking a tenth of it back
+ * is both pointless — it is the sponsor paying themselves — and dishonest,
+ * because the season advertises a prize larger than it pays. So the cut applies
+ * to what the entrants paid in, and a season with no entry fee has no cut.
  */
-export function houseCut(ruleset: Ruleset, pot: bigint): bigint {
+export function houseCut(ruleset: Ruleset, pot: bigint, base = pot): bigint {
   if (pot <= ruleset.houseThreshold) return 0n;
-  return (pot * BigInt(ruleset.houseBps)) / 10_000n;
+  return (base * BigInt(ruleset.houseBps)) / 10_000n;
 }
 
-export function distribute(ruleset: Ruleset, pot: bigint, entrants: number): Distribution {
+export function distribute(
+  ruleset: Ruleset,
+  pot: bigint,
+  entrants: number,
+  options: { readonly houseBaseLamports?: bigint } = {},
+): Distribution {
   if (pot < 0n) throw new RulesetError('a pot cannot be negative');
 
   const band = bandFor(ruleset, pot);
@@ -58,7 +69,7 @@ export function distribute(ruleset: Ruleset, pot: bigint, entrants: number): Dis
     return { pot, house: 0n, distributable: 0n, payouts: [], band, paidPlaces: 0 };
   }
 
-  const house = houseCut(ruleset, pot);
+  const house = houseCut(ruleset, pot, options.houseBaseLamports ?? pot);
   const distributable = pot - house;
 
   // Fewer entrants than the band pays places for. The shares are renormalized

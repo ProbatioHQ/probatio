@@ -25,6 +25,8 @@ export interface CreateSeasonInput {
   readonly engineVersion: number;
   /** Hex. The 32 bytes the program records for this season. */
   readonly rulesetHash: string;
+  /** A prize put up rather than paid for by entries. Lamports, as digits. */
+  readonly sponsorLamports?: string;
 }
 
 export async function createRankedSeason(
@@ -36,8 +38,9 @@ export async function createRankedSeason(
     sql: `INSERT INTO seasons
             (ordinal, name, ranked, status, starts_at, ends_at, entry_opens_at, entry_closes_at,
              starting_balance, entry_cost, house_bps, house_threshold,
-             latency_ms, max_price_impact_bps, engine_version, scoring_formula_hash, created_at)
-          VALUES (?, ?, 1, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             latency_ms, max_price_impact_bps, engine_version, scoring_formula_hash,
+             sponsor_lamports, created_at)
+          VALUES (?, ?, 1, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id`,
     args: [
       input.ordinal,
@@ -54,6 +57,7 @@ export async function createRankedSeason(
       input.maxPriceImpactBps,
       input.engineVersion,
       input.rulesetHash,
+      input.sponsorLamports ?? '0',
       now,
     ],
   });
@@ -108,8 +112,12 @@ export async function highestRankedOrdinal(db: Client): Promise<number> {
 
 export interface SeasonTotals {
   readonly entrants: number;
-  /** Summed from verified payments, never from a counter. */
+  /** Entries plus any sponsored prize. What the season actually pays out. */
   readonly potLamports: bigint;
+  /** The part the entrants paid, and the part they are owed back if it voids. */
+  readonly entriesLamports: bigint;
+  /** The part somebody put up. Never refundable, because it was never theirs. */
+  readonly sponsorLamports: bigint;
 }
 
 /**
@@ -131,10 +139,21 @@ export async function seasonTotals(db: Client, seasonId: number): Promise<Season
     args: [seasonId],
   });
 
-  let pot = 0n;
-  for (const row of payments.rows) pot += BigInt(String(row['amount']));
+  let entries = 0n;
+  for (const row of payments.rows) entries += BigInt(String(row['amount']));
 
-  return { entrants: Number(entrants.rows[0]?.['n'] ?? 0), potLamports: pot };
+  const sponsored = await db.execute({
+    sql: 'SELECT sponsor_lamports FROM seasons WHERE id = ?',
+    args: [seasonId],
+  });
+  const sponsor = BigInt(String(sponsored.rows[0]?.['sponsor_lamports'] ?? '0'));
+
+  return {
+    entrants: Number(entrants.rows[0]?.['n'] ?? 0),
+    potLamports: entries + sponsor,
+    entriesLamports: entries,
+    sponsorLamports: sponsor,
+  };
 }
 
 function toSeason(row: Record<string, unknown>): SeasonRow {
