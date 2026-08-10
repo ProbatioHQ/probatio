@@ -1,7 +1,7 @@
 import type { Launch } from '@probatio/db';
 import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { marketCapLamports, priceFromReserves } from '@probatio/candles';
-import { subscribeToCurves, subscribeToLaunches } from '@/lib/launch-stream';
+import { subscribeToCurves, subscribeToLaunches, takeStreamSlot } from '@/lib/launch-stream';
 import { knownImages } from '@/lib/token-images';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -22,10 +22,19 @@ export const runtime = 'nodejs';
 const HEARTBEAT_MS = 25_000;
 
 export async function GET(request: Request): Promise<Response> {
-  // One connection costs a subscription slot, not a query, so the limit here
-  // is against opening hundreds of them rather than against reading.
   const throttled = await rateLimit(request, 'read');
   if (throttled.response) return throttled.response;
+
+  // A rate limit does not bound this. A stream is held open, so the cost is
+  // concurrency rather than frequency: one caller allowed 120 reads a minute
+  // could hold 120 streams open forever and never ask for anything again.
+  const slot = takeStreamSlot(throttled.key);
+  if (!slot.granted) {
+    return Response.json(
+      { error: 'too many open streams from here' },
+      { status: 429, headers: { 'retry-after': '30' } },
+    );
+  }
 
   const encoder = new TextEncoder();
 
@@ -109,6 +118,7 @@ export async function GET(request: Request): Promise<Response> {
         clearInterval(heartbeat);
         unsubscribe();
         unsubscribeCurves();
+        slot.release();
         try {
           controller.close();
         } catch {
@@ -117,6 +127,13 @@ export async function GET(request: Request): Promise<Response> {
       };
 
       request.signal.addEventListener('abort', close);
+      // Already aborted before this ran — a client that hung up during the
+      // handshake would otherwise hold a slot with nothing to release it.
+      if (request.signal.aborted) close();
+    },
+    cancel() {
+      // The runtime tears the stream down without an abort in some paths.
+      slot.release();
     },
   });
 

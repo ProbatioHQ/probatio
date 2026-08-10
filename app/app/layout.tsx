@@ -48,6 +48,11 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <HeaderScroll />
         <header className="site-header">
           <div className="shell">
+            {/* A plain anchor, not next/link, and the same goes for every
+                internal link on the site. PageTransition intercepts these
+                clicks and routes them itself so the page can fade out first;
+                next/link would navigate on its own and the two would race. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/" className="wordmark">
               <span className="mark" aria-hidden="true" />
               Probatio

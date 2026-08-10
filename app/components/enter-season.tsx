@@ -22,13 +22,6 @@ interface IntentResponse {
   error?: string;
 }
 
-function sol(lamports: string): string {
-  const value = BigInt(lamports);
-  const whole = value / 1_000_000_000n;
-  const fraction = ((value % 1_000_000_000n) * 1_000n) / 1_000_000_000n;
-  return `${whole}.${fraction.toString().padStart(3, '0')}`;
-}
-
 export function EnterSeason({ free = false }: { free?: boolean }) {
   const [stage, setStage] = useState<Stage>('idle');
   const [message, setMessage] = useState<string | null>(null);

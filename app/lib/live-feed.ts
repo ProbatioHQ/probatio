@@ -6,7 +6,7 @@ import { db } from './db';
 import { reportFeedRunning, reportFeedState } from './health';
 import { publishLaunches } from './launch-stream';
 import { resolveLaunchImages } from './token-images';
-import { ingestTradeEvents, startTradeCandles } from './trade-candles';
+import { ingestTradeEvents, startTradeCandles, stopTradeCandles } from './trade-candles';
 import { rpcEndpoint } from './env';
 
 /**
@@ -97,4 +97,7 @@ export function stopLiveFeed(): void {
   subscription?.stop();
   subscription = null;
   started = false;
+  // Started by startLiveFeed, so it stops here too. Left running, its timer
+  // and buffer survived every restart across a dev session.
+  stopTradeCandles();
 }

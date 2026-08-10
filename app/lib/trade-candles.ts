@@ -32,6 +32,16 @@ const FLUSH_INTERVAL_MS = 3_000;
  * asked for; growing without limit costs the process.
  */
 const MAX_MINTS = 400;
+/**
+ * A ceiling per mint, per flush window.
+ *
+ * The mint count was bounded and the array behind each one was not, so a token
+ * being hammered could accumulate without limit between flushes. The candle a
+ * window produces is the same whether it saw two hundred trades or two
+ * thousand — the open, the extremes and the close are already fixed by the
+ * first few hundred — so the tail costs memory and buys nothing.
+ */
+const MAX_PER_MINT = 500;
 
 const pending = new Map<string, Observation[]>();
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -45,6 +55,7 @@ export function ingestTradeEvents(events: readonly TradeEvent[]): void {
       observations = [];
       pending.set(event.mint, observations);
     }
+    if (observations.length >= MAX_PER_MINT) continue;
     // The same reserves the fill engine quotes against, so a chart and a fill
     // can never disagree about what the price was.
     observations.push(observationFromEvent(event));

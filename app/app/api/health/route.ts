@@ -1,6 +1,8 @@
 import { capabilities, overall } from '@probatio/health';
 import { rateLimit } from '@/lib/rate-limit';
 import { downNow } from '@/lib/health';
+import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
+import { pendingTradeMints } from '@/lib/trade-candles';
 
 /**
  * What the site can currently do.
@@ -24,6 +26,20 @@ export async function GET(request: Request): Promise<Response> {
       status: level,
       down,
       capabilities: states.filter((state) => state.level !== 'ok'),
+      /*
+       * The live subsystems, counted rather than assumed.
+       *
+       * These are the things that fail quietly. A stream registry that has
+       * drifted from the number of open connections means slots are leaking;
+       * a trade buffer pinned at its ceiling means candles are being dropped.
+       * Neither shows up as an outage, and neither is visible at all without
+       * a number to look at.
+       */
+      live: {
+        openStreams: openStreamCount(),
+        streamSubscribers: launchListenerCount(),
+        bufferedTradeMints: pendingTradeMints(),
+      },
       // Stated whatever the status, because the promise matters most when
       // something is broken.
       promise:

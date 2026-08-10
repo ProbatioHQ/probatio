@@ -21,13 +21,19 @@ const EXIT_MS = 190;
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [leaving, setLeaving] = useState(false);
+  /*
+   * Which page is on its way out, rather than a boolean saying one is.
+   *
+   * The flag used to be reset by an effect watching the path, which meant every
+   * navigation rendered twice: once with the new route still marked as leaving,
+   * then again after the effect cleared it. Derived from the path instead, it
+   * is simply false the moment the path changes — no effect, no second render,
+   * and no window in which the arriving page is styled as though it were
+   * departing.
+   */
+  const [leavingFrom, setLeavingFrom] = useState<string | null>(null);
+  const leaving = leavingFrom !== null && leavingFrom === pathname;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // A new path means the new page has arrived, so stop leaving.
-  useEffect(() => {
-    setLeaving(false);
-  }, [pathname]);
 
   const onClick = useCallback(
     (event: MouseEvent) => {
@@ -45,7 +51,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       if (href === pathname) return;
 
       event.preventDefault();
-      setLeaving(true);
+      setLeavingFrom(pathname);
 
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => router.push(href), EXIT_MS);

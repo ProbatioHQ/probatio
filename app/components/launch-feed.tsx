@@ -225,10 +225,26 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   const [showFilters, setShowFilters] = useState(false);
 
   const searching = query.trim().length > 0;
+
+  /*
+   * Read by the stream handlers, which are registered once and would otherwise
+   * close over the values from the render that created them.
+   *
+   * Written in an effect rather than during render. A ref mutated in the render
+   * body is a side effect in a function React is allowed to run twice, throw
+   * away, or interrupt — so under concurrent rendering the handlers can end up
+   * reading a value from a render that was never committed.
+   */
   const searchingRef = useRef(searching);
-  searchingRef.current = searching;
   const pausedRef = useRef(filters.paused);
-  pausedRef.current = filters.paused;
+
+  useEffect(() => {
+    searchingRef.current = searching;
+  }, [searching]);
+
+  useEffect(() => {
+    pausedRef.current = filters.paused;
+  }, [filters.paused]);
   /** False until the first save has been deliberately skipped. */
   const savedOnce = useRef(false);
 

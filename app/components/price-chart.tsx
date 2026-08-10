@@ -112,8 +112,16 @@ export function PriceChart({
   const [showMa, setShowMa] = useState(true);
   const [drawing, setDrawing] = useState(false);
   const [lineCount, setLineCount] = useState(0);
+  /*
+   * Read by the chart's click handler, registered once when the chart is
+   * created. Written in an effect rather than during render: a ref mutated in
+   * the render body is a side effect in a function React may run twice or
+   * discard.
+   */
   const drawingRef = useRef(drawing);
-  drawingRef.current = drawing;
+  useEffect(() => {
+    drawingRef.current = drawing;
+  }, [drawing]);
 
   useEffect(() => {
     let cancelled = false;

@@ -132,9 +132,3 @@ export async function solUsd(): Promise<number | null> {
     inFlight = null;
   }
 }
-
-/** Lamports to dollars, for rendering. Null in, null out. */
-export function usdFromLamports(lamports: bigint, solUsdPrice: number | null): number | null {
-  if (solUsdPrice === null) return null;
-  return (Number(lamports) / 1e9) * solUsdPrice;
-}
