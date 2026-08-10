@@ -4,7 +4,7 @@ export const metadata = { title: 'Verify a record, Probatio' };
 
 export default function VerifyPage() {
   return (
-    <main className="prose">
+    <main className="prose page-prose">
       <h1>Check a record</h1>
       <p>
         This page does not ask us whether a record is valid. It rebuilds every trade from its

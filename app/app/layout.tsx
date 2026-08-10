@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { PageTransition } from '@/components/page-transition';
 import { StatusBanner } from '@/components/status-banner';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
@@ -33,6 +34,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
+        <div className="grain" aria-hidden="true" />
+        <div className="glow" aria-hidden="true" />
         <header className="site-header">
           <div className="shell">
             <a href="/" className="wordmark">
@@ -48,7 +51,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
 
         <StatusBanner />
 
-        <div className="shell">{children}</div>
+        <PageTransition>
+          <div className="shell">{children}</div>
+        </PageTransition>
 
         <footer className="site-footer">
           <div className="shell">

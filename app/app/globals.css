@@ -809,3 +809,370 @@ hr {
 .button-link:hover {
   background: color-mix(in srgb, var(--text) 88%, transparent);
 }
+
+/* ============================================================ depth */
+
+/*
+ * What made the old page look cheap was not the absence of movement. It was
+ * that every surface sat on exactly the same flat plane: one background, one
+ * border, no light anywhere. These are the layers that give it a floor and a
+ * light source.
+ */
+
+/* Film grain. Almost invisible on its own, and the thing that stops a large
+   dark area reading as a blank fill. */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* A light source above the fold, so the page has a top rather than being
+   uniformly dark from edge to edge. */
+.glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(80% 55% at 18% -8%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 62%),
+    radial-gradient(60% 45% at 88% 2%, color-mix(in srgb, var(--gain) 8%, transparent), transparent 60%);
+}
+
+body > *:not(.grain):not(.glow) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================================ transitions */
+
+.page {
+  animation: page-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.page.leaving {
+  animation: page-out 190ms ease both;
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes page-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+
+/* ============================================================ surfaces */
+
+/*
+ * Panels and cards get a lit top edge and a gradient body rather than a flat
+ * fill. It is the difference between a rectangle and an object.
+ */
+.panel,
+.card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 3%, var(--ink-raised)), var(--ink-raised) 45%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 8px 24px -12px rgb(0 0 0 / 0.6);
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+}
+
+/* A highlight that follows the top edge, brighter where the light is. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 45%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card:hover {
+  border-color: var(--line-bright);
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent),
+    0 2px 4px rgb(0 0 0 / 0.4),
+    0 18px 40px -16px rgb(0 0 0 / 0.75);
+}
+
+/* The number a card exists to show, given its own weight. */
+.card .figure {
+  background: linear-gradient(180deg, var(--text), color-mix(in srgb, var(--text) 55%, transparent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ============================================================ header */
+
+.site-header {
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.site-nav a {
+  position: relative;
+  padding: 4px 0;
+}
+
+/* An underline that grows from the left rather than appearing. */
+.site-nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 100%;
+  background: var(--text);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.site-nav a:hover::after {
+  transform: scaleX(1);
+}
+
+/* ============================================================ hero */
+
+.hero {
+  padding: 104px 0 88px;
+}
+
+.badge {
+  background: color-mix(in srgb, var(--ink-raised) 88%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+}
+
+.badge .dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gain) 22%, transparent);
+}
+
+button,
+.button-link {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent),
+    0 2px 6px rgb(0 0 0 / 0.45);
+}
+
+.ghost-link {
+  background: color-mix(in srgb, var(--ink-raised) 70%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
+}
+
+/* ============================================================ prose */
+
+/*
+ * The written pages were plain text on a flat ground, which is exactly what
+ * they looked like. They get the same floor as everything else.
+ */
+.prose h1 {
+  font-size: clamp(34px, 5vw, 52px);
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, var(--text) 35%, color-mix(in srgb, var(--text) 55%, transparent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 4px;
+}
+
+.prose h2 {
+  font-size: 21px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.prose > p:first-of-type {
+  font-size: 17.5px;
+  color: var(--text);
+}
+
+.prose table {
+  background: var(--ink-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.prose table th,
+.prose table td {
+  padding: 10px 14px;
+}
+
+.prose pre {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .page.leaving,
+  .card,
+  .card::before,
+  .site-nav a::after {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ============================================================ docs */
+
+.docs-shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: 56px;
+  padding: 56px 0 96px;
+  align-items: start;
+}
+
+.docs-nav {
+  position: sticky;
+  top: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.docs-nav ul {
+  gap: 2px;
+}
+
+.docs-nav a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: var(--text-dim);
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.docs-nav a:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--ink-raised) 80%, transparent);
+}
+
+.docs-nav a[aria-current='page'] {
+  color: var(--text);
+  background: var(--ink-raised);
+  border-color: var(--line);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+
+.docs-nav .label {
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.docs-nav .blurb {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.35;
+}
+
+.docs-nav-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.docs-nav-foot a {
+  padding: 0;
+  border: 0;
+  color: var(--text-faint);
+}
+
+/*
+ * Prose sets its own rhythm.
+ *
+ * The page-level layout spaces sections 64px apart, which is right for panels
+ * and enormous for paragraphs. Left alone, the written pages read as fragments
+ * floating in the dark with the eye travelling between them.
+ */
+.docs-body,
+.prose {
+  display: block;
+}
+
+.prose > * + * {
+  margin-top: 14px;
+}
+
+.prose > h2 + p,
+.prose > h2 + ul,
+.prose > h2 + ol,
+.prose > h2 + div {
+  margin-top: 12px;
+}
+
+.prose > p + p {
+  margin-top: 12px;
+}
+
+.prose ul,
+.prose ol {
+  margin-top: 10px;
+}
+
+.prose li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  .docs-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding: 32px 0 64px;
+  }
+
+  .docs-nav {
+    position: static;
+  }
+
+  .docs-nav ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 6px;
+  }
+
+  .docs-nav .blurb {
+    display: none;
+  }
+}
+
+/* A written page that is not under /docs still needs prose rhythm. */
+.page-prose {
+  padding: 56px 0 96px;
+  max-width: 72ch;
+}

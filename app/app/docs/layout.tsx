@@ -1,3 +1,5 @@
+import { DocsNav } from '@/components/docs-nav';
+
 /**
  * The documentation shell.
  *
@@ -8,14 +10,9 @@
  */
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="prose">
-      <nav className="site-nav" aria-label="Documentation" style={{ marginBottom: 8 }}>
-        <a href="/docs">Overview</a>
-        <a href="/docs/fills">Fills</a>
-        <a href="/docs/records">Records</a>
-        <a href="/docs/scoring">Scoring</a>
-      </nav>
-      {children}
-    </main>
+    <div className="docs-shell">
+      <DocsNav />
+      <article className="prose docs-body">{children}</article>
+    </div>
   );
 }

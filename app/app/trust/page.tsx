@@ -10,7 +10,7 @@ export const metadata = { title: 'What you have to trust, Probatio' };
  */
 export default function TrustPage() {
   return (
-    <main className="prose">
+    <main className="prose page-prose">
       <h1>What you have to trust</h1>
 
       <p>
