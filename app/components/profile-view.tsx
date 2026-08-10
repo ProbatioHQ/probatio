@@ -78,7 +78,7 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
             <dd className="mono">{season.roundTrips}</dd>
             <dt>Win rate</dt>
             <dd className="mono">
-              {season.winRateBps === null ? '—' : `${(season.winRateBps / 100).toFixed(1)}%`}
+              {season.winRateBps === null ? ', ' : `${(season.winRateBps / 100).toFixed(1)}%`}
             </dd>
             <dt>Profit and loss</dt>
             <dd className={`mono ${season.netPnl.startsWith('-') ? 'loss' : 'gain'}`}>
@@ -104,7 +104,7 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
         <a href={`/verify?trader=${encodeURIComponent(profile.trader)}`}>
           Check this record yourself
         </a>{' '}
-        — the verifier runs in your browser against an RPC you choose. Nothing on this page
+       , the verifier runs in your browser against an RPC you choose. Nothing on this page
         is taken on our word.
       </p>
     </>

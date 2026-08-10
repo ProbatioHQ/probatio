@@ -120,7 +120,7 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
     // failure we have not established.
     setStage('error');
     setMessage(
-      'Still waiting on the network. Your payment is not lost — reload in a minute and it will be picked up.',
+      'Still waiting on the network. Your payment is not lost, reload in a minute and it will be picked up.',
     );
   }
 
@@ -155,7 +155,7 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
         {stage === 'signing' && 'Approve in Phantom…'}
         {stage === 'confirming' && (free ? 'Entering…' : 'Confirming…')}
         {(stage === 'idle' || stage === 'error') &&
-          (free ? 'Enter — free' : 'Enter the season')}
+          (free ? 'Enter, free' : 'Enter the season')}
       </button>
 
       {message && <p role={stage === 'error' ? 'alert' : undefined}>{message}</p>}

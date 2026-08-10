@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Records — Probatio',
+  title: 'Records, Probatio',
   description:
     'How a trade becomes a hash chain on Solana that nobody can revise, and how to check one without trusting this site.',
 };
@@ -19,7 +19,7 @@ export default function RecordsDoc() {
 
       <p>
         Each fill is encoded into a fixed-width record and hashed. It carries the amounts, the
-        fees, the slot it was clicked at, the slot it filled at, the engine that priced it — and
+        fees, the slot it was clicked at, the slot it filled at, the engine that priced it, and
         the pool reserves it was quoted against.
       </p>
 
@@ -47,7 +47,7 @@ export default function RecordsDoc() {
       </pre>
 
       <p>
-        That value is what lives on chain — thirty-two bytes covering every trade you have ever
+        That value is what lives on chain, thirty-two bytes covering every trade you have ever
         made, in order. A list would grow forever and cost rent forever; a single latest root
         would let history be quietly replaced.
       </p>
@@ -64,7 +64,7 @@ export default function RecordsDoc() {
       <ul>
         <li>
           <strong>Us.</strong> The server cannot revise a trade after the fact. The key that
-          writes commitments cannot either — it can only append.
+          writes commitments cannot either, it can only append.
         </li>
         <li>
           <strong>A stolen key.</strong> Somebody who took the committing key could append
@@ -81,7 +81,7 @@ export default function RecordsDoc() {
 
       <p>
         <a href="/verify">The verify page</a> rebuilds every trade from its own recorded inputs,
-        recomputes each batch root, folds the chain, and compares the result against Solana — in
+        recomputes each batch root, folds the chain, and compares the result against Solana, in
         your browser, against an endpoint you choose. It does not ask this server whether the
         record is valid, because a server vouching for its own records is worth nothing.
       </p>

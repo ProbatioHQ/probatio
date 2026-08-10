@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Fills — Probatio',
+  title: 'Fills, Probatio',
   description:
     'How a simulated fill is computed against live pool reserves, with real slippage and real delay. And the measured error against real trades: 0 bps.',
 };
@@ -11,8 +11,8 @@ export default function FillsDoc() {
 
       <p>
         A paper trading tool that fills you at the price you clicked is a toy. It teaches the one
-        habit that loses money in the market it is pretending to be — that size is free and speed
-        is free — and then tells you that you are good at trading.
+        habit that loses money in the market it is pretending to be, that size is free and speed
+        is free, and then tells you that you are good at trading.
       </p>
 
       <h2>What happens when you click</h2>
@@ -79,7 +79,7 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        A pair is only scored when the reserves prove the two trades were consecutive — that
+        A pair is only scored when the reserves prove the two trades were consecutive, that
         nothing happened in between that we did not see. In the run above, 91 of 221 events were
         skipped for that reason. Throwing away most of the data is what makes the number mean
         anything: a sample that quietly included gaps would be measuring our bookkeeping rather

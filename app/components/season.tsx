@@ -104,10 +104,10 @@ export function Season() {
       {season.payouts.length > 0 && (
         <>
           <h3>Paid now</h3>
-          <ol className="mono">
+          <ol className="mono bare">
             {season.payouts.map((payout) => (
               <li key={payout.place}>
-                {ORDINALS[payout.place - 1] ?? `${payout.place}th`} — {sol(payout.lamports)} SOL
+                {ORDINALS[payout.place - 1] ?? `${payout.place}th`}, {sol(payout.lamports)} SOL
               </li>
             ))}
           </ol>

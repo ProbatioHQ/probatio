@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Scoring — Probatio',
+  title: 'Scoring, Probatio',
   description:
     'Highest return wins. How ties are broken, why there is no minimum trade count, and why risk-adjusted scoring was removed.',
 };
@@ -40,7 +40,7 @@ export default function ScoringDoc() {
 
       <p>
         Published in advance and hashed into the season&apos;s rules, because with a prize on the
-        table a tie is the most contestable moment there is — and the wrong time to decide is
+        table a tie is the most contestable moment there is, and the wrong time to decide is
         after seeing who it affects.
       </p>
 
@@ -52,7 +52,7 @@ export default function ScoringDoc() {
         </li>
         <li>Then whoever entered the season first.</li>
         <li>
-          Then the lower wallet address. This one is arbitrary and it is meant to be — it exists
+          Then the lower wallet address. This one is arbitrary and it is meant to be, it exists
           so the order is total, because a ranking that reports two firsts cannot pay one.
         </li>
       </ol>
@@ -65,16 +65,16 @@ export default function ScoringDoc() {
 
       <p>
         Anything still held is valued at the market price. A token whose price cannot be read is
-        held at what it cost rather than marked to nothing — wiping a position because a network
+        held at what it cost rather than marked to nothing, wiping a position because a network
         call failed would invent the number that decides who gets paid.
       </p>
 
       <h2>The rules cannot move</h2>
 
       <p>
-        A season&apos;s entire ruleset — the scoring, the tie-breaks, the payout shape, the entry
+        A season&apos;s entire ruleset, the scoring, the tie-breaks, the payout shape, the entry
         cost, the simulation conditions, and the conditions under which the season does not count
-        — is encoded and hashed before anybody enters, and that hash is recorded on chain with
+       , is encoded and hashed before anybody enters, and that hash is recorded on chain with
         the season.
       </p>
 
@@ -89,13 +89,13 @@ export default function ScoringDoc() {
         A season is void only under conditions published in advance and measured, never judged:
         an extended price feed outage, a chain halt, any trade left uncommitted, any trade that
         will not rebuild from its own inputs, or the engine changing mid-season. Everything else
-        stands — an unpopular winner, a lucky winner, a one-trade winner and a single entrant are
+        stands, an unpopular winner, a lucky winner, a one-trade winner and a single entrant are
         outcomes, not faults.
       </p>
 
       <p>
         A void season refunds every entrant in full and takes no cut. And once results are on
-        chain a season can never be voided, however unpopular the winner — otherwise every
+        chain a season can never be voided, however unpopular the winner, otherwise every
         condition above becomes a way to cancel a result somebody dislikes after seeing it.
       </p>
     </>

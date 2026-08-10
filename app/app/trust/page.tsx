@@ -1,4 +1,4 @@
-export const metadata = { title: 'What you have to trust — Probatio' };
+export const metadata = { title: 'What you have to trust, Probatio' };
 
 /**
  * The page that argues against the product.
@@ -26,7 +26,7 @@ export default function TrustPage() {
       </p>
       <p>
         But a Solana program has an upgrade authority, and while one exists that key can replace
-        the program with a different one — including a version that rewrites records the current
+        the program with a different one, including a version that rewrites records the current
         version refuses to touch. So the honest claim is not that your record cannot be edited.
         It is that your record cannot be edited <strong>without replacing the program on chain,
         which is a public, permanent, timestamped act</strong> that anyone watching would see.
@@ -44,7 +44,7 @@ export default function TrustPage() {
 
       <h2>Why it has not been burned yet</h2>
       <p>
-        Burning it is the strongest version of the promise, and it is permanent — no bug fix
+        Burning it is the strongest version of the promise, and it is permanent, no bug fix
         afterwards, ever. A review of the program found five issues, one of which meant entry
         fees would have been locked in the vault forever with no way to pay anybody. Burning a
         program with a bug like that in it would have made the bug permanent too.
@@ -72,7 +72,7 @@ export default function TrustPage() {
         <li>
           The key that signs commitments is a hot key on a server. It cannot rewrite anything or
           move money, but a stolen copy could append records for trades that never happened. That
-          is detectable — every commitment is compared against what we predicted — and it is not
+          is detectable, every commitment is compared against what we predicted, and it is not
           repairable, so a season it happened in would be void.
         </li>
         <li>

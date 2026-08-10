@@ -375,6 +375,8 @@ li::marker {
   color: var(--text-faint);
 }
 
+/* Anything already numbered in its own text. */
+ol.bare,
 ul.bare {
   list-style: none;
   padding-left: 0;
@@ -383,6 +385,7 @@ ul.bare {
   gap: 8px;
 }
 
+ol.bare li + li,
 ul.bare li + li {
   margin-top: 0;
 }
@@ -574,4 +577,235 @@ hr {
 
 .status-banner.stopped {
   background: color-mix(in srgb, var(--loss) 18%, var(--ink));
+}
+
+/* ------------------------------------------------------------ motion */
+
+/*
+ * Movement, used to direct attention rather than to decorate.
+ *
+ * The page had none, which made it read as a document. Everything here is
+ * short, runs once on arrival, and is switched off entirely for anyone who
+ * asked for less motion.
+ */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes appear {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.85); }
+}
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+.rise { animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.appear { animation: appear 0.7s ease both; }
+.slide { animation: slide 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Children arrive one after another rather than all at once. */
+.stagger > * { animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stagger > *:nth-child(1) { animation-delay: 40ms; }
+.stagger > *:nth-child(2) { animation-delay: 100ms; }
+.stagger > *:nth-child(3) { animation-delay: 160ms; }
+.stagger > *:nth-child(4) { animation-delay: 220ms; }
+.stagger > *:nth-child(5) { animation-delay: 280ms; }
+.stagger > *:nth-child(6) { animation-delay: 340ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 380ms; }
+
+/* ------------------------------------------------------------ hero */
+
+.hero {
+  position: relative;
+  padding: 88px 0 72px;
+  overflow: hidden;
+}
+
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
+  /* Faded at the edges so the type never fights the drawing behind it. */
+  mask-image: radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 78%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 780px;
+}
+
+.display {
+  font-size: clamp(40px, 7.2vw, 74px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  background: linear-gradient(180deg, var(--text) 30%, color-mix(in srgb, var(--text) 45%, transparent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lede {
+  font-size: clamp(16px, 1.7vw, 19px);
+  line-height: 1.55;
+  color: var(--text-dim);
+  max-width: 60ch;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  border: 1px solid var(--line-bright);
+  background: color-mix(in srgb, var(--ink-raised) 70%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gain);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------ cards */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  background: var(--ink-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.card:hover {
+  border-color: var(--line-bright);
+  transform: translateY(-2px);
+}
+
+.card h3 {
+  font-size: 15px;
+}
+
+.card p {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.card .figure {
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* A line that draws itself under a section heading. */
+.rule {
+  height: 1px;
+  background: var(--line);
+  position: relative;
+  overflow: hidden;
+}
+
+.rule::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: sweep 2.8s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .appear,
+  .slide,
+  .stagger > *,
+  .badge .dot,
+  .rule::after {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Links that have to look like actions without stealing the primary button. */
+.ghost-link,
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 550;
+  font-size: 14.5px;
+  border-radius: 8px;
+  padding: 9px 18px;
+  text-decoration: none;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.ghost-link {
+  color: var(--text-dim);
+  border: 1px solid var(--line-bright);
+}
+
+.ghost-link:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.button-link {
+  color: var(--ink);
+  background: var(--text);
+}
+
+.button-link:hover {
+  background: color-mix(in srgb, var(--text) 88%, transparent);
 }

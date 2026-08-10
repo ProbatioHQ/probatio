@@ -27,10 +27,14 @@ let started = false;
  * healthy feed on a server where the feed was never started — which is a lie
  * that looks like good news, the worst kind for a status page to tell.
  */
-const feedState = { running: false, connected: false };
+const feedState = { running: false, connected: false, startedAt: 0 };
+
+/** A socket needs a moment to connect. Below this, silence is not an outage. */
+const CONNECT_GRACE_MS = 20_000;
 
 export function reportFeedRunning(): void {
   feedState.running = true;
+  feedState.startedAt = Date.now();
 }
 
 export function reportFeedState(connected: boolean): void {
@@ -39,7 +43,14 @@ export function reportFeedState(connected: boolean): void {
 
 function feedFailure(): string | null {
   if (!feedState.running) return 'feed not running on this instance';
-  return feedState.connected ? null : 'websocket disconnected';
+  if (feedState.connected) return null;
+
+  // Still connecting. Reporting that as an outage put "new launches are not
+  // arriving" on the front page while launches were visibly arriving, which is
+  // worse than saying nothing: it teaches people the banner is noise.
+  if (Date.now() - feedState.startedAt < CONNECT_GRACE_MS) return null;
+
+  return 'websocket disconnected';
 }
 
 async function probeRpc(): Promise<string | null> {
@@ -66,7 +77,13 @@ export async function probeOnce(): Promise<void> {
   // process will notice.
   await record('rpc', await probeRpc(), now);
   await record('feed', feedFailure(), now);
-  await record('coach', coachApiKey() === null ? 'not configured' : null, now);
+
+  // A feature that was never switched on is absent, not broken. Recording it
+  // as an outage put a permanent warning strip across every page for something
+  // nobody had asked for, which is how a banner teaches people to ignore it.
+  // If the key is set and the calls fail, that is a different thing and the
+  // coach route reports it where it happens.
+  if (coachApiKey() !== null) await record('coach', null, now);
 }
 
 export function startProbing(): void {

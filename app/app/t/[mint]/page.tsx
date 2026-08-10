@@ -11,7 +11,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { mint } = await params;
   const token = await tokenName(mint);
-  return { title: token.known ? `${token.symbol ?? token.name} — Probatio` : 'Probatio' };
+  return { title: token.known ? `${token.symbol ?? token.name}, Probatio` : 'Probatio' };
 }
 
 export default async function TokenPage({

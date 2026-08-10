@@ -32,7 +32,7 @@ const STEPS = [
     title: 'Make a trade',
     body:
       'You start with 10 SOL of practice money. The fill is quoted when you click and lands after a real delay, ' +
-      'so the price moves while you wait — and sometimes the trade fails, exactly as it would with real money.',
+      'so the price moves while you wait, and sometimes the trade fails, exactly as it would with real money.',
   },
 ] as const;
 
@@ -71,7 +71,7 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
           return (
             <li key={step.title} aria-current={state === 'current' ? 'step' : undefined}>
               <strong>{step.title}</strong>
-              {state === 'done' && <span aria-label="done"> — done</span>}
+              {state === 'done' && <span aria-label="done">, done</span>}
               {state === 'current' && <p>{step.body}</p>}
             </li>
           );
@@ -79,7 +79,7 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
       </ol>
       <p>
         Free, and nothing here risks real money. Your record is written to the chain as you
-        trade, so it can be checked later by anyone — including against us.
+        trade, so it can be checked later by anyone, including against us.
       </p>
     </aside>
   );

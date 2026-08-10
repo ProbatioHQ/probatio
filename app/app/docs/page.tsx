@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'How it works — Probatio',
+  title: 'How it works, Probatio',
   description:
     'How fills are computed, how records are committed, and how a season is won. With the measured accuracy of the simulator.',
 };
@@ -31,7 +31,7 @@ export default function DocsIndex() {
           <a href="/docs/records">Records</a>
         </h2>
         <p>
-          How a trade becomes a hash, a batch, and a value on Solana that nobody can revise —
+          How a trade becomes a hash, a batch, and a value on Solana that nobody can revise , 
           and how to check one without asking us anything.
         </p>
       </section>

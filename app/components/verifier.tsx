@@ -171,7 +171,7 @@ export function Verifier() {
           passed: health.result === 'ok',
           detail:
             health.result === 'ok'
-              ? 'reachable — the trader record account is read from here'
+              ? 'reachable, the trader record account is read from here'
               : 'reachable but not healthy',
         });
       } catch {
@@ -231,7 +231,7 @@ export function Verifier() {
               <span className={check.passed ? 'gain' : 'dim'}>
                 {check.passed ? 'Pass' : 'Not verified'}
               </span>{' '}
-              — {check.label}: <span className="dim">{check.detail}</span>
+             , {check.label}: <span className="dim">{check.detail}</span>
             </li>
           ))}
         </ol>
