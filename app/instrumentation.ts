@@ -15,4 +15,8 @@ export async function register(): Promise<void> {
   // unreachable matters more than the feed does.
   const { startProbing } = await import('./lib/health');
   startProbing();
+
+  // Commits records to the chain. Does nothing without a key, and says so.
+  const { startKeeper } = await import('./lib/keeper');
+  startKeeper();
 }

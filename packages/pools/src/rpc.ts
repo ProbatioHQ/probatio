@@ -338,6 +338,52 @@ export class RpcClient {
   }
 
   /**
+   * Submit a signed transaction.
+   *
+   * Preflight is left on: the simulation catches a malformed instruction before
+   * it costs a fee, and the keeper submits few enough transactions that the
+   * extra round trip is worth more than the latency.
+   *
+   * Resolving means the cluster accepted it, not that it landed. Only reading
+   * the chain proves that, which is what reconcile is for.
+   */
+  async sendTransaction(base64: string): Promise<string> {
+    return this.call<string>('sendTransaction', [
+      base64,
+      { encoding: 'base64', preflightCommitment: this.commitment, maxRetries: 3 },
+    ]);
+  }
+
+  /**
+   * Wait for a signature to settle, or give up.
+   *
+   * Gives up rather than throwing: a transaction that has not confirmed yet may
+   * still land, and treating "not yet" as "failed" is exactly how a batch gets
+   * committed twice.
+   */
+  async confirmSignature(
+    signature: string,
+    options: { timeoutMs?: number; pollMs?: number } = {},
+  ): Promise<{ confirmed: boolean; slot: number | null; err: unknown }> {
+    const deadline = Date.now() + (options.timeoutMs ?? 60_000);
+    const sleep = this.#options.sleepImpl ?? defaultSleep;
+
+    for (;;) {
+      const result = await this.call<
+        WithContext<({ slot: number; err: unknown; confirmationStatus: string } | null)[]>
+      >('getSignatureStatuses', [[signature], { searchTransactionHistory: true }]);
+
+      const status = result.value[0];
+      if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
+        return { confirmed: status.err === null, slot: status.slot, err: status.err };
+      }
+
+      if (Date.now() >= deadline) return { confirmed: false, slot: null, err: null };
+      await sleep(options.pollMs ?? 1_000);
+    }
+  }
+
+  /**
    * A blockhash to build a transaction against.
    *
    * `lastValidBlockHeight` is returned with it because a transaction built on a

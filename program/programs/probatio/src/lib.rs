@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("HZvgzZ6JvBtcUBYuLEkQQJ5hbwx1ZACss52LjFLd4UPX");
+declare_id!("HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA");
 
 /// Probatio's on-chain half.
 ///

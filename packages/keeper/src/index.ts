@@ -10,6 +10,19 @@
 export { DEFAULT_MAX_BATCH, planBatches } from './plan';
 export type { Batch } from './plan';
 
+export {
+  COMMIT_ROOT_DISCRIMINATOR,
+  PROGRAM_ID,
+  SolanaGateway,
+  TRADER_RECORD_DISCRIMINATOR,
+  anchorDiscriminator,
+  commitRootInstruction,
+  decodeTraderRecord,
+  recordAddress,
+  seasonAddress,
+} from './solana';
+export type { SolanaGatewayOptions } from './solana';
+
 export { NO_RECORD, auditRecords } from './audit';
 export type { AuditFinding, AuditResult, AuditVerdict } from './audit';
 

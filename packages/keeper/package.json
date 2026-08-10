@@ -13,6 +13,11 @@
   "dependencies": {
     "@probatio/commit": "*",
     "@probatio/db": "*",
-    "@probatio/sim": "*"
+    "@probatio/sim": "*",
+    "@probatio/pools": "*",
+    "@probatio/payments": "*",
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.6.0",
+    "bs58": "^6.0.0"
   }
 }

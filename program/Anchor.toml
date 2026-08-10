@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-probatio = "HZvgzZ6JvBtcUBYuLEkQQJ5hbwx1ZACss52LjFLd4UPX"
+probatio = "HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA"
 
 [provider]
 cluster = "localnet"
