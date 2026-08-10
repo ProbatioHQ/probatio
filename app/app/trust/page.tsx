@@ -18,11 +18,25 @@ export default function TrustPage() {
         them. That is true of the records. It is not true of everything, and the gaps are here.
       </p>
 
+      <h2>The program is not on mainnet yet</h2>
+      <p>
+        This is the largest one, so it goes first. The on-chain program has been written,
+        reviewed and tested, and it has never been deployed. Until it is, every claim on this
+        page about what the chain enforces is a claim about source code you can read rather than
+        about a program that is running.
+      </p>
+      <p>
+        Trades are still recorded and still hashed the moment they fill. What is not happening
+        yet is the part that makes them checkable by a stranger, and the interface says which
+        trades have reached the chain rather than assuming they all have — your record and your
+        trade log both report it per trade, and the honest answer today is none of them.
+      </p>
+
       <h2>The program can still be replaced</h2>
       <p>
         The on-chain program treats records as append-only: nothing can rewrite a trade once it
         is committed, not the server, not the key that signs the commitments, not us. That is
-        enforced by the code that is deployed.
+        enforced by the program itself — once it is running, and subject to the section above.
       </p>
       <p>
         But a Solana program has an upgrade authority, and while one exists that key can replace
@@ -50,10 +64,12 @@ export default function TrustPage() {
         program with a bug like that in it would have made the bug permanent too.
       </p>
       <p>
-        There is also a specific thing still missing. The published void policy promises every
-        entrant a full refund if a season does not count, and the program has no instruction that
-        can pay one. Burning the authority today would make that promise impossible to keep for
-        good.
+        There was also a specific thing missing, and it is worth saying that it is no longer
+        missing. The published void policy promises every entrant a full refund if a season does
+        not count, and for a long time the program had no instruction that could pay one —
+        burning the authority then would have made that promise impossible to keep for good.
+        <code>void_season</code> and <code>refund_entry</code> now exist, so that blocker is
+        gone and what remains is deployment itself.
       </p>
 
       <h2>The commitment</h2>
@@ -65,6 +81,10 @@ export default function TrustPage() {
       <p>
         That ordering is checkable. The burn is visible on chain, the refund instruction is
         visible in the program, and the season taking money is visible from its entry cost.
+      </p>
+      <p>
+        Where that stands today: the refund instruction exists, the authority is not burned
+        because the program is not deployed, and no season has taken a lamport from anybody.
       </p>
 
       <h2>The rest of the list</h2>

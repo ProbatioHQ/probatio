@@ -103,8 +103,9 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
         </ol>
 
         <p className="footnote">
-          Free, and nothing here risks real money. Your record is written to the chain as you
-          trade, so it can be checked later by anyone, including against us.
+          Free, and nothing here risks real money. Every trade is hashed as it fills and
+          committed to the chain in batches, so a record can be checked later by anyone,
+          including against us — <a href="/trust">and here is what that does not cover yet</a>.
         </p>
       </div>
     </aside>

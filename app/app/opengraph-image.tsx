@@ -45,8 +45,11 @@ export default function SiteCard() {
         <div style={{ fontSize: 30, color: '#8a8f98', marginTop: 44, display: 'flex' }}>
           Live pump.fun prices, real slippage and delay.
         </div>
+        {/* The card is the claim most people see and the one nobody can click
+            through to qualify, so it says what the fills do rather than what
+            the chain has recorded. */}
         <div style={{ fontSize: 30, color: '#8a8f98', marginTop: 8, display: 'flex' }}>
-          Every trade committed to Solana as you make it.
+          Every trade hashed as it fills, and checkable.
         </div>
       </div>
     ),

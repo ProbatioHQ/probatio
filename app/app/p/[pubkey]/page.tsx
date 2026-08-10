@@ -17,8 +17,11 @@ export async function generateMetadata({
   return {
     title: `${who} · Probatio`,
     description:
-      'A trading record committed to Solana as it was made, so it cannot be edited ' +
-      'afterwards. Check it yourself.',
+      // The page itself reports how many trades have reached the chain. The
+      // description that travels with the link should not promise more than
+      // the page it links to.
+      'A trading record hashed as it was made and committed to Solana in batches, so it ' +
+      'cannot be edited afterwards. Check it yourself.',
   };
 }
 
