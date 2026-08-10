@@ -3,6 +3,7 @@ import { launchByMint } from '@probatio/db';
 import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
 import { db } from '@/lib/db';
+import { isDexIndexed } from '@/lib/dex-pairs';
 import { knownImages } from '@/lib/token-images';
 import { shortMint, tokenName } from '@/lib/token-name';
 
@@ -20,10 +21,13 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   const { mint } = await params;
   const client = await db();
 
-  const [token, launch, images] = await Promise.all([
+  const [token, launch, images, dexIndexed] = await Promise.all([
     tokenName(mint),
     launchByMint(client, mint),
     knownImages([mint]),
+    // Asked here rather than in the browser, so the page opens on the chart
+    // that actually has data instead of flipping once it finds out.
+    isDexIndexed(mint),
   ]);
   const image = images.get(mint) ?? null;
 
@@ -61,7 +65,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
         </div>
       </div>
 
-      <TokenView mint={mint} />
+      <TokenView mint={mint} dexIndexed={dexIndexed} />
 
       {/* Below the trading surface, not above it. Somebody who navigated to a
           token came to trade it, and putting the explainer first pushed the

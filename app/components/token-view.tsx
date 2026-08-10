@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DexChart } from '@/components/dex-chart';
 import { PriceChart, TIMEFRAME_LABELS } from '@/components/price-chart';
 import { useWallet } from '@/components/wallet';
@@ -19,7 +19,14 @@ import type { PriceUnit } from '@/lib/price-display';
 
 const TIMEFRAMES = ['s15', 'm1', 'm5', 'm15', 'h1'] as const;
 
-export function TokenView({ mint }: { mint: string }) {
+export function TokenView({
+  mint,
+  dexIndexed,
+}: {
+  mint: string;
+  /** Whether DEX Screener has a pair for this token yet. */
+  dexIndexed: boolean;
+}) {
   const { status } = useWallet();
   const signedIn = status === 'signed-in';
   const [tradeCount, setTradeCount] = useState(0);
@@ -28,12 +35,40 @@ export function TokenView({ mint }: { mint: string }) {
   // draws as one candle and looks like a chart that is not working.
   const [timeframe, setTimeframe] = useState<string>('s15');
   /**
-   * TradingView first, because it is what a trader already knows how to use.
-   * The native chart stays one click away: it is drawn from the same reserves
-   * this site quotes fills against, which is the chart the product's claims are
-   * actually about.
+   * Whichever chart has data.
+   *
+   * TradingView when the pair is indexed, because it is what a trader already
+   * knows how to use. The native chart when it is not — which is every token
+   * for its first few minutes, and those are the ones this site is most about.
+   * Getting this the wrong way round means an empty frame on exactly the
+   * tokens people came to look at.
    */
-  const [source, setSource] = useState<'tradingview' | 'native'>('tradingview');
+  const [indexed, setIndexed] = useState(dexIndexed);
+  const [source, setSource] = useState<'tradingview' | 'native'>(
+    dexIndexed ? 'tradingview' : 'native',
+  );
+  /** True once the reader has chosen for themselves; we stop choosing for them. */
+  const [chosen, setChosen] = useState(false);
+
+  // A token minutes old gets indexed while somebody is looking at it. Noticing
+  // beats making them reload to find out.
+  useEffect(() => {
+    if (indexed) return;
+    const timer = setInterval(() => {
+      void fetch(`/api/chart-source?mint=${encodeURIComponent(mint)}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body: { indexed?: boolean } | null) => {
+          if (!body?.indexed) return;
+          setIndexed(true);
+          // Only switches if they have not picked a chart themselves. Pulling
+          // the chart out from under someone reading it is worse than leaving
+          // them on the one they chose.
+          if (!chosen) setSource('tradingview');
+        })
+        .catch(() => undefined);
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [indexed, mint, chosen]);
   const [unit, setUnit] = useState<PriceUnit>('market-cap');
 
   return (
@@ -47,7 +82,16 @@ export function TokenView({ mint }: { mint: string }) {
                 type="button"
                 className={source === 'tradingview' ? 'on' : undefined}
                 aria-pressed={source === 'tradingview'}
-                onClick={() => setSource('tradingview')}
+                disabled={!indexed}
+                title={
+                  indexed
+                    ? undefined
+                    : 'DEX Screener has not indexed this token yet — it usually takes a few minutes after launch'
+                }
+                onClick={() => {
+                  setChosen(true);
+                  setSource('tradingview');
+                }}
               >
                 TRADINGVIEW
               </button>
@@ -55,7 +99,10 @@ export function TokenView({ mint }: { mint: string }) {
                 type="button"
                 className={source === 'native' ? 'on' : undefined}
                 aria-pressed={source === 'native'}
-                onClick={() => setSource('native')}
+                onClick={() => {
+                  setChosen(true);
+                  setSource('native');
+                }}
               >
                 NATIVE
               </button>
@@ -120,7 +167,35 @@ export function TokenView({ mint }: { mint: string }) {
               </p>
             </>
           ) : (
-            <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={560} />
+            <>
+              <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={560} />
+              <p className="dim chart-note">
+                {indexed ? (
+                  <>
+                    Built from the reserves this site reads directly — the same ones your fills
+                    are quoted against.{' '}
+                    <button
+                      type="button"
+                      className="linklike"
+                      onClick={() => {
+                        setChosen(true);
+                        setSource('tradingview');
+                      }}
+                    >
+                      Switch to TradingView
+                    </button>
+                    .
+                  </>
+                ) : (
+                  <>
+                    This token is too new for DEX Screener to have indexed, so TradingView has
+                    nothing to draw yet. This chart is built from the launch feed&apos;s own trade
+                    stream and works from the first trade. TradingView turns on here by itself
+                    once the pair appears.
+                  </>
+                )}
+              </p>
+            </>
           )}
         </div>
       </section>

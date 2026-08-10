@@ -3170,3 +3170,14 @@ body:has(main.wide) .site-footer .shell {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* A source that has no data yet is offered but not pretended to work. */
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.segmented button:disabled:hover {
+  background: transparent;
+  color: var(--text-faint);
+}

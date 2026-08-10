@@ -22,11 +22,19 @@ import { minMoveFor, precisionFor, toDisplay, type PriceUnit } from '@/lib/price
  * The library is created inside an effect rather than at module scope because
  * it needs a real DOM node, and a Next server render has none.
  *
- * Not TradingView, and not for want of trying: their widget only charts symbols
- * listed on the exchanges it knows about, and a pump.fun mint that came into
- * existence ninety seconds ago is on none of them. Their Advanced Charts
- * library, which can take custom data, is licensed and not redistributable. So
- * the indicators and the drawing are built here on top of the same series.
+ * The chart for tokens the embedded one cannot draw.
+ *
+ * TradingView is on the token page too, via DEX Screener, and it is the better
+ * chart wherever it works. It does not work for the first few minutes of a
+ * token's life, because the pair has not been indexed yet — and those minutes
+ * are what this site is most about. This one is fed by the launch feed's own
+ * trade stream and a backfill of the token's first transactions, so it draws
+ * from the first trade onward.
+ *
+ * It is also the chart the product's claims are about: the prices here come
+ * from the same reserves the fill engine quotes against, so a chart and a fill
+ * can never disagree. That is worth keeping reachable even once the embed
+ * lights up.
  */
 
 interface RawCandle {
@@ -300,7 +308,10 @@ export function PriceChart({
       // to a wide canvas draws three enormous blocks that read as a rendering
       // fault rather than as a token minutes old; pinning them to the right
       // instead leaves a wall of empty space where history would be.
-      const comfortable = Math.floor(width / 12);
+      // Wide enough that candles are not tiny, tight enough that two of them
+      // are not marooned at the left edge of an otherwise empty canvas — which
+      // is the normal state of a token thirty seconds old.
+      const comfortable = Math.min(Math.floor(width / 12), Math.max(points.length + 8, 40));
 
       if (points.length > 0 && points.length < comfortable) {
         // Data from the left, room to the right. The chart is filling forward,
