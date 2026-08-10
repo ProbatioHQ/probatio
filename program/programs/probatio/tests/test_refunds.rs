@@ -166,3 +166,16 @@ fn a_refund_goes_to_the_trader_not_the_caller() {
 
     assert_eq!(harness.balance(&first.pubkey()) - trader_before, paid);
 }
+
+#[test]
+fn a_voided_season_is_terminal_in_every_direction() {
+    let (mut harness, season, _first, _second) = entered();
+    let replacement = harness.fund(1_000_000_000);
+
+    harness.void_season(&season, None).unwrap();
+
+    // Void means over. Nothing about the season may still move — not its
+    // status, not its records, and not the key that writes them.
+    assert!(harness.set_keeper(&season, replacement.pubkey(), None).is_err());
+    assert_eq!(harness.season(&season).keeper, harness.keeper.pubkey());
+}

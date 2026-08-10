@@ -75,14 +75,14 @@ hard.
 ```bash
 npm install
 cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
-npm test                                # 1108 tests, no network
+npm test                                # 1151 tests, no network
 npm --prefix app run dev
 ```
 
 The Anchor program is separate and needs the Solana toolchain:
 
 ```bash
-cd program && cargo test               # 62 tests, under litesvm
+cd program && cargo test               # 63 tests, under litesvm
 ```
 
 Note that `cargo build` does **not** rebuild the binary the tests load. Use

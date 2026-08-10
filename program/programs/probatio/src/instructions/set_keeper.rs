@@ -30,6 +30,14 @@ pub fn handle_set_keeper(ctx: Context<SetKeeper>, keeper: Pubkey) -> Result<()> 
         season.status != SeasonStatus::Finalized,
         ProbatioError::SeasonFinalized
     );
+    // And not a voided one. Void is terminal in the same way finalized is:
+    // it takes no more commits, so there is nothing for a new keeper to do,
+    // and a terminal season that still has moving parts is a season somebody
+    // will later have to reason about.
+    require!(
+        season.status != SeasonStatus::Voided,
+        ProbatioError::SeasonAlreadyVoided
+    );
 
     season.keeper = keeper;
     Ok(())

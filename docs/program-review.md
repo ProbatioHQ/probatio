@@ -134,4 +134,4 @@ This is a careful read by the person who wrote it, not an independent audit. It
 has not been reviewed by anyone else, and no fuzzing or formal analysis has been
 done. The program has never been deployed to mainnet.
 
-62 tests run against the program under litesvm.
+63 tests run against the program under litesvm.
