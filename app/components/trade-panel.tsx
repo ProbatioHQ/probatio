@@ -77,6 +77,7 @@ const REJECTION_TEXT: Record<string, string> = {
   venue_changed: 'The token graduated while your trade was in flight.',
   insufficient_sol: 'Not enough SOL.',
   insufficient_tokens: 'You do not hold that many tokens.',
+  raced: 'Another of your trades landed first. Nothing changed — try again.',
 };
 
 export function TradePanel({

@@ -85,7 +85,18 @@ async function seed(): Promise<void> {
 }
 
 /** Write a trade exactly as the trade route does, sequence and all. */
-async function writeTrade(index: number): Promise<number> {
+async function writeTrade(
+  index: number,
+  /**
+   * Which trade this one follows, when that differs from its content.
+   *
+   * `recordTrade` now writes conditionally on the balance and holding it was
+   * quoted against, so writing the same content twice has to say that the
+   * second one follows the first. Without this the two are indistinguishable
+   * from a double-spend, which is exactly what that check exists to stop.
+   */
+  after: number = index,
+): Promise<number> {
   const now = Date.now() + index;
   const base = {
     seasonOrdinal: 1,
@@ -144,6 +155,13 @@ async function writeTrade(index: number): Promise<number> {
       realizedPnl: '0',
       closed: false,
     },
+    // Each trade is quoted against what the one before it left behind: the
+    // balance the last fill wrote, and the holding it built up. Null on the
+    // first, because there is no position yet.
+    expected: {
+      solBalance: String(10_000_000_000 - 1_000_000 * after),
+      tokenAmount: after === 0 ? null : String(30_000 * after),
+    },
     newBalance: String(10_000_000_000 - 1_000_000 * (index + 1)),
     leafHashFor: (sequence) => toHex(hashLeaf({ ...base, sequence })),
     now,
@@ -178,7 +196,9 @@ describe('trade sequences', () => {
     // The bug this replaced: every leaf was hashed with a sequence of zero, so
     // two identical trades committed to the same hash.
     await writeTrade(0);
-    await writeTrade(0);
+    // Identical content, written after the first. The leaves must still differ,
+    // because the sequence is hashed into them.
+    await writeTrade(0, 1);
 
     const trades = await loadTrades(db, seasonId, TRADER, 1, 999);
     expect(trades[0]!.leafHash).not.toBe(trades[1]!.leafHash);

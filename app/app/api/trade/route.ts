@@ -3,6 +3,7 @@ import { DEFAULT_RULES, simulateFill, totalFeeBps } from '@probatio/sim';
 import { applyFill, emptyPosition, TradingError, type AccountState } from '@probatio/trading';
 import { hashLeaf, toHex } from '@probatio/commit';
 import {
+  ConcurrentTradeError,
   openPosition,
   recordTrade,
 } from '@probatio/db';
@@ -222,45 +223,80 @@ export async function POST(request: Request): Promise<Response> {
     createdAt: now,
   };
 
-  const recorded = await recordTrade(client, {
-    snapshot: {
-      mint,
-      solReserve: pool.solReserve.toString(),
-      tokenReserve: pool.tokenReserve.toString(),
-      tokenDecimals: pool.tokenDecimals || PUMPFUN_TOKEN_DECIMALS,
-      feeBps: totalFeeBps(pool.fees),
-      source: pool.source,
-      slot: pool.slot,
-    },
-    trade: {
-      accountId: account.id,
-      seasonId,
-      userPubkey: user.pubkey,
-      mint,
-      side,
-      solAmount: outcome.quote.solAmount.toString(),
-      tokenAmount: outcome.quote.tokenAmount.toString(),
-      fee: outcome.quote.feeLamports.toString(),
-      priceImpactBps: outcome.quote.priceImpactBps,
-      partial: outcome.quote.partial,
-      poolSource: pool.source,
-      clickedAtSlot: atClickResolution.slot,
-      filledAtSlot: pool.slot,
-      latencyMs: account.latencyMs,
-      engineVersion: outcome.quote.engineVersion,
-    },
-    position: {
-      accountId: account.id,
-      mint,
-      tokenAmount: nextPosition.tokenAmount.toString(),
-      costBasis: nextPosition.costBasis.toString(),
-      realizedPnl: nextPosition.realizedPnl.toString(),
-      closed: applied.closed,
-    },
-    newBalance: applied.account.solBalance.toString(),
-    leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
-    now,
-  });
+  let recorded;
+  try {
+    recorded = await recordTrade(client, {
+      snapshot: {
+        mint,
+        solReserve: pool.solReserve.toString(),
+        tokenReserve: pool.tokenReserve.toString(),
+        tokenDecimals: pool.tokenDecimals || PUMPFUN_TOKEN_DECIMALS,
+        feeBps: totalFeeBps(pool.fees),
+        source: pool.source,
+        slot: pool.slot,
+      },
+      trade: {
+        accountId: account.id,
+        seasonId,
+        userPubkey: user.pubkey,
+        mint,
+        side,
+        solAmount: outcome.quote.solAmount.toString(),
+        tokenAmount: outcome.quote.tokenAmount.toString(),
+        fee: outcome.quote.feeLamports.toString(),
+        priceImpactBps: outcome.quote.priceImpactBps,
+        partial: outcome.quote.partial,
+        poolSource: pool.source,
+        clickedAtSlot: atClickResolution.slot,
+        filledAtSlot: pool.slot,
+        latencyMs: account.latencyMs,
+        engineVersion: outcome.quote.engineVersion,
+      },
+      position: {
+        accountId: account.id,
+        mint,
+        tokenAmount: nextPosition.tokenAmount.toString(),
+        costBasis: nextPosition.costBasis.toString(),
+        realizedPnl: nextPosition.realizedPnl.toString(),
+        closed: applied.closed,
+      },
+      // The state this fill was quoted against, read before the latency wait.
+      // The write is conditional on it still holding — see below.
+      expected: {
+        solBalance: account.solBalance,
+        tokenAmount: position?.tokenAmount ?? null,
+      },
+      newBalance: applied.account.solBalance.toString(),
+      leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
+      now,
+    });
+  } catch (error) {
+    /*
+     * Another trade on this account landed while this one was in flight.
+     *
+     * The gap is not theoretical: the engine deliberately waits out the
+     * season's latency between quoting and writing, so two clicks a fraction
+     * of a second apart are both quoted against the same balance. Before the
+     * write became conditional, both would commit and the trader would have
+     * spent one balance twice — minting the practice SOL the leaderboard ranks
+     * on, in a season that pays real money.
+     *
+     * Rejected rather than retried. A retry would fill at a price quoted
+     * against a balance that no longer exists, which is the same lie the
+     * latency exists to prevent. The trader clicks again and gets a fresh
+     * quote.
+     */
+    if (error instanceof ConcurrentTradeError) {
+      return Response.json({
+        status: 'rejected',
+        reason: 'raced',
+        detail:
+          'Another of your trades landed while this one was in flight, so this one was not ' +
+          'filled. Nothing changed. Try again.',
+      });
+    }
+    throw error;
+  }
 
   // Recorded after the fill landed, so activation means a trade that happened
   // rather than one that was attempted.

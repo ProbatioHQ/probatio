@@ -38,6 +38,35 @@ beforeEach(async () => {
 
 afterEach(() => harness.cleanup());
 
+/**
+ * What the account and position hold right now.
+ *
+ * `recordTrade` writes conditionally on this: the balance and holding a fill
+ * was quoted against must still be there when it lands, or the fill is void.
+ * These fixtures make trades in sequence, so each one reads what the last one
+ * left rather than asserting a constant.
+ */
+async function priorState(
+  db: import('@libsql/client').Client,
+  id: number,
+  mint: string,
+): Promise<{ solBalance: string; tokenAmount: string | null }> {
+  const account = await db.execute({
+    sql: 'SELECT sol_balance FROM accounts WHERE id = ?',
+    args: [id],
+  });
+  const position = await db.execute({
+    sql: `SELECT token_amount FROM positions
+          WHERE account_id = ? AND mint = ? AND closed_at IS NULL
+          ORDER BY opened_at DESC LIMIT 1`,
+    args: [id, mint],
+  });
+  return {
+    solBalance: String(account.rows[0]!['sol_balance']),
+    tokenAmount: position.rows[0] ? String(position.rows[0]['token_amount']) : null,
+  };
+}
+
 let slot = 100;
 
 async function record(
@@ -48,6 +77,7 @@ async function record(
   position: { tokenAmount: string; costBasis: string; realizedPnl: string; closed: boolean },
 ): Promise<void> {
   slot += 1;
+  const prior = await priorState(harness.db, accountId, MINT);
   await recordTrade(harness.db, {
     snapshot: {
       mint: MINT,
@@ -76,6 +106,7 @@ async function record(
       engineVersion: 1,
     },
     position: { accountId, mint: MINT, ...position },
+    expected: prior,
     newBalance: '10000000000',
     leafHashFor: (sequence) => `hash-${sequence}`,
     now: at,

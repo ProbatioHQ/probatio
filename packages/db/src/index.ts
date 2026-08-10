@@ -163,6 +163,7 @@ export type {
   StoredObservation,
 } from './coach';
 
+export { ConcurrentTradeError } from './trading';
 export {
   allTrades,
   ensureAccount,

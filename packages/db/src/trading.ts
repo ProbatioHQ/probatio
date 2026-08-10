@@ -190,12 +190,45 @@ export interface PositionWrite {
  * landed cannot be verified — either would be worse than the trade simply
  * failing.
  */
+/**
+ * A trade whose inputs went stale before it could be written.
+ *
+ * Raised when the balance or the position moved between the quote and the
+ * write. That gap is real and wide: the engine waits out the season's latency
+ * in the middle of it, so two clicks a fraction of a second apart are both
+ * quoted against the same starting balance.
+ */
+export class ConcurrentTradeError extends Error {
+  constructor(readonly what: 'balance' | 'position') {
+    super(
+      what === 'balance'
+        ? 'the account balance changed while this trade was in flight'
+        : 'the position changed while this trade was in flight',
+    );
+    this.name = 'ConcurrentTradeError';
+  }
+}
+
 export async function recordTrade(
   db: Client,
   input: {
     readonly snapshot: PoolSnapshotWrite;
     readonly trade: Omit<TradeWrite, 'poolSnapshotId' | 'leafHash'>;
     readonly position: PositionWrite;
+    /**
+     * The state the fill was quoted against.
+     *
+     * Every write below is conditional on this still being true. Without it
+     * `newBalance` is an absolute figure derived from a read that may be
+     * hundreds of milliseconds old, and two concurrent trades both write the
+     * same "after" balance — which is how a trader buys twice with one
+     * balance and mints the practice SOL the leaderboard ranks on.
+     */
+    readonly expected: {
+      readonly solBalance: string;
+      /** Tokens held before this fill. Null when there was no open position. */
+      readonly tokenAmount: string | null;
+    };
     readonly newBalance: string;
     /**
      * Produces the leaf hash once the sequence is known.
@@ -271,10 +304,17 @@ export async function recordTrade(
       ],
     });
 
-    await tx.execute({
-      sql: 'UPDATE accounts SET sol_balance = ?, updated_at = ? WHERE id = ?',
-      args: [input.newBalance, input.now, input.trade.accountId],
+    // Compare and swap. If the balance is no longer the one the fill was
+    // quoted against, another trade landed first and this one is void — the
+    // whole transaction rolls back rather than overwriting their result.
+    const balanceUpdate = await tx.execute({
+      sql: `UPDATE accounts SET sol_balance = ?, updated_at = ?
+            WHERE id = ? AND sol_balance = ?`,
+      args: [input.newBalance, input.now, input.trade.accountId, input.expected.solBalance],
     });
+    if (Number(balanceUpdate.rowsAffected) !== 1) {
+      throw new ConcurrentTradeError('balance');
+    }
 
     const existing = await tx.execute({
       sql: `SELECT id FROM positions WHERE account_id = ? AND mint = ? AND closed_at IS NULL
@@ -283,9 +323,12 @@ export async function recordTrade(
     });
 
     if (existing.rows[0]) {
-      await tx.execute({
+      // The balance alone is not enough: a concurrent sell can leave the
+      // balance exactly where this fill expected it while emptying the
+      // holding it was computed against.
+      const positionUpdate = await tx.execute({
         sql: `UPDATE positions SET token_amount = ?, cost_basis = ?, realized_pnl = ?,
-                closed_at = ?, updated_at = ? WHERE id = ?`,
+                closed_at = ?, updated_at = ? WHERE id = ? AND token_amount = ?`,
         args: [
           input.position.tokenAmount,
           input.position.costBasis,
@@ -293,9 +336,18 @@ export async function recordTrade(
           input.position.closed ? input.now : null,
           input.now,
           Number(existing.rows[0]['id']),
+          input.expected.tokenAmount ?? '0',
         ],
       });
+      if (Number(positionUpdate.rowsAffected) !== 1) {
+        throw new ConcurrentTradeError('position');
+      }
     } else {
+      // No open row, so the fill must have been quoted against holding
+      // nothing. If it expected tokens, the position was closed underneath it.
+      if (input.expected.tokenAmount !== null && input.expected.tokenAmount !== '0') {
+        throw new ConcurrentTradeError('position');
+      }
       await tx.execute({
         sql: `INSERT INTO positions
                 (account_id, mint, token_amount, cost_basis, realized_pnl, opened_at, closed_at, updated_at)

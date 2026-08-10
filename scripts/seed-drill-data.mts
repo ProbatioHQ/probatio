@@ -181,6 +181,8 @@ for (let t = 0; t < traderCount; t += 1) {
         realizedPnl: nowRealized.toString(),
         closed,
       },
+      // One fill per account here, so the starting balance is what it sees.
+      expected: { solBalance: String(10_000_000_000n), tokenAmount: null },
       newBalance: String(10_000_000_000n - basis),
       leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
       now: START + slot * 1_000,

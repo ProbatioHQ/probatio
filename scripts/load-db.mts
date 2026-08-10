@@ -150,6 +150,8 @@ async function placeTrade(
         realizedPnl: '0',
         closed: false,
       },
+      // Each trade is quoted against what the one before it left behind.
+      expected: { solBalance: String(10_000_000_000n - solAmount * BigInt(index)), tokenAmount: null },
       newBalance: String(10_000_000_000n - solAmount * BigInt(index + 1)),
       leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
       now: START + mySlot,
