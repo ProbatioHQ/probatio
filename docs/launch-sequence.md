@@ -10,23 +10,25 @@ one sequence, and names the gap that would otherwise be discovered at the end.
 
 ---
 
-## The gap in the plan
+## The gap in the plan — closed
 
-**The keeper has no concrete chain gateway, and is never started in
-production.**
+This section used to open on the hole in the middle of the plan: `ChainGateway`
+was an interface whose only implementations were test doubles, so nothing could
+ever be committed and the central claim of the product was unfulfilled.
 
-`ChainGateway` is an interface. The only implementations are test doubles. The
-keeper is not wired into the app, so nothing runs it. Today, and on the day the
-program is deployed, the consequence is the same:
+Both halves of that are now built:
 
-- no trade is ever committed on chain
-- `/verify` reports that nothing is committed, for everybody
-- every profile card reads "not yet committed on chain"
-- the central claim of the product is unfulfilled
+- `SolanaGateway` builds, signs and sends the commit transactions by hand, and
+  a drill against a local validator confirms the accumulator on chain matches
+  the one computed locally, byte for byte.
+- `void_season` and `refund_entry` mean a voided season can give every entrant
+  back exactly what they paid — which the void policy always promised, and
+  which had to exist before any season could honestly charge.
 
-The plan goes site → docs → repo → GitHub → CI → deploy program → deploy app →
-"season 1 opens, first real committed records". Nothing in that list builds the
-thing that produces a committed record.
+What is left is deployment itself and the upgrade authority. While that
+authority is held, the program can be replaced, so every claim above is a claim
+about source code until it is dealt with. That is the subject of the rest of
+this document.
 
 **This has to be built and proved on devnet before anything else in this
 sequence.** It is the gate. Everything downstream — the trust page, the verify

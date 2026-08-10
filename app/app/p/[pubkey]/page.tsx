@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { activeName, shortAddressSafe } from '@/lib/profile-data';
 import { ProfileView } from '@/components/profile-view';
 
@@ -21,12 +22,17 @@ export async function generateMetadata({
   };
 }
 
+/** The same shape a Solana address has. See the token page. */
+const PUBKEY_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
 export default async function ProfilePage({
   params,
 }: {
   params: Promise<{ pubkey: string }>;
 }) {
   const { pubkey } = await params;
+  // A record page for something that cannot be a wallet is not a record page.
+  if (!PUBKEY_PATTERN.test(pubkey)) notFound();
   const name = await activeName(pubkey);
 
   return (

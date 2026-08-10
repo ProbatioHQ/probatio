@@ -14,11 +14,15 @@ import { currentUser } from '@/lib/session';
 /**
  * Enter a season that costs nothing.
  *
- * The seed season is free, because the published commitment is that the upgrade
- * authority is burned before any season takes money and the program cannot
- * refund anybody yet. So there is no payment to build, sign or verify — but
- * there is still a wallet to look at, and with no entry fee the funding-source
- * limit is the only thing standing between one person and fifty entries.
+ * A free season has no payment to build, sign or verify — but there is still a
+ * wallet to look at, and with no entry fee the funding-source limit is the only
+ * thing standing between one person and fifty entries. That is why the sybil
+ * check below is heavier here than on the paid path, not lighter.
+ *
+ * Free seasons are now a choice rather than the only safe option. They used to
+ * be forced, because the void policy promises full refunds and the program had
+ * no instruction that could pay one; `refund_entry` closed that, and the
+ * running season charges. This route is for the ones that do not.
  *
  * Refuses outright on a paid season. A route that quietly let somebody in
  * without paying would be a far worse bug than one that refuses.

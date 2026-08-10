@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { launchByMint } from '@probatio/db';
 import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
@@ -13,12 +14,25 @@ export async function generateMetadata({
   params: Promise<{ mint: string }>;
 }): Promise<Metadata> {
   const { mint } = await params;
+  if (!MINT_PATTERN.test(mint)) return { title: 'Not found, Probatio' };
+
   const token = await tokenName(mint);
   return { title: token.known ? `${token.symbol ?? token.name}, Probatio` : 'Probatio' };
 }
 
+/**
+ * Base58, and the length a Solana address actually is.
+ *
+ * Without this, any string at all rendered a full trading surface — chart,
+ * buy and sell buttons, the lot — for a token that cannot exist. It would
+ * never fill, but offering the controls at all is the wrong answer.
+ */
+const MINT_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
 export default async function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
+  if (!MINT_PATTERN.test(mint)) notFound();
+
   const client = await db();
 
   const [token, launch, images, dexIndexed] = await Promise.all([
