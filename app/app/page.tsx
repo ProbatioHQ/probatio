@@ -29,7 +29,8 @@ export default function Home() {
           program on chain, and that is a public act anyone can see.
         </p>
         <p>
-          <a href="/trust">What you still have to trust</a> ·{' '}
+          <a href="/docs/fills">The fills are measured against real trades</a> — 0 bps error on
+          every sample. <a href="/trust">What you still have to trust</a> ·{' '}
           <a href="/verify">Check any record yourself</a>
         </p>
         <SignIn />

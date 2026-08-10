@@ -6,6 +6,15 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  /*
+   * Without this, the card image URL resolves against localhost and every
+   * shared link points at a machine nobody else can reach — which breaks the
+   * only free distribution channel there is, and only once deployed.
+   *
+   * Read from the same value the sign-in message is bound to, so there is one
+   * answer to "what is this site's address" rather than two that can disagree.
+   */
+  metadataBase: new URL(process.env['APP_URI'] ?? 'http://localhost:3000'),
   title: { default: 'Probatio', template: '%s' },
   description:
     'Trade live Solana markets with practice money. Honest fills, and a record anyone can check.',
@@ -29,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
               Probatio
             </a>
             <nav className="site-nav" aria-label="Main">
+              <a href="/docs">How it works</a>
               <a href="/verify">Verify</a>
               <a href="/trust">Trust</a>
             </nav>
@@ -41,7 +51,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <div className="shell">
             <span>Practice money. Real prices. Records anyone can check.</span>
             <span>
-              <a href="/verify">Verify a record</a> · <a href="/trust">What you have to trust</a>
+              <a href="/docs">How it works</a> · <a href="/verify">Verify a record</a> ·{' '}
+              <a href="/trust">What you have to trust</a>
             </span>
           </div>
         </footer>
