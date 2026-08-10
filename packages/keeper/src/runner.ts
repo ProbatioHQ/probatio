@@ -80,6 +80,11 @@ export async function runOnce(
 
       if (id === null) {
         failed += 1;
+        // A count with no cause is what an operator cannot act on.
+        errors.push(
+          `${batch.userPubkey.slice(0, 8)}… season ${batch.seasonId}: ` +
+            (keeper.lastFailure ?? 'commit failed with no reason recorded'),
+        );
       } else {
         committed += 1;
         tradesCommitted += batch.tradeIds.length;

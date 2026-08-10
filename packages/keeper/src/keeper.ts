@@ -146,8 +146,16 @@ export class Keeper {
    * The order is the whole point: record the intent, send, verify the chain
    * agrees, then confirm. A crash at any step leaves something reconcilable.
    */
+  /** Why the most recent commit returned null. Cleared on the next success. */
+  #lastFailure: string | null = null;
+
+  get lastFailure(): string | null {
+    return this.#lastFailure;
+  }
+
   async commit(request: CommitRequest): Promise<StoredCommit['id'] | null> {
     if (this.#halted) throw new KeeperHalt(this.#halted);
+    this.#lastFailure = null;
 
     const previous = await localAccumulator(this.#db, request.seasonId, request.userPubkey);
     const predicted = predictAccumulator(
@@ -187,7 +195,18 @@ export class Keeper {
     } catch (error) {
       // A rejection is not proof the transaction failed — it may have landed
       // and the response been lost. The intent stays for reconcile to settle.
-      await markFailed(this.#db, id, error instanceof Error ? error.message : String(error));
+      const reason = error instanceof Error ? error.message : String(error);
+      await markFailed(this.#db, id, reason);
+      /*
+       * Kept for the caller as well as the row.
+       *
+       * The reason was written to the database and `null` returned, so the
+       * runner counted a failure it could not describe and the operator saw a
+       * number with no cause. It is on the instance because the return type is
+       * what every caller and test already expects; the alternative was
+       * changing a signature to carry something only one caller reads.
+       */
+      this.#lastFailure = reason;
       return null;
     }
 

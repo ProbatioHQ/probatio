@@ -79,12 +79,39 @@ export function startKeeper(): void {
       },
     });
 
-    if (result.committed > 0 || result.reconciled > 0 || result.halted) {
-      console.log(
+    /*
+     * Anything that happened, including nothing working.
+     *
+     * This used to log only on a committed batch, a reconcile or a halt — so a
+     * keeper failing every single cycle produced a completely silent log. That
+     * is the worst possible shape for this particular failure: commits quietly
+     * stop, every record stays uncommitted, the central claim of the product
+     * stops being true, and the only signal is an absence of output that looks
+     * exactly like a quiet, healthy system.
+     */
+    if (
+      result.committed > 0 ||
+      result.reconciled > 0 ||
+      result.discarded > 0 ||
+      result.failed > 0 ||
+      result.halted
+    ) {
+      const line =
         `[keeper] committed ${result.committed} batch(es), ${result.tradesCommitted} trade(s), ` +
-          `reconciled ${result.reconciled}` +
-          (result.halted ? ` — HALTED: ${result.halted}` : ''),
-      );
+        `reconciled ${result.reconciled}, discarded ${result.discarded}, failed ${result.failed}` +
+        (result.halted ? ` — HALTED: ${result.halted}` : '');
+
+      if (result.failed > 0 || result.halted) console.error(line);
+      else console.log(line);
+
+      // The reasons, not just the count. Bounded so a bad cycle cannot fill
+      // the log with one line per trader.
+      for (const message of result.errors.slice(0, 5)) {
+        console.error(`[keeper]   ${message}`);
+      }
+      if (result.errors.length > 5) {
+        console.error(`[keeper]   …and ${result.errors.length - 5} more`);
+      }
     }
   };
 
