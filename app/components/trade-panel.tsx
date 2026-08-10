@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWallet } from './wallet';
 
 /**
@@ -99,6 +99,8 @@ export function TradePanel({
   const [result, setResult] = useState<TradeResult | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const [held, setHeld] = useState<string>('0');
+  /** Scopes the hotkeys: see the keydown handler below. */
+  const panel = useRef<HTMLElement>(null);
 
   // What this trader has, right now. Without it the sell side cannot know
   // whether there is anything to sell, and the buy side cannot say what is
@@ -192,7 +194,27 @@ export function TradePanel({
       const target = event.target as HTMLElement | null;
       // Never steal a keystroke from something being typed into.
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (target?.isContentEditable) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      /*
+       * Only when nothing else has the keyboard.
+       *
+       * These fire a real trade with no confirmation, and they used to fire
+       * from anywhere on the page. Two presses of Tab put focus on the
+       * wordmark in the header; a digit after that bought a tenth of a SOL.
+       * Anyone moving through the page by keyboard was one keystroke from
+       * spending money they had not decided to spend.
+       *
+       * So they work where a trader actually is — nothing focused, or focus
+       * already inside the trading surface — and stay out of the way while
+       * somebody is navigating. The muscle memory is intact for the case it
+       * was built for: watching the chart, hand on the number row.
+       */
+      const active = document.activeElement;
+      const idle = !active || active === document.body;
+      const inPanel = active instanceof Node && panel.current?.contains(active);
+      if (!idle && !inPanel) return;
 
       const digit = Number(event.key);
       if (Number.isInteger(digit) && digit >= 1 && digit <= BUY_PRESETS.length) {
@@ -241,7 +263,7 @@ export function TradePanel({
   const holding = BigInt(held);
 
   return (
-    <section className="term trade" aria-label="Trade">
+    <section className="term trade" aria-label="Trade" ref={panel}>
       <div className="term-bar">
         <span className="prompt">~/trade</span>
         <span>practice money</span>
