@@ -3,29 +3,48 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
- * Newly launched tokens, arriving as they launch.
+ * The launch feed, in three lanes.
  *
- * The first thing a visitor sees, so it has to work before they have a wallet,
- * and it has to be moving — a feed of live launches that only changes when you
- * reload is indistinguishable from a list.
+ * One list ordered by age was the wrong shape. Nobody trades pump.fun that way
+ * — they watch what just launched, what is close to graduating, and what
+ * already has, and those are three different decisions. So they are three
+ * columns, and a token moves between them as its curve fills.
  *
- * Loaded over HTTP once, then kept current by a server-sent stream. Both, not
- * either: the stream only carries what happens after you connect, so without
- * the fetch a new arrival would sit in front of an empty box waiting for
- * somebody to launch something.
+ * Loaded over HTTP once, then kept current by a server-sent stream carrying
+ * both new launches and curve progress. Both, not either: the stream only
+ * carries what happens after you connect, so without the fetch a new arrival
+ * would sit in front of three empty boxes.
  */
 
-interface Launch {
+interface Token {
   mint: string;
   name: string;
   symbol: string;
   creator: string;
   launchedAt: number;
   image: string | null;
+  /** Null when nothing has read this curve yet, which is not the same as zero. */
+  progressBps: number | null;
+  solRaised: string | null;
+  complete: boolean;
 }
 
+interface Lanes {
+  new: Token[];
+  bonding: Token[];
+  bonded: Token[];
+}
+
+type LaneKey = keyof Lanes;
+
+const LANES: { key: LaneKey; title: string; prompt: string; blurb: string }[] = [
+  { key: 'new', title: 'New', prompt: '~/new', blurb: 'Just created' },
+  { key: 'bonding', title: 'About to bond', prompt: '~/bonding', blurb: 'Half the curve sold' },
+  { key: 'bonded', title: 'Bonded', prompt: '~/bonded', blurb: 'Graduated to the AMM' },
+];
+
 /** Kept bounded. A feed left open all day should not grow without limit. */
-const MAX_ROWS = 60;
+const MAX_ROWS = 40;
 
 function age(launchedAt: number, now: number): string {
   const seconds = Math.max(0, Math.floor(now / 1000) - launchedAt);
@@ -54,10 +73,10 @@ function MintMark({ mint }: { mint: string }) {
   );
 }
 
-function TokenImage({ launch }: { launch: Launch }) {
+function TokenImage({ token }: { token: Token }) {
   const [broken, setBroken] = useState(false);
 
-  if (!launch.image || broken) return <MintMark mint={launch.mint} />;
+  if (!token.image || broken) return <MintMark mint={token.mint} />;
 
   return (
     // Not next/image: these are arbitrary hosts chosen by whoever launched the
@@ -66,7 +85,7 @@ function TokenImage({ launch }: { launch: Launch }) {
     // by the browser, and never sent a referrer.
     <img
       className="token-img"
-      src={launch.image}
+      src={token.image}
       alt=""
       loading="lazy"
       decoding="async"
@@ -76,12 +95,50 @@ function TokenImage({ launch }: { launch: Launch }) {
   );
 }
 
+function Row({ token, lane, fresh, now }: { token: Token; lane: LaneKey; fresh: boolean; now: number }) {
+  const progress = token.progressBps;
+
+  return (
+    <li className={fresh ? 'feed-row fresh' : 'feed-row'}>
+      <a href={`/t/${token.mint}`}>
+        <TokenImage token={token} />
+
+        <span className="feed-name">
+          <strong>{token.symbol || '???'}</strong>
+          <span className="dim">{token.name}</span>
+        </span>
+
+        {/* The right-hand column says something different in each lane: how far
+            along in the bonding one, how old in the other two. Not how much a
+            graduated token raised — every reserve field is zeroed on
+            graduation, so that number is gone by the time it lands here. */}
+        {lane === 'bonding' && progress !== null ? (
+          <span className="feed-progress">
+            <span className="track" aria-hidden="true">
+              <span className="fill" style={{ width: `${Math.min(100, progress / 100)}%` }} />
+            </span>
+            <span className="mono pct">{(progress / 100).toFixed(0)}%</span>
+          </span>
+        ) : (
+          <span className="feed-age mono dim">{age(token.launchedAt, now)}</span>
+        )}
+
+        <span className="feed-go" aria-hidden="true">
+          trade
+        </span>
+      </a>
+    </li>
+  );
+}
+
 export function LaunchFeedList() {
-  const [launches, setLaunches] = useState<Launch[] | null>(null);
+  const [lanes, setLanes] = useState<Lanes | null>(null);
+  const [results, setResults] = useState<Token[] | null>(null);
   const [query, setQuery] = useState('');
   const [live, setLive] = useState(false);
   const [arrived, setArrived] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
+
   const searching = query.trim().length > 0;
   const searchingRef = useRef(searching);
   searchingRef.current = searching;
@@ -89,10 +146,17 @@ export function LaunchFeedList() {
   const load = useCallback(async (search: string) => {
     try {
       const url = search ? `/api/launches?q=${encodeURIComponent(search)}` : '/api/launches';
-      const body = (await (await fetch(url)).json()) as { launches: Launch[] };
-      setLaunches(body.launches);
+      const body = (await (await fetch(url)).json()) as {
+        lanes?: Lanes;
+        results?: Token[];
+      };
+      if (search) setResults(body.results ?? []);
+      else {
+        setResults(null);
+        if (body.lanes) setLanes(body.lanes);
+      }
     } catch {
-      setLaunches([]);
+      if (search) setResults([]);
     }
   }, []);
 
@@ -103,7 +167,7 @@ export function LaunchFeedList() {
   }, [query, load]);
 
   // Ages are relative, so they have to be recomputed rather than rendered once.
-  // One timer for the whole list rather than one per row.
+  // One timer for every lane rather than one per row.
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
@@ -115,25 +179,98 @@ export function LaunchFeedList() {
     source.addEventListener('ready', () => setLive(true));
 
     source.addEventListener('launches', (event) => {
-      // While somebody is searching, new launches would shove their results
-      // around. The stream stays connected and its arrivals are dropped.
+      // While somebody is searching, arrivals would shove their results
+      // around. The stream stays connected and its launches are dropped.
       if (searchingRef.current) return;
 
-      const incoming = JSON.parse((event as MessageEvent<string>).data) as Launch[];
-      setLaunches((current) => {
-        const existing = current ?? [];
-        const seen = new Set(existing.map((launch) => launch.mint));
+      const incoming = JSON.parse((event as MessageEvent<string>).data) as Token[];
+
+      setLanes((current) => {
+        if (!current) return current;
+
+        // Every lane, not just the new one: a replayed launch for a token that
+        // has since bonded would otherwise appear in two columns at once.
+        const seen = new Set(
+          [...current.new, ...current.bonding, ...current.bonded].map((token) => token.mint),
+        );
+
         // A reconnecting socket replays recent history, so repeats are normal.
-        const fresh = incoming.filter((launch) => !seen.has(launch.mint));
-        if (fresh.length === 0) return current;
+        // Deduped within the batch as well as against it — one flush can carry
+        // the same mint twice, and filtering only against what is already on
+        // screen would let both copies through.
+        const additions: Token[] = [];
+        for (const token of incoming) {
+          if (seen.has(token.mint)) continue;
+          seen.add(token.mint);
+          additions.push(token);
+        }
+        if (additions.length === 0) return current;
 
         setArrived((was) => {
           const next = new Set(was);
-          for (const launch of fresh) next.add(launch.mint);
+          for (const token of additions) next.add(token.mint);
           return next;
         });
 
-        return [...fresh, ...existing].slice(0, MAX_ROWS);
+        // Always the new lane. A token cannot launch already bonded.
+        return { ...current, new: [...additions, ...current.new].slice(0, MAX_ROWS) };
+      });
+    });
+
+    source.addEventListener('curves', (event) => {
+      if (searchingRef.current) return;
+      const updates = JSON.parse((event as MessageEvent<string>).data) as {
+        mint: string;
+        progressBps: number;
+        solRaised: string;
+        complete: boolean;
+      }[];
+      if (updates.length === 0) return;
+
+      const byMint = new Map(updates.map((update) => [update.mint, update]));
+
+      setLanes((current) => {
+        if (!current) return current;
+
+        // Apply the new numbers wherever the token already is.
+        const applied: Lanes = {
+          new: current.new.map((token) => merge(token, byMint.get(token.mint))),
+          bonding: current.bonding.map((token) => merge(token, byMint.get(token.mint))),
+          bonded: current.bonded.map((token) => merge(token, byMint.get(token.mint))),
+        };
+
+        // Then move anything that has crossed a boundary. This is the whole
+        // reason the lanes are worth having: a token graduating should appear
+        // under Bonded while you are looking at it.
+        const known = new Map<string, Token>();
+        for (const lane of ['new', 'bonding', 'bonded'] as const) {
+          for (const token of applied[lane]) known.set(token.mint, token);
+        }
+
+        const next: Lanes = { new: [], bonding: [], bonded: [] };
+        const promoted = new Set<string>();
+
+        for (const token of known.values()) {
+          const progress = token.progressBps ?? 0;
+          const belongs: LaneKey = token.complete ? 'bonded' : progress >= 5_000 ? 'bonding' : 'new';
+          const wasIn = laneOf(current, token.mint);
+          if (wasIn !== null && wasIn !== belongs) promoted.add(token.mint);
+          next[belongs].push(token);
+        }
+
+        // Order within each lane is the lane's own: newest, closest, latest.
+        next.new.sort((a, b) => b.launchedAt - a.launchedAt);
+        next.bonding.sort((a, b) => (b.progressBps ?? 0) - (a.progressBps ?? 0));
+
+        if (promoted.size > 0) {
+          setArrived((was) => new Set([...was, ...promoted]));
+        }
+
+        return {
+          new: next.new.slice(0, MAX_ROWS),
+          bonding: next.bonding.slice(0, MAX_ROWS),
+          bonded: next.bonded.slice(0, MAX_ROWS),
+        };
       });
     });
 
@@ -142,8 +279,7 @@ export function LaunchFeedList() {
     return () => source.close();
   }, []);
 
-  // The highlight on a new row is a moment, not a state. Cleared shortly after
-  // so a row that arrived a minute ago does not stay lit.
+  // The highlight on a row that arrived or moved is a moment, not a state.
   useEffect(() => {
     if (arrived.size === 0) return;
     const timer = setTimeout(() => setArrived(new Set()), 2_000);
@@ -154,20 +290,26 @@ export function LaunchFeedList() {
   // stream without one ask again a moment later rather than staying blank
   // until a reload.
   useEffect(() => {
-    if (!launches) return;
-    const missing = launches.filter((launch) => !launch.image).map((launch) => launch.mint);
+    if (!lanes) return;
+    const missing = [...lanes.new, ...lanes.bonding, ...lanes.bonded]
+      .filter((token) => !token.image)
+      .map((token) => token.mint);
     if (missing.length === 0) return;
 
     const timer = setTimeout(() => {
-      void fetch(`/api/token-images?mints=${missing.slice(0, 60).join(',')}`)
+      void fetch(`/api/token-images?mints=${[...new Set(missing)].slice(0, 60).join(',')}`)
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { images: Record<string, string> } | null) => {
           if (!body || Object.keys(body.images).length === 0) return;
-          setLaunches((current) =>
+          const paint = (token: Token): Token =>
+            token.image ? token : { ...token, image: body.images[token.mint] ?? null };
+          setLanes((current) =>
             current
-              ? current.map((launch) =>
-                  launch.image ? launch : { ...launch, image: body.images[launch.mint] ?? null },
-                )
+              ? {
+                  new: current.new.map(paint),
+                  bonding: current.bonding.map(paint),
+                  bonded: current.bonded.map(paint),
+                }
               : current,
           );
         })
@@ -175,13 +317,14 @@ export function LaunchFeedList() {
     }, 3_000);
 
     return () => clearTimeout(timer);
-  }, [launches]);
+  }, [lanes]);
 
   return (
-    <section id="feed" aria-label="Tokens" className="term">
+    <section id="feed" aria-label="Tokens" className="term feed-term">
       <div className="term-bar">
         <span className="prompt">~/feed</span>
-        <span>pump.fun launches</span>
+        <span>pump.fun</span>
+        <span className={live ? 'pill live' : 'pill'}>{live ? 'streaming' : 'reconnecting'}</span>
         <span className="lights">
           <i />
           <i />
@@ -190,13 +333,6 @@ export function LaunchFeedList() {
       </div>
 
       <div className="term-body">
-        <div className="season-head">
-          <h2>Live launches</h2>
-          <span className={live ? 'pill live' : 'pill'}>
-            {live ? 'streaming' : 'reconnecting'}
-          </span>
-        </div>
-
         <label className="field">
           <span>Search</span>
           <input
@@ -207,37 +343,76 @@ export function LaunchFeedList() {
           />
         </label>
 
-        {launches === null ? (
-          <p className="dim">Loading…</p>
-        ) : launches.length === 0 ? (
-          <p className="dim">
-            {searching
-              ? 'Nothing matches that.'
-              : 'No launches yet. The feed fills as tokens are created.'}
-          </p>
+        {searching ? (
+          results === null ? (
+            <p className="dim">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="dim">Nothing matches that.</p>
+          ) : (
+            <ul className="bare feed">
+              {results.map((token) => (
+                <Row key={token.mint} token={token} lane="new" fresh={false} now={now} />
+              ))}
+            </ul>
+          )
         ) : (
-          <ul className="bare scroller feed">
-            {launches.map((launch) => (
-              <li
-                key={launch.mint}
-                className={arrived.has(launch.mint) ? 'feed-row fresh' : 'feed-row'}
-              >
-                <a href={`/t/${launch.mint}`}>
-                  <TokenImage launch={launch} />
-                  <span className="feed-name">
-                    <strong>{launch.symbol || '???'}</strong>
-                    <span className="dim">{launch.name}</span>
-                  </span>
-                  <span className="feed-age mono dim">{age(launch.launchedAt, now)}</span>
-                  <span className="feed-go" aria-hidden="true">
-                    trade
-                  </span>
-                </a>
-              </li>
+          <div className="lanes">
+            {LANES.map((lane) => (
+              <div className="lane" key={lane.key}>
+                <div className="lane-head">
+                  <span className="prompt">{lane.prompt}</span>
+                  <h3>{lane.title}</h3>
+                  <span className="lane-blurb">{lane.blurb}</span>
+                </div>
+
+                {!lanes ? (
+                  <p className="dim lane-empty">Loading…</p>
+                ) : lanes[lane.key].length === 0 ? (
+                  <p className="dim lane-empty">
+                    {lane.key === 'new'
+                      ? 'Nothing yet. This fills as tokens are created.'
+                      : lane.key === 'bonding'
+                        ? 'Nothing past halfway right now.'
+                        : 'Nothing has graduated yet.'}
+                  </p>
+                ) : (
+                  <ul className="bare feed">
+                    {lanes[lane.key].map((token) => (
+                      <Row
+                        key={token.mint}
+                        token={token}
+                        lane={lane.key}
+                        fresh={arrived.has(token.mint)}
+                        now={now}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </section>
   );
+}
+
+function merge(
+  token: Token,
+  update: { progressBps: number; solRaised: string; complete: boolean } | undefined,
+): Token {
+  if (!update) return token;
+  return {
+    ...token,
+    progressBps: update.progressBps,
+    solRaised: update.solRaised,
+    complete: update.complete,
+  };
+}
+
+function laneOf(lanes: Lanes, mint: string): LaneKey | null {
+  if (lanes.new.some((token) => token.mint === mint)) return 'new';
+  if (lanes.bonding.some((token) => token.mint === mint)) return 'bonding';
+  if (lanes.bonded.some((token) => token.mint === mint)) return 'bonded';
+  return null;
 }

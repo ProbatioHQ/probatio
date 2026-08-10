@@ -88,6 +88,18 @@ export {
 export type { Launch } from './launches';
 
 export {
+  INITIAL_REAL_TOKEN_RESERVES,
+  bondedLaunches,
+  bondingLaunches,
+  curveStatesFor,
+  curvesToRefresh,
+  newLaunches,
+  progressBpsFor,
+  recordCurveStates,
+} from './curves';
+export type { CurveState, CurveWrite, LaunchWithCurve } from './curves';
+
+export {
   createRankedSeason,
   currentRankedSeason,
   highestRankedOrdinal,

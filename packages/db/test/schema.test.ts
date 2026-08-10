@@ -116,6 +116,7 @@ describe('migrations', () => {
       '013_availability.sql',
       '014_activity.sql',
       '015_sponsored_prize.sql',
+      '016_curve_state.sql',
     ]);
   });
 

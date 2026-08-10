@@ -1,17 +1,51 @@
-import { recentLaunches, searchLaunches } from '@probatio/db';
+import {
+  bondedLaunches,
+  bondingLaunches,
+  newLaunches,
+  searchLaunches,
+  type LaunchWithCurve,
+} from '@probatio/db';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { knownImages, resolveLaunchImages } from '@/lib/token-images';
 
 /**
- * The launch feed, and search over it.
+ * The launch feed, in three lanes, and search over it.
  *
  * Open to anyone. Discovery is what a visitor sees before they have a wallet,
  * and putting it behind a sign-in would mean the first thing a new arrival
  * meets is a login wall in front of an empty room.
+ *
+ * Three lanes rather than one list because that is how these are actually
+ * traded: what just launched, what is close to graduating, and what already
+ * has. Which lane a token is in comes from its bonding curve account, not from
+ * its age — a token can sit at 2% for a week or graduate in ninety seconds.
  */
 
 const MAX_LIMIT = 100;
+/**
+ * The floor for "about to bond".
+ *
+ * Half the curve sold. Without a floor this lane is the new lane in a different
+ * order, and a token at 0.4% is not about to do anything.
+ */
+const BONDING_FLOOR_BPS = 5_000;
+
+function shape(launch: LaunchWithCurve, image: string | null) {
+  return {
+    mint: launch.mint,
+    name: launch.name,
+    symbol: launch.symbol,
+    creator: launch.creator,
+    launchedAt: launch.launchedAt,
+    image,
+    // Null means nothing has read this curve yet, which is normal for a token
+    // that launched seconds ago and is different from a curve at zero.
+    progressBps: launch.curve?.progressBps ?? null,
+    solRaised: launch.curve?.realSolReserves.toString() ?? null,
+    complete: launch.curve?.complete ?? false,
+  };
+}
 
 export async function GET(request: Request): Promise<Response> {
   const throttled = await rateLimit(request, 'read');
@@ -26,22 +60,47 @@ export async function GET(request: Request): Promise<Response> {
     : 30;
 
   const client = await db();
-  const launches = query
-    ? await searchLaunches(client, query, limit)
-    : await recentLaunches(client, limit);
 
-  const mints = launches.map((launch) => launch.mint);
+  // A search is a search. Splitting results across three lanes would hide the
+  // token somebody pasted an address for in whichever column it happened to
+  // belong to.
+  if (query) {
+    const found = await searchLaunches(client, query, limit);
+    const mints = found.map((launch) => launch.mint);
+    const images = await knownImages(mints);
+    resolveLaunchImages(mints);
+
+    return Response.json({
+      query,
+      results: found.map((launch) =>
+        shape({ ...launch, curve: null }, images.get(launch.mint) ?? null),
+      ),
+    });
+  }
+
+  const [fresh, bonding, bonded] = await Promise.all([
+    newLaunches(client, limit),
+    bondingLaunches(client, BONDING_FLOOR_BPS, limit),
+    bondedLaunches(client, limit),
+  ]);
+
+  const mints = [...new Set([...fresh, ...bonding, ...bonded].map((launch) => launch.mint))];
   const images = await knownImages(mints);
   // Anything without a picture is queued rather than fetched inline. Waiting on
   // a stranger's IPFS gateway before returning a feed would make the slowest
   // token on the page decide how long the page takes.
   resolveLaunchImages(mints);
 
+  const withImages = (rows: LaunchWithCurve[]) =>
+    rows.map((launch) => shape(launch, images.get(launch.mint) ?? null));
+
   return Response.json({
-    query,
-    launches: launches.map((launch) => ({
-      ...launch,
-      image: images.get(launch.mint) ?? null,
-    })),
+    query: '',
+    lanes: {
+      new: withImages(fresh),
+      bonding: withImages(bonding),
+      bonded: withImages(bonded),
+    },
+    bondingFloorBps: BONDING_FLOOR_BPS,
   });
 }

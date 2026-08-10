@@ -11,6 +11,14 @@ export async function register(): Promise<void> {
     startLiveFeed();
   }
 
+  // Which lane a token sits in changes with its curve, not with its age, so
+  // the curve accounts are polled. Tied to the feed switch because without a
+  // feed there are no launches to watch.
+  if (process.env['PROBATIO_DISABLE_FEED'] !== '1') {
+    const { startCurveWatch } = await import('./lib/curve-watch');
+    startCurveWatch();
+  }
+
   // Probing runs even when the feed is disabled: knowing the chain is
   // unreachable matters more than the feed does.
   const { startProbing } = await import('./lib/health');

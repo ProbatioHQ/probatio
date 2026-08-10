@@ -1,5 +1,5 @@
 import type { Launch } from '@probatio/db';
-import { subscribeToLaunches } from '@/lib/launch-stream';
+import { subscribeToCurves, subscribeToLaunches } from '@/lib/launch-stream';
 import { knownImages } from '@/lib/token-images';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -69,6 +69,21 @@ export async function GET(request: Request): Promise<Response> {
           .catch(() => undefined);
       });
 
+      // Curve progress moves a token between lanes without anything new being
+      // launched, so it is its own event. A reader that treated it as a launch
+      // would show the same token in two columns at once.
+      const unsubscribeCurves = subscribeToCurves((curves) => {
+        send(
+          'curves',
+          curves.map((curve) => ({
+            mint: curve.mint,
+            progressBps: curve.progressBps,
+            solRaised: curve.realSolReserves.toString(),
+            complete: curve.complete,
+          })),
+        );
+      });
+
       const heartbeat = setInterval(() => {
         if (!open) return;
         try {
@@ -83,6 +98,7 @@ export async function GET(request: Request): Promise<Response> {
         open = false;
         clearInterval(heartbeat);
         unsubscribe();
+        unsubscribeCurves();
         try {
           controller.close();
         } catch {
