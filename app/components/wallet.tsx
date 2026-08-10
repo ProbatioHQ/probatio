@@ -243,8 +243,11 @@ export function WalletButton() {
 
       {open && (
         <div className="wallet-menu" role="menu">
+          <a href="/me" role="menuitem">
+            Your account
+          </a>
           <a href={`/p/${pubkey}`} role="menuitem">
-            Your record
+            Public record
           </a>
           <a href="/season" role="menuitem">
             This season

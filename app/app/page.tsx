@@ -1,7 +1,5 @@
-import { Coach } from '@/components/coach';
 import { LaunchFeedList } from '@/components/launch-feed';
 import { Leaderboard } from '@/components/leaderboard';
-import { NameClaim } from '@/components/name-claim';
 import { Onboarding } from '@/components/onboarding';
 import { PriceCanvas } from '@/components/price-canvas';
 import { Season } from '@/components/season';
@@ -118,8 +116,6 @@ export default function Home() {
       <Onboarding />
       <Season />
       <Leaderboard />
-      <Coach />
-      <NameClaim />
 
       <section className="term">
         <div className="term-bar">

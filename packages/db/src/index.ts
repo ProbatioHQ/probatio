@@ -79,6 +79,7 @@ export {
 export type { CommitIntent, PendingTrade, StoredCommit } from './commits';
 
 export {
+  creatorLaunchCounts,
   launchByMint,
   launchesByCreator,
   recentLaunches,

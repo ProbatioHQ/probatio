@@ -1,6 +1,7 @@
 import {
   bondedLaunches,
   bondingLaunches,
+  creatorLaunchCounts,
   newLaunches,
   searchLaunches,
   type LaunchWithCurve,
@@ -51,7 +52,7 @@ function marketCapOf(launch: LaunchWithCurve): string | null {
   return marketCapLamports(price, PUMPFUN_TOKEN_TOTAL_SUPPLY).toString();
 }
 
-function shape(launch: LaunchWithCurve, image: string | null) {
+function shape(launch: LaunchWithCurve, image: string | null, creatorLaunches: number) {
   return {
     mint: launch.mint,
     name: launch.name,
@@ -64,6 +65,9 @@ function shape(launch: LaunchWithCurve, image: string | null) {
     progressBps: launch.curve?.progressBps ?? null,
     marketCap: marketCapOf(launch),
     complete: launch.curve?.complete ?? false,
+    // A floor on how many tokens this wallet has launched, counted from what
+    // this feed has seen. One is an unknown; forty is a pattern.
+    creatorLaunches,
   };
 }
 
@@ -90,11 +94,20 @@ export async function GET(request: Request): Promise<Response> {
     const images = await knownImages(mints);
     resolveLaunchImages(mints);
 
+    const searchCounts = await creatorLaunchCounts(
+      client,
+      found.map((launch) => launch.creator),
+    );
+
     return Response.json({
       query,
       solUsd: await solUsd(),
       results: found.map((launch) =>
-        shape({ ...launch, curve: null }, images.get(launch.mint) ?? null),
+        shape(
+          { ...launch, curve: null },
+          images.get(launch.mint) ?? null,
+          searchCounts.get(launch.creator) ?? 1,
+        ),
       ),
     });
   }
@@ -112,8 +125,15 @@ export async function GET(request: Request): Promise<Response> {
   // token on the page decide how long the page takes.
   resolveLaunchImages(mints);
 
+  const counts = await creatorLaunchCounts(
+    client,
+    [...fresh, ...bonding, ...bonded].map((launch) => launch.creator),
+  );
+
   const withImages = (rows: LaunchWithCurve[]) =>
-    rows.map((launch) => shape(launch, images.get(launch.mint) ?? null));
+    rows.map((launch) =>
+      shape(launch, images.get(launch.mint) ?? null, counts.get(launch.creator) ?? 1),
+    );
 
   return Response.json({
     query: '',

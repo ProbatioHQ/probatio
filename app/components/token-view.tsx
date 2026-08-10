@@ -73,7 +73,7 @@ export function TokenView({ mint }: { mint: string }) {
           </span>
         </div>
         <div className="term-body">
-          <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={420} />
+          <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={560} />
         </div>
       </section>
 

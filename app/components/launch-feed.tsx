@@ -34,6 +34,8 @@ interface Token {
   /** Lamports, as a digit string. Null when the curve has not been read yet. */
   marketCap: string | null;
   complete: boolean;
+  /** A floor on how many tokens this creator has launched. */
+  creatorLaunches?: number;
 }
 
 interface Lanes {
@@ -61,6 +63,8 @@ interface Filters {
   /** Percent. Raises the floor of the middle lane above the server's own. */
   minBondedPct: number;
   hideImageless: boolean;
+  /** 0 means no limit. Anything else hides serial launchers. */
+  maxCreatorLaunches: number;
   paused: boolean;
 }
 
@@ -68,6 +72,7 @@ const DEFAULT_FILTERS: Filters = {
   minMarketCapUsd: 0,
   minBondedPct: 50,
   hideImageless: false,
+  maxCreatorLaunches: 0,
   paused: false,
 };
 
@@ -169,6 +174,12 @@ function Row({
         <span className="feed-name">
           <strong>{token.symbol || '???'}</strong>
           <span className="dim">{token.name}</span>
+          {/* Worth seeing without opening a filter panel. */}
+          {(token.creatorLaunches ?? 1) >= 5 && (
+            <span className="serial" title={`This creator has launched at least ${token.creatorLaunches} tokens`}>
+              {token.creatorLaunches}x
+            </span>
+          )}
         </span>
 
         {/* What a token is worth is the one figure worth having in every lane,
@@ -460,6 +471,12 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
 
       return rows.filter((token) => {
         if (filters.hideImageless && !token.image) return false;
+        if (
+          filters.maxCreatorLaunches > 0 &&
+          (token.creatorLaunches ?? 1) > filters.maxCreatorLaunches
+        ) {
+          return false;
+        }
         if (lane === 'bonding' && (token.progressBps ?? 0) < filters.minBondedPct * 100) {
           return false;
         }
@@ -559,6 +576,24 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
               </select>
             </label>
 
+            <label className="field">
+              <span>Creator&apos;s launches, at most</span>
+              <select
+                value={filters.maxCreatorLaunches}
+                onChange={(event) =>
+                  setFilters((was) => ({
+                    ...was,
+                    maxCreatorLaunches: Number(event.target.value),
+                  }))
+                }
+              >
+                <option value={0}>Any</option>
+                <option value={1}>First launch only</option>
+                <option value={3}>3</option>
+                <option value={10}>10</option>
+              </select>
+            </label>
+
             <label className="field checkbox">
               <input
                 type="checkbox"
@@ -569,6 +604,12 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
               />
               <span>Hide tokens with no image</span>
             </label>
+
+            <p className="dim filter-note">
+              Every token here launched on pump.fun — that is the only feed this indexes, so
+              there is no launchpad to choose between. A creator&apos;s launch count is a floor,
+              counted from what this feed has seen rather than their whole history.
+            </p>
 
             {solUsd === null && (
               <p className="dim" style={{ fontSize: 12 }}>

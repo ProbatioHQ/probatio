@@ -1,11 +1,12 @@
 import 'server-only';
 import { LaunchFeed, LogSubscription, toWebSocketUrl } from '@probatio/feed';
-import { PUMP_PROGRAM_ID } from '@probatio/pools';
+import { PUMP_PROGRAM_ID, extractTradeEvents } from '@probatio/pools';
 import { recordLaunches } from '@probatio/db';
 import { db } from './db';
 import { reportFeedRunning, reportFeedState } from './health';
 import { publishLaunches } from './launch-stream';
 import { resolveLaunchImages } from './token-images';
+import { ingestTradeEvents, startTradeCandles } from './trade-candles';
 import { rpcEndpoint } from './env';
 
 /**
@@ -73,6 +74,13 @@ export function startLiveFeed(): void {
     onNotification: (notification) => {
       for (const launch of feed.ingest(notification)) pending.push(launch);
       if (pending.length >= BATCH_SIZE) void flush();
+
+      // The same messages carry every trade. Charts are built from these
+      // rather than from the curve watcher's samples: one sample per bucket
+      // makes open, high, low and close the same number, and every candle
+      // draws as a flat line.
+      const trades = extractTradeEvents(notification.logs);
+      if (trades.length > 0) ingestTradeEvents(trades);
     },
   });
 
@@ -80,6 +88,7 @@ export function startLiveFeed(): void {
   // Never the reason the process stays alive.
   timer.unref?.();
 
+  startTradeCandles();
   reportFeedRunning();
   subscription.start();
 }

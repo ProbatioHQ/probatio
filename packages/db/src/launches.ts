@@ -138,3 +138,33 @@ export async function launchesByCreator(
   });
   return result.rows.map((row) => toLaunch(row as unknown as Record<string, unknown>));
 }
+
+/**
+ * How many tokens each of these wallets has launched.
+ *
+ * A creator's history is the cheapest rug signal there is. Somebody on their
+ * first launch is an unknown; somebody on their fortieth, all of which went to
+ * zero, is a pattern — and it costs one query over data already recorded.
+ *
+ * Counts what this feed has seen, which is not the same as what the wallet has
+ * ever done. A creator whose earlier tokens predate our index reads as newer
+ * than they are, so this is a floor on their history rather than the whole of
+ * it, and is presented that way.
+ */
+export async function creatorLaunchCounts(
+  db: Client,
+  creators: readonly string[],
+): Promise<Map<string, number>> {
+  if (creators.length === 0) return new Map();
+
+  const unique = [...new Set(creators)];
+  const placeholders = unique.map(() => '?').join(', ');
+  const result = await db.execute({
+    sql: `SELECT creator, COUNT(*) AS n FROM launches
+          WHERE creator IN (${placeholders})
+          GROUP BY creator`,
+    args: [...unique],
+  });
+
+  return new Map(result.rows.map((row) => [String(row['creator']), Number(row['n'])]));
+}

@@ -3,6 +3,7 @@ import type { Client } from '@libsql/client';
 import { openDatabase } from '../src/client';
 import { migrate } from '../src/migrate';
 import {
+  creatorLaunchCounts,
   launchByMint,
   launchesByCreator,
   recentLaunches,
@@ -197,5 +198,41 @@ describe('by creator', () => {
 
     const theirs = await launchesByCreator(db, CREATOR);
     expect(theirs.map((entry) => entry.mint)).toEqual(['b', 'a']);
+  });
+});
+
+describe('creator history', () => {
+  it('counts how many launches each wallet is behind', async () => {
+    const other = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
+    await recordLaunches(
+      db,
+      [
+        launch({ mint: MINT }),
+        launch({ mint: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R' }),
+        launch({ mint: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', creator: other }),
+      ],
+      NOW,
+    );
+
+    const counts = await creatorLaunchCounts(db, [CREATOR, other]);
+    expect(counts.get(CREATOR)).toBe(2);
+    expect(counts.get(other)).toBe(1);
+  });
+
+  it('leaves out a wallet that has launched nothing', async () => {
+    // Absent rather than zero: the caller defaults it, and a zero here would
+    // claim we know something about a wallet we have never seen.
+    const counts = await creatorLaunchCounts(db, [CREATOR]);
+    expect(counts.has(CREATOR)).toBe(false);
+  });
+
+  it('asks once for a repeated creator', async () => {
+    await recordLaunches(db, [launch({ mint: MINT })], NOW);
+    const counts = await creatorLaunchCounts(db, [CREATOR, CREATOR, CREATOR]);
+    expect(counts.get(CREATOR)).toBe(1);
+  });
+
+  it('has nothing to ask when given no creators', async () => {
+    expect((await creatorLaunchCounts(db, [])).size).toBe(0);
   });
 });

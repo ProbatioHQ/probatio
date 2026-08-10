@@ -3055,3 +3055,84 @@ body:has(main.wide) .site-header .shell,
 body:has(main.wide) .site-footer .shell {
   max-width: 1448px;
 }
+
+/* ============================================================ chart tools */
+
+/*
+ * The token page gives the chart the room, not the panel.
+ *
+ * A trading surface is read left to right: the chart is the thing being
+ * studied and the panel is the thing being operated. Splitting them evenly
+ * made the chart too small to see a level on, which is the whole reason it is
+ * there.
+ */
+.trade-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+
+@media (min-width: 1180px) {
+  .token-page { max-width: 1400px; }
+}
+
+.chart-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.chart-change { margin-left: auto; font-size: 13px; }
+
+.chart-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Small toggles that sit above the plot without competing with it. */
+.chip {
+  align-self: center;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--ink-sunken);
+  color: var(--text-faint);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.chip:hover:not(.on) { color: var(--text-dim); border-color: var(--line-bright); }
+
+.chip.on {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+/* While placing a level, the cursor says so. */
+.chart-canvas.drawing { cursor: crosshair; }
+
+.chart-hint {
+  font-size: 11.5px;
+  margin-top: 6px;
+}
+
+/* A creator who has done this many times before. Amber, not red: it is a fact
+   about them, not a verdict on the token. */
+.serial {
+  flex: none;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, #f0b429 18%, transparent);
+  color: #f0b429;
+}
+
+.filter-note {
+  flex: 1 1 100%;
+  font-size: 11.5px;
+  max-width: 70ch;
+  margin: 0;
+}
