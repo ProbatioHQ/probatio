@@ -31,9 +31,13 @@ export default async function AccountPage() {
     <main>
       <div className="page-head">
         <h1>Your account</h1>
+        {/* Says what the log shows rather than asserting the outcome. Whether
+            a trade reached the chain is a fact about the keeper, and the table
+            below reports it per trade instead of being promised here. */}
         <p className="dim">
-          Practice money, real prices. Every trade below was committed to Solana as you made it —{' '}
-          <a href={`/p/${user.pubkey}`}>your public record</a> is the same data, checkable by
+          Practice money, real prices. Every trade below is hashed as it fills and committed to
+          Solana in batches — the log says which have landed.{' '}
+          <a href={`/p/${user.pubkey}`}>Your public record</a> is the same data, checkable by
           anyone.
         </p>
       </div>

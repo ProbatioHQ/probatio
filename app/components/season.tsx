@@ -31,6 +31,8 @@ interface Ranked {
   nextBand: { places: number; entriesAway: number } | null;
   rulesetHash: string;
   entered: boolean;
+  /** False when this server cannot take an entry — see /api/season. */
+  entryAvailable?: boolean;
 }
 
 function sol(lamports: string): string {
@@ -146,10 +148,19 @@ export function Season() {
 
         <hr />
 
+        {/* Offered only when the server can actually take it. A paid
+                season needs a treasury address, which is configuration
+                rather than code — without it the button drew, the reader
+                pressed it, and only then met a refusal. */}
         {season.entered ? (
           <p className="accent mono">You are entered.</p>
-        ) : season.status === 'entry_open' ? (
+        ) : season.status === 'entry_open' && season.entryAvailable !== false ? (
           <EnterSeason free={BigInt(season.entryCost) === 0n} />
+        ) : season.status === 'entry_open' ? (
+          <p className="dim">
+            Entry is not open on this server yet. Free play is, and trades made in it are
+            committed the same way.
+          </p>
         ) : (
           !closed && <p className="dim">Entries are closed for this season. Free play is always open.</p>
         )}

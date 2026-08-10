@@ -49,6 +49,8 @@ interface TradeEntry {
   partial: boolean;
   latencyMs: number;
   leafHash: string;
+  /** Whether a confirmed batch on chain covers this trade. */
+  committed?: boolean;
   createdAt: number;
 }
 
@@ -181,7 +183,11 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
               <th scope="col">Tokens</th>
               <th scope="col">Fee</th>
               <th scope="col">Impact</th>
-              <th scope="col">Committed as</th>
+              {/* What it is, not what it proves. The hash exists from the
+                  moment the trade fills; whether it is on chain is the next
+                  column's job to say. */}
+              <th scope="col">Leaf hash</th>
+              <th scope="col">On chain</th>
             </tr>
           </thead>
           <tbody>
@@ -195,6 +201,9 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td>{trade.priceImpactBps}bp{trade.partial && ' · partial'}</td>
                 {/* What a trader hands to the verifier to prove this happened. */}
                 <td><code>{trade.leafHash.slice(0, 12)}…</code></td>
+                <td className={trade.committed ? 'gain' : 'dim'}>
+                  {trade.committed ? 'committed' : 'not yet'}
+                </td>
               </tr>
             ))}
           </tbody>

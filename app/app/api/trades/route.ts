@@ -1,4 +1,4 @@
-import { tradeHistory } from '@probatio/db';
+import { commitHistory, tradeHistory } from '@probatio/db';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { activeSeason } from '@/lib/season';
@@ -8,8 +8,13 @@ import { currentUser } from '@/lib/session';
  * The trade log.
  *
  * Append-only, so this is the whole story rather than a summary of it. Each
- * entry carries its leaf hash, which is what a trader hands to the verifier to
- * prove the trade is committed.
+ * entry carries its leaf hash, which is what a trader hands to the verifier.
+ *
+ * And whether that leaf has actually been committed, which is not the same
+ * question. A leaf hash is computed the moment a trade fills and exists whether
+ * or not anything has ever reached the chain — with no keeper key configured,
+ * nothing has. The log said "committed as" over a column of hashes regardless,
+ * which is the one claim this product cannot afford to make loosely.
  */
 
 const MAX_LIMIT = 500;
@@ -41,5 +46,16 @@ export async function GET(request: Request): Promise<Response> {
 
   const trades = await tradeHistory(client, account.id, limit, mint ?? undefined);
 
-  return Response.json({ trades });
+  // Only confirmed commits count — `commitHistory` already filters to those.
+  // A trade is committed when a confirmed batch covers its id.
+  const commits = await commitHistory(client, seasonId, user.pubkey);
+  const committed = (tradeId: number): boolean =>
+    commits.some((commit) => tradeId >= commit.fromTradeId && tradeId <= commit.toTradeId);
+
+  return Response.json({
+    trades: trades.map((trade) => ({ ...trade, committed: committed(trade.id) })),
+    // Said once for the whole log as well as per trade, so an interface can
+    // explain the state rather than repeating "no" down a column.
+    anyCommitted: commits.length > 0,
+  });
 }

@@ -18,6 +18,7 @@ import { explainCondition } from '@probatio/seasons';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
+import { treasuryAddress } from '@/lib/env';
 
 /**
  * The season, as anybody can see it.
@@ -141,6 +142,21 @@ export async function GET(request: Request): Promise<Response> {
         refund: 'Every entrant is refunded exactly what they paid. No house cut.',
         finalIsFinal: 'Once results are on chain the season cannot be voided.',
       },
+
+      /*
+       * Whether an entry can actually be taken right now.
+       *
+       * A paid season needs somewhere for the money to go, and that address is
+       * configuration rather than code — unset, `/api/pay/intent` answers 503.
+       * Without saying so here the interface had no way to know: it read
+       * `entry_open` and a cost of 0.05 SOL, drew the button, and the refusal
+       * only arrived after somebody had committed to pressing it.
+       *
+       * A free season needs no treasury, so it is available whenever its window
+       * is open.
+       */
+      entryAvailable:
+        BigInt(season.entryCost) === 0n || treasuryAddress() !== null,
 
       rulesetHash: season.rulesetHash,
       // What today's code produces for this ordinal. Equal to the above unless
