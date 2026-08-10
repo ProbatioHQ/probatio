@@ -502,7 +502,20 @@ hr {
     gap: 8px;
   }
 
-  button {
+  /*
+   * Block buttons on a phone — but only the ones that are actually blocks.
+   *
+   * This was every `button` on the site, which is right for "Enter the season"
+   * at the end of a column and wrong for everything that lives inside a row:
+   * the wallet control stretched to the full width of the header and pushed
+   * the nav onto a third line, and the chart's chips, the timeframe
+   * segments, the buy and sell sides and the size presets would all have gone
+   * the same way.
+   *
+   * Named exclusions rather than a narrower selector, so a new inline control
+   * has to say it is one.
+   */
+  button:not(.wallet-connect):not(.wallet-pill):not(.chip):not(.preset):not(.side):not(.segmented button):not(.linklike):not(.toggle) {
     width: 100%;
     align-self: stretch;
   }
@@ -1621,8 +1634,45 @@ button,
 
 .wallet-menu button:hover { color: var(--loss); }
 
+/*
+ * The header on a phone.
+ *
+ * Four of the five nav links used to be `display: none` below this width, with
+ * nothing to open in their place — so Season, How it works, Verify and Trust
+ * were simply unreachable, and Season was not in the footer either. Hiding
+ * navigation is only a solution when something else reveals it.
+ *
+ * The nav drops to its own row instead and scrolls sideways if it has to. The
+ * header grows by a line, which is the honest cost of having five destinations.
+ */
 @media (max-width: 860px) {
-  .site-nav a:not(:first-child) { display: none; }
+  .site-header .shell {
+    flex-wrap: wrap;
+    height: auto;
+    padding-top: 10px;
+    padding-bottom: 8px;
+    gap: 8px 16px;
+  }
+
+  .site-header .shell > .site-nav {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    /* No scrollbar over a 12px nav; the overflow is discoverable by dragging,
+       and the row is short enough that most phones show all of it anyway. */
+    scrollbar-width: none;
+    gap: 16px;
+    padding-bottom: 2px;
+  }
+
+  .site-header .shell > .site-nav::-webkit-scrollbar { display: none; }
+
+  .site-nav a {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
   .wallet-pill .bal { display: none; }
 }
 
@@ -3180,4 +3230,51 @@ body:has(main.wide) .site-footer .shell {
 .segmented button:disabled:hover {
   background: transparent;
   color: var(--text-faint);
+}
+
+
+/*
+ * The feed's controls on a phone.
+ *
+ * Search shared a flex row with Filters and Pause, which do not shrink — so
+ * the input collapsed to about forty pixels and showed one character of its
+ * own placeholder. Search takes the row; the buttons sit under it.
+ *
+ * At the end of the file on purpose. A media query adds no specificity, so
+ * `.feed-search { flex: 1 }` further down the sheet beat the same selector
+ * inside `@media` further up, and the first attempt at this fix changed
+ * nothing at all while looking correct.
+ */
+@media (max-width: 720px) {
+  .feed-controls {
+    flex-wrap: wrap;
+  }
+
+  .feed-search {
+    flex: 1 0 100%;
+  }
+
+  .feed-controls .preset {
+    flex: 1 1 auto;
+  }
+}
+
+/*
+ * The hero on a phone.
+ *
+ * 132px of padding top and bottom is right for a wide screen with a chart
+ * running behind the headline. On a 390px viewport it pushed the badge and the
+ * headline most of a screen down, so the first thing a visitor met was an
+ * empty box with a status banner above it.
+ */
+@media (max-width: 640px) {
+  .hero {
+    padding: 40px 0 48px;
+  }
+
+  /* The chart behind the headline is decoration, and at this width it sits
+     directly under the text rather than beside it. Kept, but quieter. */
+  .hero-canvas {
+    opacity: 0.5;
+  }
 }
