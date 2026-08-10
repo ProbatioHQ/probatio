@@ -295,6 +295,52 @@ impl Harness {
         self.send(instruction, &[&authority], &authority.pubkey())
     }
 
+    pub fn void_season(
+        &mut self,
+        season: &Pubkey,
+        signer: Option<&Keypair>,
+    ) -> Result<(), FailedTransactionMetadata> {
+        let authority = self.authority.insecure_clone();
+        let signer = signer.unwrap_or(&authority);
+
+        let instruction = Instruction::new_with_bytes(
+            self.program_id,
+            &probatio::instruction::VoidSeason {}.data(),
+            probatio::accounts::VoidSeason {
+                authority: signer.pubkey(),
+                season: *season,
+            }
+            .to_account_metas(None),
+        );
+        self.send(instruction, &[signer], &signer.pubkey())
+    }
+
+    pub fn refund_entry(
+        &mut self,
+        season: &Pubkey,
+        trader: &Pubkey,
+    ) -> Result<(), FailedTransactionMetadata> {
+        let entry = self.entry_pda(season, trader);
+        let vault = self.vault_pda(season);
+
+        let instruction = Instruction::new_with_bytes(
+            self.program_id,
+            &probatio::instruction::RefundEntry {}.data(),
+            probatio::accounts::RefundEntry {
+                payer: self.authority.pubkey(),
+                season: *season,
+                entry,
+                trader: *trader,
+                vault,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        );
+
+        let authority = self.authority.insecure_clone();
+        self.send(instruction, &[&authority], &authority.pubkey())
+    }
+
     pub fn balance(&self, address: &Pubkey) -> u64 {
         self.svm.get_account(address).map(|a| a.lamports).unwrap_or(0)
     }

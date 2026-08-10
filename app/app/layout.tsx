@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { AmbientTerminal } from '@/components/ambient-terminal';
 import { HeaderScroll } from '@/components/header-scroll';
 import { PageTransition } from '@/components/page-transition';
 import { StatusBanner } from '@/components/status-banner';
+import { WalletButton, WalletProvider } from '@/components/wallet';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -37,10 +39,12 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body>
         <div className="grain" aria-hidden="true" />
         <div className="glow" aria-hidden="true" />
+        <AmbientTerminal />
         <div className="scan" aria-hidden="true" />
         <div className="rails" aria-hidden="true" />
         <span className="rail-pulse left" aria-hidden="true" />
         <span className="rail-pulse right" aria-hidden="true" />
+        <WalletProvider>
         <HeaderScroll />
         <header className="site-header">
           <div className="shell">
@@ -49,10 +53,14 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
               Probatio
             </a>
             <nav className="site-nav" aria-label="Main">
+              <a href="/season">Season</a>
               <a href="/docs">How it works</a>
               <a href="/verify">Verify</a>
               <a href="/trust">Trust</a>
             </nav>
+            {/* The wallet lives in the furniture, so signing in is reachable
+                from every page rather than only from the front one. */}
+            <WalletButton />
           </div>
         </header>
 
@@ -61,6 +69,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <PageTransition>
           <div className="shell">{children}</div>
         </PageTransition>
+
+        </WalletProvider>
 
         <footer className="site-footer">
           <div className="shell">

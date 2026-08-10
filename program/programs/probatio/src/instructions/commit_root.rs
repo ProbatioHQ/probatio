@@ -56,6 +56,14 @@ pub fn handle_commit_root(
         ctx.accounts.season.status != SeasonStatus::Finalized,
         ProbatioError::SeasonFinalized
     );
+    // Or to a voided one. A void season is over and its entries are being
+    // refunded; a keeper still appending to it would grow a record for a
+    // season that, by the policy that voided it, ran under conditions nobody
+    // is willing to stand behind.
+    require!(
+        ctx.accounts.season.status != SeasonStatus::Voided,
+        ProbatioError::SeasonAlreadyVoided
+    );
 
     let clock = Clock::get()?;
     let record = &mut ctx.accounts.record;

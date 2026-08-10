@@ -1,6 +1,7 @@
 import { recentLaunches, searchLaunches } from '@probatio/db';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
+import { knownImages, resolveLaunchImages } from '@/lib/token-images';
 
 /**
  * The launch feed, and search over it.
@@ -29,5 +30,18 @@ export async function GET(request: Request): Promise<Response> {
     ? await searchLaunches(client, query, limit)
     : await recentLaunches(client, limit);
 
-  return Response.json({ query, launches });
+  const mints = launches.map((launch) => launch.mint);
+  const images = await knownImages(mints);
+  // Anything without a picture is queued rather than fetched inline. Waiting on
+  // a stranger's IPFS gateway before returning a feed would make the slowest
+  // token on the page decide how long the page takes.
+  resolveLaunchImages(mints);
+
+  return Response.json({
+    query,
+    launches: launches.map((launch) => ({
+      ...launch,
+      image: images.get(launch.mint) ?? null,
+    })),
+  });
 }

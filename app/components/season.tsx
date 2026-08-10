@@ -154,6 +154,15 @@ export function Season() {
           !closed && <p className="dim">Entries are closed for this season. Free play is always open.</p>
         )}
 
+        {/* The front page is the summary. Everything else about the season —
+            the full board, every trader's numbers — is one click away rather
+            than duplicated here. */}
+        <p>
+          <a href="/season" className="ghost-link">
+            Full standings and rules
+          </a>
+        </p>
+
         <p>
           <small className="mono">ruleset {season.rulesetHash.slice(0, 16)}…</small>
         </p>

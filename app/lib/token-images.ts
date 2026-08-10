@@ -1,0 +1,136 @@
+import 'server-only';
+import {
+  getManyTokenMetadata,
+  launchByMint,
+  recordOffchainFailure,
+  recordOffchainMetadata,
+  upsertOnchainMetadata,
+} from '@probatio/db';
+import { fetchOffchainMetadata } from '@probatio/metadata';
+import { db } from './db';
+
+/**
+ * Token pictures.
+ *
+ * A launch carries a metadata URI, not an image — the picture is a field inside
+ * a JSON document on a host the token's creator chose. So resolving one means
+ * fetching an arbitrary URL somebody else controls, which is why it happens
+ * here on a leash rather than in the browser: the fetch is size-capped,
+ * time-capped, and refuses anything that is not http or ipfs, and the result is
+ * cached so the same document is never pulled twice.
+ *
+ * The image URL itself is only ever handed to a browser to render, never
+ * fetched by this server. A failure is recorded as a failure with a timestamp,
+ * so a token whose gateway is dead is not retried on every page load.
+ */
+
+/** Never hold up a feed for one slow gateway. */
+const TIMEOUT_MS = 6_000;
+/** How many documents to have in flight at once. */
+const CONCURRENCY = 4;
+/** Refresh an image at most this often. Metadata is mutable but rarely moves. */
+const STALE_MS = 24 * 60 * 60 * 1_000;
+
+/** Mints being resolved right now, so two callers do not fetch the same one. */
+const inFlight = new Set<string>();
+
+async function resolveOne(mint: string, now: number): Promise<void> {
+  if (inFlight.has(mint)) return;
+  inFlight.add(mint);
+  try {
+    const client = await db();
+
+    // The launch row is where the URI came from. Seeding the metadata cache
+    // from it means the picture can be resolved without an RPC round trip for
+    // something we already watched happen.
+    const launch = await launchByMint(client, mint);
+    if (!launch?.uri) return;
+
+    await upsertOnchainMetadata(
+      client,
+      {
+        mint,
+        name: launch.name || null,
+        symbol: launch.symbol || null,
+        uri: launch.uri,
+        updateAuthority: null,
+        decimals: null,
+      },
+      now,
+    );
+
+    try {
+      const document = await fetchOffchainMetadata(launch.uri, { timeoutMs: TIMEOUT_MS });
+      await recordOffchainMetadata(
+        client,
+        mint,
+        {
+          name: document.name,
+          symbol: document.symbol,
+          description: document.description,
+          imageUrl: document.image,
+        },
+        now,
+      );
+    } catch (error) {
+      await recordOffchainFailure(
+        client,
+        mint,
+        error instanceof Error ? error.message : 'fetch failed',
+        now,
+      );
+    }
+  } catch (error) {
+    // A picture is never worth failing a request over.
+    console.error('[images] could not resolve', mint, error);
+  } finally {
+    inFlight.delete(mint);
+  }
+}
+
+/**
+ * Fetch what is missing, in the background.
+ *
+ * Returns immediately. Callers that need the images now should read the cache
+ * afterwards and accept that the newest tokens will not have one yet — which is
+ * true of every client, because the document is fetched after the token exists.
+ */
+export function resolveLaunchImages(mints: readonly string[]): void {
+  void (async () => {
+    if (mints.length === 0) return;
+    const client = await db();
+    const now = Date.now();
+    const cached = await getManyTokenMetadata(client, mints);
+
+    const wanted = mints.filter((mint) => {
+      const entry = cached.get(mint);
+      if (!entry) return true;
+      if (entry.offchainFetchedAt === null) return true;
+      return entry.offchainFetchedAt < now - STALE_MS;
+    });
+
+    // A plain worker pool: a launch burst can be a hundred mints, and a
+    // hundred simultaneous fetches to one IPFS gateway gets us rate limited
+    // and gets the images nowhere faster.
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(CONCURRENCY, wanted.length) }, async () => {
+      while (cursor < wanted.length) {
+        const mint = wanted[cursor];
+        cursor += 1;
+        if (mint) await resolveOne(mint, Date.now());
+      }
+    });
+    await Promise.all(workers);
+  })().catch(() => undefined);
+}
+
+/** Cached image URLs for these mints. Only ever what is already known. */
+export async function knownImages(mints: readonly string[]): Promise<Map<string, string>> {
+  if (mints.length === 0) return new Map();
+  const cached = await getManyTokenMetadata(await db(), mints);
+  const images = new Map<string, string>();
+  for (const [mint, entry] of cached) {
+    if (entry.imageUrl) images.set(mint, entry.imageUrl);
+  }
+  return images;
+}

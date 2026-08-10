@@ -8,13 +8,19 @@
  * The ruleset hash printed here is what goes on chain with init_season. If the
  * two ever disagree, the published rules are not the rules.
  *
- * The seed season is the exception to most of this. It is ordinal 0, free to
- * enter, and its prize is put up rather than paid for by entries — because the
- * published commitment is that the upgrade authority is burned before any
- * season takes money, and the program cannot refund anybody yet.
+ * The seed season is ordinal 0: before the first numbered one, and carrying a
+ * prize that is put up rather than paid for by entries, so the first board is
+ * worth being on before anybody has heard of this.
+ *
+ * It used to be forced free, because the void policy promises full refunds and
+ * the program had no instruction that could pay one — a season that took money
+ * it could not give back. `refund_entry` closed that, so the seed season is now
+ * priced like any other and `--free` is an explicit choice rather than the only
+ * safe option.
  *
  *   DATABASE_URL=file:./app/probatio.db npx tsx scripts/open-season.mts [--at <iso>] [--dry]
- *   ... --seed --sponsor 2               open season 0, free, with a 2 SOL prize
+ *   ... --seed --sponsor 2               open season 0 with a 2 SOL prize on top
+ *   ... --free                           charge nothing to enter
  */
 import {
   createRankedSeason,
@@ -30,6 +36,7 @@ const url = process.env['DATABASE_URL'] ?? 'file:./app/probatio.db';
 const dry = process.argv.includes('--dry');
 
 const seed = process.argv.includes('--seed');
+const free = process.argv.includes('--free');
 
 const sponsorIndex = process.argv.indexOf('--sponsor');
 const sponsorSol =
@@ -66,12 +73,12 @@ const previous = previousOrdinal > 0 ? await seasonByOrdinal(db, previousOrdinal
 const start = startsAt ?? previous?.endsAt ?? now;
 
 const base = rulesetFor(ordinal);
-const entryCost = seed ? 0n : base.entryCost;
+const entryCost = free ? 0n : base.entryCost;
 
 // The hash has to describe the season that actually runs. Hashing the standard
 // ruleset while opening a free season would publish a commitment to an entry
 // cost nobody is charged — the one thing the hash exists to make impossible.
-const rules = seed ? { ...base, entryCost } : base;
+const rules = free ? { ...base, entryCost } : base;
 
 const schedule = scheduleFrom(start, rules.durationMs, rules.entryWindowMs);
 const hash = rulesetHashHex(rules);
@@ -93,7 +100,7 @@ console.log(seed ? 'Season 0 (seed)' : `Season ${ordinal}`);
 console.log(`  starts        ${new Date(schedule.startsAt).toISOString()}`);
 console.log(`  entries close ${new Date(schedule.entryClosesAt).toISOString()}`);
 console.log(`  ends          ${new Date(schedule.endsAt).toISOString()}`);
-console.log(`  entry         ${entryCost} lamports${seed ? ' (free)' : ''}`);
+console.log(`  entry         ${entryCost} lamports${free ? ' (free)' : ''}`);
 if (sponsorLamports > 0n) console.log(`  prize         ${sponsorLamports} lamports (sponsored)`);
 console.log(`  balance       ${rules.startingBalance} lamports`);
 console.log(`  ruleset       ${encodeRuleset(rules).length} bytes`);

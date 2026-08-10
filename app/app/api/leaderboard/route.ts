@@ -1,4 +1,4 @@
-import { currentRankedSeason, ensureFreePlaySeason, seasonTotals } from '@probatio/db';
+import { currentRankedSeason, ensureFreePlaySeason, namesFor, seasonTotals } from '@probatio/db';
 import { distribute, rulesetFor, statusAt } from '@probatio/seasons';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
@@ -54,11 +54,22 @@ export async function GET(request: Request): Promise<Response> {
   const limit = Math.min(Number(url.searchParams.get('limit') ?? PAGE) || PAGE, 200);
   const user = await currentUser();
 
-  const shown = board.standings.slice(0, limit).map((standing) => ({
+  const page = board.standings.slice(0, limit);
+
+  // Looked up in one query for the whole page rather than per row. A board is
+  // a list of strangers until the people on it have names.
+  const names = await namesFor(
+    client,
+    [...new Set([...page.map((standing) => standing.trader), ...(user ? [user.pubkey] : [])])],
+  );
+
+  const shown = page.map((standing) => ({
     rank: standing.rank,
     trader: standing.trader,
+    name: names.get(standing.trader) ?? null,
     returnBps: standing.returnBps,
     finalEquity: standing.finalEquity.toString(),
+    startingBalance: standing.startingBalance.toString(),
     tradeCount: standing.tradeCount,
     payoutLamports: (payoutByPlace.get(standing.rank) ?? 0n).toString(),
   }));
@@ -71,8 +82,10 @@ export async function GET(request: Request): Promise<Response> {
       ? {
           rank: mine.rank,
           trader: mine.trader,
+          name: names.get(mine.trader) ?? null,
           returnBps: mine.returnBps,
           finalEquity: mine.finalEquity.toString(),
+          startingBalance: mine.startingBalance.toString(),
           tradeCount: mine.tradeCount,
           payoutLamports: (payoutByPlace.get(mine.rank) ?? 0n).toString(),
         }

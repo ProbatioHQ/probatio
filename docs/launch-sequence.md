@@ -97,7 +97,7 @@ the sequence stops here.
 
 ### 4. Season 1
 
-17. Requires the refund instruction shipped **and** the upgrade authority
+17. Requires the refund instruction (shipped: `void_season` + `refund_entry`) **and** the upgrade authority
     burned. If either is missing, season 1 runs free like season 0.
 18. Never charge for entry and then discover a refund cannot be paid.
 
@@ -122,7 +122,7 @@ Named in advance, for the same reason the void conditions were.
 - `/verify` does not verify against a real chain
 - The keeper cannot commit, or commits something the audit does not recognise
 - The fee wallet cannot cover a whole season
-- A season would take money while the program cannot refund it
+- ~~A season would take money while the program cannot refund it~~ *(closed: refunds shipped)*
 - The published ruleset hash does not match what the program recorded
 
 Any one of these and the sequence stops. None of them is a judgement call, and

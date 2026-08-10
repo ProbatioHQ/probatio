@@ -4,6 +4,8 @@ import { PUMP_PROGRAM_ID } from '@probatio/pools';
 import { recordLaunches } from '@probatio/db';
 import { db } from './db';
 import { reportFeedRunning, reportFeedState } from './health';
+import { publishLaunches } from './launch-stream';
+import { resolveLaunchImages } from './token-images';
 import { rpcEndpoint } from './env';
 
 /**
@@ -41,7 +43,14 @@ export function startLiveFeed(): void {
     const batch = pending;
     pending = [];
     try {
-      await recordLaunches(await db(), batch, Date.now());
+      const now = Date.now();
+      await recordLaunches(await db(), batch, now);
+      // Published after the write, so a tab never shows a launch that failed
+      // to persist and vanishes on the next reload. A reconnecting socket
+      // replays recent history, so the batch can contain launches already
+      // sent; readers key by mint and drop the repeats.
+      publishLaunches(batch.map((launch) => ({ ...launch, firstSeenAt: now })));
+      void resolveLaunchImages(batch.map((launch) => launch.mint));
     } catch (error) {
       // Dropped rather than retried: these arrive continuously, and a batch
       // held across a database outage would grow without limit.

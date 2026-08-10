@@ -60,4 +60,10 @@ pub enum ProbatioError {
     SeasonNotOver,
     #[msg("the entry window has not closed yet")]
     EntryWindowStillOpen,
+    #[msg("this season has not been voided")]
+    SeasonNotVoided,
+    #[msg("this season has already been voided")]
+    SeasonAlreadyVoided,
+    #[msg("this entry paid nothing, so there is nothing to refund")]
+    NothingToRefund,
 }

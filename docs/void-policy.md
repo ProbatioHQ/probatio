@@ -49,10 +49,21 @@ Every entrant is refunded exactly what they paid. The house takes nothing —
 voiding a season must never be a way to earn from failure. No placings are
 awarded and no prize is paid.
 
-The season is then finalized on chain with a root that means *void*, which is
-distinct from the root for a season nobody entered and from the zero value that
-means not yet finalized. Those three endings are different and are recorded
-differently.
+On chain this is `void_season` followed by one `refund_entry` per entrant. Void
+is a status of its own rather than a finalization with a special root, and the
+two are mutually exclusive in the program: a voided season can never be
+finalized, and a finalized one can never be voided. That exclusivity is what
+guarantees an entry has at most one way to be paid out, so nobody can take a
+prize and a refund for the same season.
+
+The refund amount is not a parameter. It is what the chain recorded the trader
+paying when they entered, so there is nothing for the authority, the caller, or
+the trader to decide. Anyone at all can submit a refund on an entrant's behalf
+and the lamports still go to the wallet named in the entry — a refund does not
+depend on us being willing to send it.
+
+A voided season also stops accepting commits. A season nobody is willing to
+stand behind should not keep growing records.
 
 ## What this does not cover
 

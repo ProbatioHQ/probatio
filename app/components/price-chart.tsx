@@ -58,6 +58,7 @@ export function PriceChart({
   height?: number;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const fitted = useRef(false);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<'Candlestick'> | null>(null);
 
@@ -68,23 +69,36 @@ export function PriceChart({
     let cancelled = false;
     setError(null);
 
-    void fetch(`/api/candles?mint=${encodeURIComponent(mint)}&timeframe=${timeframe}`)
-      .then(async (response) => {
-        const body = (await response.json()) as CandleResponse | { error: string };
-        if (cancelled) return;
-        if ('error' in body) {
-          setError(body.error);
-          return;
-        }
-        setData(body);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Could not load the chart.');
-      });
+    const read = (): void => {
+      void fetch(`/api/candles?mint=${encodeURIComponent(mint)}&timeframe=${timeframe}`)
+        .then(async (response) => {
+          const body = (await response.json()) as CandleResponse | { error: string };
+          if (cancelled) return;
+          if ('error' in body) {
+            setError(body.error);
+            return;
+          }
+          setError(null);
+          setData(body);
+        })
+        .catch(() => {
+          // Only the first failure is worth reporting. A dropped poll on a
+          // chart that is already drawn should not replace it with an error.
+          if (!cancelled && !data) setError('Could not load the chart.');
+        });
+    };
+
+    read();
+    // A chart on a live market that only updates on reload is a screenshot.
+    // Short timeframes move faster and are polled faster.
+    const period = timeframe.startsWith('s') ? 3_000 : 8_000;
+    const timer = setInterval(read, period);
 
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mint, timeframe]);
 
   const points = useMemo<CandlestickData[]>(() => {
@@ -104,26 +118,33 @@ export function PriceChart({
 
     const instance = createChart(node, {
       height,
+      // Matched to the site's own tokens rather than the library defaults,
+      // so the chart belongs to the page it sits in.
       layout: {
         background: { color: 'transparent' },
-        textColor: '#8b8b93',
+        textColor: '#6b7280',
+        fontFamily: 'var(--font-geist-mono), ui-monospace, monospace',
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: 'rgba(140,140,150,0.08)' },
-        horzLines: { color: 'rgba(140,140,150,0.08)' },
+        vertLines: { color: 'rgba(63,224,138,0.05)' },
+        horzLines: { color: 'rgba(63,224,138,0.05)' },
       },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
-      crosshair: { mode: 0 },
+      crosshair: {
+        mode: 0,
+        vertLine: { color: 'rgba(63,224,138,0.4)', labelBackgroundColor: '#1d7a4a' },
+        horzLine: { color: 'rgba(63,224,138,0.4)', labelBackgroundColor: '#1d7a4a' },
+      },
     });
 
     const candles = instance.addSeries(CandlestickSeries, {
-      upColor: '#26a37b',
-      downColor: '#d1495b',
+      upColor: '#3fe08a',
+      downColor: '#ff5f56',
       borderVisible: false,
-      wickUpColor: '#26a37b',
-      wickDownColor: '#d1495b',
+      wickUpColor: '#3fe08a',
+      wickDownColor: '#ff5f56',
     });
 
     chart.current = instance;
@@ -157,16 +178,49 @@ export function PriceChart({
     });
 
     series.current.setData(points);
-    chart.current?.timeScale().fitContent();
+
+    // Only on the first draw. Refitting on every poll would yank the view back
+    // to the whole range each time somebody zoomed in to look at something.
+    if (!fitted.current) {
+      chart.current?.timeScale().fitContent();
+      fitted.current = true;
+    }
   }, [points]);
 
+  // A new token or timeframe is a new chart, so it earns a fresh fit.
+  useEffect(() => {
+    fitted.current = false;
+  }, [mint, timeframe]);
+
+  const last = points.at(-1);
+  const first = points.at(0);
+  const change =
+    last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
+
   return (
-    <div>
-      <div ref={container} style={{ width: '100%', height }} />
-      {error && <p role="alert">{error}</p>}
-      {!error && data && points.length === 0 && (
-        <p>No trades yet. The chart fills in as this token trades.</p>
-      )}
+    <div className="chart">
+      <div className="chart-head">
+        <span className="cmd">
+          {unit === 'market-cap' ? 'market cap' : 'price'}
+          <span className="caret" />
+        </span>
+        {change !== null && (
+          <span className={change >= 0 ? 'gain mono' : 'loss mono'}>
+            {change >= 0 ? '+' : ''}
+            {change.toFixed(2)}%
+          </span>
+        )}
+      </div>
+      <div className="chart-canvas" style={{ height }}>
+        <div ref={container} style={{ width: '100%', height }} />
+        {/* Centred in the plot area rather than under it. An empty 420px box
+            with a caption below reads as a chart that failed to load. */}
+        {(error || (data && points.length === 0)) && (
+          <p role={error ? 'alert' : undefined} className={error ? 'chart-empty loss' : 'chart-empty dim'}>
+            {error ?? 'No trades yet. The chart fills in as this token trades.'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

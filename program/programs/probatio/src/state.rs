@@ -17,6 +17,10 @@ pub enum SeasonStatus {
     Closed,
     /// Results published. Terminal.
     Finalized,
+    /// The season did not count. Terminal, and the only state in which entry
+    /// fees can be given back. A voided season can never be finalized, so this
+    /// is not a way to discard a result after seeing it.
+    Voided,
 }
 
 /// A season, and every condition that could change a result.
@@ -60,6 +64,8 @@ pub struct Season {
     /// Merkle root of the final rankings. Zero until finalized.
     pub results_root: [u8; 32],
     pub finalized_at: i64,
+    /// When the season was declared void. Zero unless it was.
+    pub voided_at: i64,
 
     pub bump: u8,
     pub vault_bump: u8,

@@ -69,6 +69,16 @@ pub mod probatio {
         instructions::claim_prize::handle_claim_prize(ctx, claim, proof)
     }
 
+    /// Declare a season void, so its entries can be refunded.
+    pub fn void_season(ctx: Context<VoidSeason>) -> Result<()> {
+        instructions::void_season::handle_void_season(ctx)
+    }
+
+    /// Give an entry fee back, after the season was voided.
+    pub fn refund_entry(ctx: Context<RefundEntry>) -> Result<()> {
+        instructions::refund_entry::handle_refund_entry(ctx)
+    }
+
     /// Replace the keeper key.
     pub fn set_keeper(ctx: Context<SetKeeper>, keeper: Pubkey) -> Result<()> {
         instructions::set_keeper::handle_set_keeper(ctx, keeper)

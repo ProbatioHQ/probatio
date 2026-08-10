@@ -75,14 +75,14 @@ hard.
 ```bash
 npm install
 cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
-npm test                                # 1088 tests, no network
+npm test                                # 1108 tests, no network
 npm --prefix app run dev
 ```
 
 The Anchor program is separate and needs the Solana toolchain:
 
 ```bash
-cd program && cargo test               # 52 tests, under litesvm
+cd program && cargo test               # 62 tests, under litesvm
 ```
 
 Note that `cargo build` does **not** rebuild the binary the tests load. Use
@@ -154,13 +154,18 @@ The user-facing explanations live at `/docs` on the site.
 Not deployed. The program has never been on mainnet, and until it is, every
 claim about what it does is a claim about source code.
 
-Two things are known to be missing and are written down rather than left to be
-discovered:
+Both of the gaps that used to be listed here are closed:
 
-- **The keeper has no concrete chain gateway.** `ChainGateway` is an interface
-  whose only implementations are test doubles, so nothing is committed yet.
-- **There is no refund instruction**, so no season can take money until there
-  is one. The void policy promises full refunds and the program cannot pay one.
+- **The chain gateway is real.** `SolanaGateway` builds, signs and sends the
+  commit transactions by hand, and a drill against a local validator confirms
+  the accumulator on chain matches the one computed locally, byte for byte.
+- **Refunds exist.** `void_season` and `refund_entry` mean a voided season can
+  give every entrant back exactly what they paid, which is what the void policy
+  always promised. Until they existed no season could honestly charge for entry.
+
+What remains is deployment itself, and the upgrade authority: while it is held,
+the program can be replaced, so read [what you still have to
+trust](docs/upgrade-authority.md) before believing anything above.
 
 See [the launch sequence](docs/launch-sequence.md) for the order these have to
 happen in and why.

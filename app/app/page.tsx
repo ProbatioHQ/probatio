@@ -5,7 +5,7 @@ import { NameClaim } from '@/components/name-claim';
 import { Onboarding } from '@/components/onboarding';
 import { PriceCanvas } from '@/components/price-canvas';
 import { Season } from '@/components/season';
-import { SignIn } from '@/components/sign-in';
+import { SignIn } from '@/components/wallet';
 
 /**
  * The front page.

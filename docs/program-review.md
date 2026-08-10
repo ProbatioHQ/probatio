@@ -119,10 +119,12 @@ Not fixed, and each is a decision rather than an oversight.
   the keeper batches, so trades made in the last minutes of a season are
   committed after it closes. The void policy requires every trade committed
   before finalization, which is the real gate.
-- **No refund instruction for a void season.** The void policy says entrants are
-  refunded in full, and there is currently no on-chain path to do it. This must
-  be built before a ranked season runs on mainnet. It is listed here rather than
-  quietly left out.
+- **~~No refund instruction for a void season.~~** *Closed.* The void policy
+  promised full refunds and the program had no on-chain path to pay one, which
+  meant no season could honestly take money at all. `void_season` and
+  `refund_entry` close it, with the exclusivity between void and finalized
+  enforced in both directions so an entry can never be paid twice. Ten tests
+  cover it, including that a rejected second refund moves no lamports.
 
 ---
 
@@ -132,4 +134,4 @@ This is a careful read by the person who wrote it, not an independent audit. It
 has not been reviewed by anyone else, and no fuzzing or formal analysis has been
 done. The program has never been deployed to mainnet.
 
-52 tests run against the program under litesvm.
+62 tests run against the program under litesvm.
