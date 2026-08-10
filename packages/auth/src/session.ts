@@ -10,12 +10,33 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
  */
 
 export const SESSION_COOKIE = 'probatio_session' as const;
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+/**
+ * Seven days, not thirty.
+ *
+ * A stolen cookie is valid until it expires or the epoch below moves. Thirty
+ * days was a long time to be exposed for a session that can place trades and
+ * speak for a public record, and nothing about this product needs a month of
+ * uninterrupted sign-in.
+ */
+export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface SessionPayload {
   readonly pubkey: string;
   readonly issuedAt: number;
   readonly expiresAt: number;
+  /**
+   * Which generation of this wallet's sessions the token belongs to.
+   *
+   * Compared against the wallet's current epoch on every read. Raising that
+   * epoch invalidates every token issued before it, which is the only way a
+   * stateless token can be withdrawn — the signature stays valid forever, so
+   * something outside it has to be able to say "not this one any more".
+   *
+   * Optional on the way in so a token issued before this existed still reads,
+   * rather than signing everybody out on deploy. Treated as epoch zero, which
+   * is where every existing wallet starts.
+   */
+  readonly epoch?: number;
 }
 
 export class SessionError extends Error {
@@ -37,6 +58,7 @@ export function issueSession(
   pubkey: string,
   secret: string,
   now: number,
+  epoch = 0,
   ttlMs: number = SESSION_TTL_MS,
 ): string {
   assertUsableSecret(secret);
@@ -45,6 +67,7 @@ export function issueSession(
     pubkey,
     issuedAt: now,
     expiresAt: now + ttlMs,
+    epoch,
   };
 
   const payloadPart = base64urlEncode(Buffer.from(JSON.stringify(payload), 'utf8'));
@@ -88,6 +111,9 @@ export function readSession(token: string, secret: string, now: number): Session
     typeof payload.expiresAt !== 'number'
   ) {
     throw new SessionError('session payload is missing fields');
+  }
+  if (payload.epoch !== undefined && typeof payload.epoch !== 'number') {
+    throw new SessionError('session epoch is not a number');
   }
 
   if (now >= payload.expiresAt) {

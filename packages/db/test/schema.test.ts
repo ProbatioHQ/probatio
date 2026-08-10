@@ -118,6 +118,7 @@ describe('migrations', () => {
       '015_sponsored_prize.sql',
       '016_curve_state.sql',
       '017_curve_virtual_reserves.sql',
+      '018_session_epoch.sql',
     ]);
   });
 
@@ -131,7 +132,12 @@ describe('users', () => {
   it('has no email column, and cannot grow one by accident', async () => {
     const result = await db.execute('SELECT * FROM pragma_table_info(?)', ['users']);
     const columns = result.rows.map((r) => String(r['name']));
-    expect(columns).toEqual(['pubkey', 'display_name', 'created_at']);
+
+    // Pinned exactly, on purpose. Auth here is a wallet signature and nothing
+    // else, and the way that quietly stops being true is a column appearing on
+    // this table because some library wanted one. Adding to this list is meant
+    // to be a decision, which is why `session_epoch` had to be added by hand.
+    expect(columns).toEqual(['pubkey', 'display_name', 'created_at', 'session_epoch']);
     expect(columns).not.toContain('email');
   });
 });

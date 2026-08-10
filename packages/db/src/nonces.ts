@@ -81,3 +81,42 @@ export async function upsertUser(db: Client, pubkey: string, now: number): Promi
     args: [pubkey, now],
   });
 }
+
+/**
+ * The session epoch for a wallet.
+ *
+ * Every token carries the epoch it was issued under. A token whose epoch is
+ * behind the wallet's has been revoked — see migration 018.
+ *
+ * Zero for a wallet that has never been seen, which is the same answer a fresh
+ * row would give. A token for an unknown wallet is not a reason to fail closed
+ * on its own: the signature already proved it, and the row is created on first
+ * sign-in.
+ */
+export async function sessionEpoch(db: Client, pubkey: string): Promise<number> {
+  const result = await db.execute({
+    sql: 'SELECT session_epoch FROM users WHERE pubkey = ?',
+    args: [pubkey],
+  });
+  const row = result.rows[0];
+  return row ? Number(row['session_epoch']) : 0;
+}
+
+/**
+ * Invalidate every session this wallet holds, everywhere.
+ *
+ * Returns the new epoch, which is what a freshly issued token must carry. The
+ * increment happens in the statement rather than being read and written back,
+ * so two simultaneous sign-outs cannot both write the same value and leave one
+ * of them still valid.
+ */
+export async function revokeSessions(db: Client, pubkey: string): Promise<number> {
+  const result = await db.execute({
+    sql: `UPDATE users SET session_epoch = session_epoch + 1
+          WHERE pubkey = ?
+          RETURNING session_epoch`,
+    args: [pubkey],
+  });
+  const row = result.rows[0];
+  return row ? Number(row['session_epoch']) : 0;
+}

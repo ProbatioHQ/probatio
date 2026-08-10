@@ -27,6 +27,8 @@ export {
   pruneExpiredChallenges,
   storeChallenge,
   upsertUser,
+  sessionEpoch,
+  revokeSessions,
 } from './nonces';
 export type { StoredChallenge } from './nonces';
 
