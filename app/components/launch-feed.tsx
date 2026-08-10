@@ -10,6 +10,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  * already has, and those are three different decisions. So they are three
  * columns, and a token moves between them as its curve fills.
  *
+ * Two shapes, one engine. The front page gets a preview: enough to show the
+ * thing is alive and moving, and a way through to the real one. `/feed` gets
+ * the terminal — more rows, filters, and room for the numbers to be readable.
+ * Running both off one component means the preview can never drift from the
+ * page it is advertising.
+ *
  * Loaded over HTTP once, then kept current by a server-sent stream carrying
  * both new launches and curve progress. Both, not either: the stream only
  * carries what happens after you connect, so without the fetch a new arrival
@@ -45,21 +51,50 @@ const LANES: { key: LaneKey; title: string; prompt: string; blurb: string }[] = 
 ];
 
 /** Kept bounded. A feed left open all day should not grow without limit. */
-const MAX_ROWS = 40;
+const MAX_ROWS = 60;
+/** The preview shows enough to prove it is moving. The terminal shows the feed. */
+const PREVIEW_ROWS = 8;
+
+interface Filters {
+  /** Dollars. Hides the long tail of launches nobody has bought a thing from. */
+  minMarketCapUsd: number;
+  /** Percent. Raises the floor of the middle lane above the server's own. */
+  minBondedPct: number;
+  hideImageless: boolean;
+  paused: boolean;
+}
+
+const DEFAULT_FILTERS: Filters = {
+  minMarketCapUsd: 0,
+  minBondedPct: 50,
+  hideImageless: false,
+  paused: false,
+};
+
+const FILTER_KEY = 'probatio.feed.filters';
 
 /**
- * Market cap, at the width a column can spare.
+ * Market cap, in the currency people actually quote it in.
  *
- * Rounded hard on purpose: a trader scanning three columns wants to know
- * whether something is a four-figure launch or a six-figure one, and four
- * significant digits of a number that moves every second is noise.
+ * Dollars rather than SOL. "12.3◎" is not how anybody says how big a token is,
+ * and a figure nobody reads is a figure nobody uses. Falls back to SOL when no
+ * exchange rate can be had, because a figure in the wrong unit is honest and a
+ * wrong dollar number is not.
  */
-function marketCap(lamports: string): string {
+function marketCapLabel(lamports: string, solUsd: number | null): string {
   const sol = Number(BigInt(lamports)) / 1e9;
-  if (sol >= 1_000) return `${(sol / 1_000).toFixed(1)}K`;
-  if (sol >= 100) return sol.toFixed(0);
-  if (sol >= 1) return sol.toFixed(1);
-  return sol.toFixed(2);
+
+  if (solUsd === null) {
+    if (sol >= 1_000) return `${(sol / 1_000).toFixed(1)}K◎`;
+    if (sol >= 1) return `${sol.toFixed(1)}◎`;
+    return `${sol.toFixed(2)}◎`;
+  }
+
+  const usd = sol * solUsd;
+  if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
+  if (usd >= 1_000) return `$${(usd / 1_000).toFixed(1)}K`;
+  if (usd >= 1) return `$${usd.toFixed(0)}`;
+  return `$${usd.toFixed(2)}`;
 }
 
 function age(launchedAt: number, now: number): string {
@@ -111,7 +146,19 @@ function TokenImage({ token }: { token: Token }) {
   );
 }
 
-function Row({ token, lane, fresh, now }: { token: Token; lane: LaneKey; fresh: boolean; now: number }) {
+function Row({
+  token,
+  lane,
+  fresh,
+  now,
+  solUsd,
+}: {
+  token: Token;
+  lane: LaneKey;
+  fresh: boolean;
+  now: number;
+  solUsd: number | null;
+}) {
   const progress = token.progressBps;
 
   return (
@@ -129,7 +176,11 @@ function Row({ token, lane, fresh, now }: { token: Token; lane: LaneKey; fresh: 
             zero while the curve has not been read: unknown and worthless are
             different, and a column of zeroes would say the wrong one. */}
         <span className="feed-cap mono">
-          {token.marketCap ? `${marketCap(token.marketCap)}◎` : <span className="dim">—</span>}
+          {token.marketCap ? (
+            marketCapLabel(token.marketCap, solUsd)
+          ) : (
+            <span className="dim">—</span>
+          )}
         </span>
 
         {/* And then whichever second figure the lane is actually about: how far
@@ -144,49 +195,108 @@ function Row({ token, lane, fresh, now }: { token: Token; lane: LaneKey; fresh: 
         ) : (
           <span className="feed-age mono dim">{age(token.launchedAt, now)}</span>
         )}
-
-        <span className="feed-go" aria-hidden="true">
-          trade
-        </span>
       </a>
     </li>
   );
 }
 
-export function LaunchFeedList() {
+export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 'terminal' }) {
+  const terminal = variant === 'terminal';
+
   const [lanes, setLanes] = useState<Lanes | null>(null);
   const [results, setResults] = useState<Token[] | null>(null);
   const [query, setQuery] = useState('');
   const [live, setLive] = useState(false);
   const [arrived, setArrived] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
+  const [solUsd, setSolUsd] = useState<number | null>(null);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
 
   const searching = query.trim().length > 0;
   const searchingRef = useRef(searching);
   searchingRef.current = searching;
+  const pausedRef = useRef(filters.paused);
+  pausedRef.current = filters.paused;
+  /** False until the first save has been deliberately skipped. */
+  const savedOnce = useRef(false);
 
-  const load = useCallback(async (search: string) => {
+  // Filters persist. A trader who set a floor does not want to set it again
+  // every time they open the page.
+  useEffect(() => {
+    if (!terminal) return;
     try {
-      const url = search ? `/api/launches?q=${encodeURIComponent(search)}` : '/api/launches';
-      const body = (await (await fetch(url)).json()) as {
-        lanes?: Lanes;
-        results?: Token[];
-      };
-      if (search) setResults(body.results ?? []);
-      else {
-        setResults(null);
-        if (body.lanes) setLanes(body.lanes);
-      }
+      const saved = localStorage.getItem(FILTER_KEY);
+      if (saved) setFilters({ ...DEFAULT_FILTERS, ...(JSON.parse(saved) as Partial<Filters>) });
     } catch {
-      if (search) setResults([]);
+      // A corrupt or unavailable store is not worth failing a page over.
     }
-  }, []);
+  }, [terminal]);
+
+  useEffect(() => {
+    if (!terminal) return;
+
+    // Never on the first pass. Both effects run in the same commit, and this
+    // one still sees the initial state rather than the restored one — so it
+    // wrote the defaults straight back over the saved filters every time the
+    // page opened, and nothing ever persisted. The restore lands on the next
+    // render, and that is the one worth writing.
+    if (!savedOnce.current) {
+      savedOnce.current = true;
+      return;
+    }
+
+    try {
+      localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+    } catch {
+      // Private browsing, a full quota — neither is this page's problem.
+    }
+  }, [filters, terminal]);
+
+  const load = useCallback(
+    async (search: string) => {
+      try {
+        const limit = terminal ? 60 : 20;
+        const url = search
+          ? `/api/launches?q=${encodeURIComponent(search)}&limit=${limit}`
+          : `/api/launches?limit=${limit}`;
+        const body = (await (await fetch(url)).json()) as {
+          lanes?: Lanes;
+          results?: Token[];
+          solUsd?: number | null;
+        };
+        if (body.solUsd !== undefined) setSolUsd(body.solUsd);
+        if (search) setResults(body.results ?? []);
+        else {
+          setResults(null);
+          if (body.lanes) setLanes(body.lanes);
+        }
+      } catch {
+        if (search) setResults([]);
+      }
+    },
+    [terminal],
+  );
 
   // Debounced, so typing a mint address does not fire a query per keystroke.
   useEffect(() => {
     const timer = setTimeout(() => void load(query.trim()), query ? 250 : 0);
     return () => clearTimeout(timer);
   }, [query, load]);
+
+  // The exchange rate moves on its own clock, slower than anything else here.
+  useEffect(() => {
+    const read = (): void => {
+      void fetch('/api/sol-price')
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body: { solUsd: number | null } | null) => {
+          if (body) setSolUsd(body.solUsd);
+        })
+        .catch(() => undefined);
+    };
+    const timer = setInterval(read, 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Ages are relative, so they have to be recomputed rather than rendered once.
   // One timer for every lane rather than one per row.
@@ -202,8 +312,9 @@ export function LaunchFeedList() {
 
     source.addEventListener('launches', (event) => {
       // While somebody is searching, arrivals would shove their results
-      // around. The stream stays connected and its launches are dropped.
-      if (searchingRef.current) return;
+      // around. Paused is the same idea asked for explicitly: the stream stays
+      // connected and the screen stops moving.
+      if (searchingRef.current || pausedRef.current) return;
 
       const incoming = JSON.parse((event as MessageEvent<string>).data) as Token[];
 
@@ -240,7 +351,7 @@ export function LaunchFeedList() {
     });
 
     source.addEventListener('curves', (event) => {
-      if (searchingRef.current) return;
+      if (searchingRef.current || pausedRef.current) return;
       const updates = JSON.parse((event as MessageEvent<string>).data) as {
         mint: string;
         progressBps: number;
@@ -341,12 +452,39 @@ export function LaunchFeedList() {
     return () => clearTimeout(timer);
   }, [lanes]);
 
+  /** Filters are the terminal's; the preview shows what the server sent. */
+  const visible = useCallback(
+    (lane: LaneKey): Token[] => {
+      const rows = lanes?.[lane] ?? [];
+      if (!terminal) return rows.slice(0, PREVIEW_ROWS);
+
+      return rows.filter((token) => {
+        if (filters.hideImageless && !token.image) return false;
+        if (lane === 'bonding' && (token.progressBps ?? 0) < filters.minBondedPct * 100) {
+          return false;
+        }
+        if (filters.minMarketCapUsd > 0 && solUsd !== null) {
+          // A token whose curve has not been read has no market cap to judge.
+          // Hiding it would empty the new lane, which is exactly the lane where
+          // an unread curve is the normal state.
+          if (!token.marketCap) return lane === 'new';
+          const usd = (Number(BigInt(token.marketCap)) / 1e9) * solUsd;
+          if (usd < filters.minMarketCapUsd) return false;
+        }
+        return true;
+      });
+    },
+    [lanes, terminal, filters, solUsd],
+  );
+
   return (
     <section id="feed" aria-label="Tokens" className="term feed-term">
       <div className="term-bar">
         <span className="prompt">~/feed</span>
         <span>pump.fun</span>
-        <span className={live ? 'pill live' : 'pill'}>{live ? 'streaming' : 'reconnecting'}</span>
+        <span className={live && !filters.paused ? 'pill live' : 'pill'}>
+          {filters.paused ? 'paused' : live ? 'streaming' : 'reconnecting'}
+        </span>
         <span className="lights">
           <i />
           <i />
@@ -355,15 +493,91 @@ export function LaunchFeedList() {
       </div>
 
       <div className="term-body">
-        <label className="field">
-          <span>Search</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Name, symbol, or paste a mint address"
-          />
-        </label>
+        <div className="feed-controls">
+          <label className="field feed-search">
+            <span>Search</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Name, symbol, or paste a mint address"
+            />
+          </label>
+
+          {terminal && (
+            <>
+              <button
+                type="button"
+                className={showFilters ? 'preset on' : 'preset'}
+                onClick={() => setShowFilters((was) => !was)}
+                aria-expanded={showFilters}
+              >
+                Filters
+              </button>
+              <button
+                type="button"
+                className={filters.paused ? 'preset on' : 'preset'}
+                onClick={() => setFilters((was) => ({ ...was, paused: !was.paused }))}
+                aria-pressed={filters.paused}
+              >
+                {filters.paused ? 'Paused' : 'Pause'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {terminal && showFilters && (
+          <div className="feed-filters">
+            <label className="field">
+              <span>Minimum market cap</span>
+              <select
+                value={filters.minMarketCapUsd}
+                onChange={(event) =>
+                  setFilters((was) => ({ ...was, minMarketCapUsd: Number(event.target.value) }))
+                }
+              >
+                <option value={0}>Any</option>
+                <option value={5_000}>$5K</option>
+                <option value={15_000}>$15K</option>
+                <option value={50_000}>$50K</option>
+                <option value={100_000}>$100K</option>
+              </select>
+            </label>
+
+            <label className="field">
+              <span>About to bond, at least</span>
+              <select
+                value={filters.minBondedPct}
+                onChange={(event) =>
+                  setFilters((was) => ({ ...was, minBondedPct: Number(event.target.value) }))
+                }
+              >
+                <option value={50}>50%</option>
+                <option value={70}>70%</option>
+                <option value={85}>85%</option>
+                <option value={95}>95%</option>
+              </select>
+            </label>
+
+            <label className="field checkbox">
+              <input
+                type="checkbox"
+                checked={filters.hideImageless}
+                onChange={(event) =>
+                  setFilters((was) => ({ ...was, hideImageless: event.target.checked }))
+                }
+              />
+              <span>Hide tokens with no image</span>
+            </label>
+
+            {solUsd === null && (
+              <p className="dim" style={{ fontSize: 12 }}>
+                No exchange rate right now, so caps are shown in SOL and the market cap filter is
+                inactive.
+              </p>
+            )}
+          </div>
+        )}
 
         {searching ? (
           results === null ? (
@@ -373,56 +587,72 @@ export function LaunchFeedList() {
           ) : (
             <ul className="bare feed">
               {results.map((token) => (
-                <Row key={token.mint} token={token} lane="new" fresh={false} now={now} />
+                <Row
+                  key={token.mint}
+                  token={token}
+                  lane="new"
+                  fresh={false}
+                  now={now}
+                  solUsd={solUsd}
+                />
               ))}
             </ul>
           )
         ) : (
-          <div className="lanes">
-            {LANES.map((lane) => (
-              <div className="lane" key={lane.key}>
-                <div className="lane-head">
-                  <span className="prompt">{lane.prompt}</span>
-                  <h3>{lane.title}</h3>
-                  <span className="lane-blurb">{lane.blurb}</span>
-                </div>
+          <div className={terminal ? 'lanes tall' : 'lanes'}>
+            {LANES.map((lane) => {
+              const rows = visible(lane.key);
+              return (
+                <div className="lane" key={lane.key}>
+                  <div className="lane-head">
+                    <span className="prompt">{lane.prompt}</span>
+                    <h3>{lane.title}</h3>
+                    <span className="lane-blurb">
+                      {terminal && lanes ? `${rows.length} shown` : lane.blurb}
+                    </span>
+                  </div>
 
-                {/* A column of bare numbers has to say what it is. "399◎" on
-                    its own gets read as a quantity of something unnamed, which
-                    is precisely the ambiguity a header removes for one line of
-                    ten-pixel type. */}
-                <div className="lane-cols" aria-hidden="true">
-                  <span>Token</span>
-                  <span>MCap</span>
-                  <span>{lane.key === 'bonding' ? 'Bonded' : 'Age'}</span>
-                </div>
+                  {/* A column of bare numbers has to say what it is. */}
+                  <div className="lane-cols" aria-hidden="true">
+                    <span>Token</span>
+                    <span>MCap</span>
+                    <span>{lane.key === 'bonding' ? 'Bonded' : 'Age'}</span>
+                  </div>
 
-                {!lanes ? (
-                  <p className="dim lane-empty">Loading…</p>
-                ) : lanes[lane.key].length === 0 ? (
-                  <p className="dim lane-empty">
-                    {lane.key === 'new'
-                      ? 'Nothing yet. This fills as tokens are created.'
-                      : lane.key === 'bonding'
-                        ? 'Nothing past halfway right now.'
-                        : 'Nothing has graduated yet.'}
-                  </p>
-                ) : (
-                  <ul className="bare feed">
-                    {lanes[lane.key].map((token) => (
-                      <Row
-                        key={token.mint}
-                        token={token}
-                        lane={lane.key}
-                        fresh={arrived.has(token.mint)}
-                        now={now}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+                  {!lanes ? (
+                    <p className="dim lane-empty">Loading…</p>
+                  ) : rows.length === 0 ? (
+                    <p className="dim lane-empty">
+                      {lane.key === 'new'
+                        ? 'Nothing yet. This fills as tokens are created.'
+                        : lane.key === 'bonding'
+                          ? 'Nothing past that threshold right now.'
+                          : 'Nothing has graduated yet.'}
+                    </p>
+                  ) : (
+                    <ul className="bare feed">
+                      {rows.map((token) => (
+                        <Row
+                          key={token.mint}
+                          token={token}
+                          lane={lane.key}
+                          fresh={arrived.has(token.mint)}
+                          now={now}
+                          solUsd={solUsd}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        )}
+
+        {!terminal && (
+          <a href="/feed" className="button-link feed-open">
+            Open the terminal
+          </a>
         )}
       </div>
     </section>

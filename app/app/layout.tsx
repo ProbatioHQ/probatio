@@ -53,6 +53,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
               Probatio
             </a>
             <nav className="site-nav" aria-label="Main">
+              <a href="/feed">Terminal</a>
               <a href="/season">Season</a>
               <a href="/docs">How it works</a>
               <a href="/verify">Verify</a>

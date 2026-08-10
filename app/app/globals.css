@@ -2933,3 +2933,125 @@ button:hover:not(:disabled),
 .lane-cols > span:first-child { grid-column: 2; }
 .lane-cols > span:nth-child(2) { min-width: 52px; text-align: right; }
 .lane-cols > span:last-child { min-width: 52px; text-align: right; }
+
+/* ============================================================ terminal page */
+
+/*
+ * Wider than the rest of the site, and only here.
+ *
+ * Three lanes of tokens want horizontal room; a page of prose wants the
+ * opposite. The shell stays at its reading width everywhere else and this one
+ * page opts out.
+ */
+main.wide {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (min-width: 1180px) {
+  main.wide {
+    /* Reclaims the shell's own padding so the terminal reaches wider than the
+       column it is nested in, without the rails moving. */
+    margin-left: calc((100% - min(1400px, 100vw - 48px)) / 2);
+    width: min(1400px, 100vw - 48px);
+  }
+}
+
+.page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.page-head p { max-width: 62ch; }
+
+/* Search and the controls beside it share a row. */
+.feed-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.feed-search { flex: 1; }
+
+.feed-controls .preset {
+  flex: none;
+  height: 38px;
+  padding: 0 14px;
+}
+
+.preset.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 20px;
+  padding: 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--ink-sunken);
+  animation: menu-in 140ms ease both;
+}
+
+.feed-filters .field { max-width: 200px; }
+
+.feed-filters select {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  padding: 7px 10px;
+}
+
+/* A checkbox is not a stacked label; it reads left to right. */
+.field.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  max-width: none;
+}
+
+.field.checkbox input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.field.checkbox span {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* The terminal's lanes get the height the page can spare. */
+.lanes.tall .feed { max-height: min(70vh, 760px); }
+
+.feed-open { align-self: flex-start; }
+
+/* Wider rows on the terminal, where the market cap has room to be read. */
+.lanes.tall .feed-row a { grid-template-columns: 30px minmax(0, 1fr) auto auto; }
+.lanes.tall .feed-cap { min-width: 66px; font-size: 12px; }
+.lanes.tall .lane-cols { grid-template-columns: 30px minmax(0, 1fr) auto auto; }
+.lanes.tall .lane-cols > span:nth-child(2) { min-width: 66px; }
+
+/*
+ * On a wide page, the furniture widens with it.
+ *
+ * The terminal is wider than the reading column the rest of the site uses,
+ * which left the wordmark and the footer indented well inside the content they
+ * sit above and below — the page looked like it had slipped out of its frame.
+ * `:has()` lets the shell match whatever the page turned out to need, without
+ * every route having to declare its own header.
+ */
+body:has(main.wide) .site-header .shell,
+body:has(main.wide) .site-footer .shell {
+  max-width: 1448px;
+}

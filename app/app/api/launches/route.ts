@@ -10,6 +10,7 @@ import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { knownImages, resolveLaunchImages } from '@/lib/token-images';
+import { solUsd } from '@/lib/sol-price';
 
 /**
  * The launch feed, in three lanes, and search over it.
@@ -91,6 +92,7 @@ export async function GET(request: Request): Promise<Response> {
 
     return Response.json({
       query,
+      solUsd: await solUsd(),
       results: found.map((launch) =>
         shape({ ...launch, curve: null }, images.get(launch.mint) ?? null),
       ),
@@ -115,6 +117,10 @@ export async function GET(request: Request): Promise<Response> {
 
   return Response.json({
     query: '',
+    // Sent alongside rather than applied here: market caps stay lamports on
+    // the wire, and the browser does the cosmetic conversion. One rate for the
+    // whole page means every row on screen is priced the same way.
+    solUsd: await solUsd(),
     lanes: {
       new: withImages(fresh),
       bonding: withImages(bonding),

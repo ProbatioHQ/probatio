@@ -271,7 +271,7 @@ export function SignIn() {
 
   if (status === 'signed-in' && pubkey) {
     return (
-      <a href="#feed" className="button-link">
+      <a href="/feed" className="button-link">
         Pick a token and trade
       </a>
     );
