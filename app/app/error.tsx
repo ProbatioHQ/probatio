@@ -48,6 +48,11 @@ export default function Error({
             <button type="button" className="button-link" onClick={reset}>
               Try again
             </button>
+      {/* A plain anchor rather than next/link, matching every other internal
+          link here: PageTransition intercepts these clicks and routes them
+          itself so the page can fade, and next/link would navigate on its own
+          and race it. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/" className="ghost-link">
               Back to the front page
             </a>

@@ -75,15 +75,46 @@ for (const table of order) {
   const columns = manifest.columns[table]!;
   const placeholders = columns.map(() => '?').join(', ');
   const quoted = columns.map((column) => `"${column}"`).join(', ');
+  const sql = `INSERT INTO "${table}" (${quoted}) VALUES (${placeholders})`;
 
-  for (const line of lines) {
-    const values = JSON.parse(line) as unknown[];
-    await db.execute({
-      sql: `INSERT INTO "${table}" (${quoted}) VALUES (${placeholders})`,
-      args: values as never,
-    });
+  /*
+   * Batched, and that is not a micro-optimisation.
+   *
+   * This was one awaited round trip per row. A real database here is four
+   * hundred thousand rows, almost all of them candles, and a restore of it did
+   * not finish inside ten minutes — with no output at all while it ground
+   * through the largest table, because progress was only printed once a table
+   * was done. An operator restoring during an incident would have watched a
+   * silent terminal and concluded the tool was broken.
+   *
+   * A backup that cannot be restored in the time an incident allows is not a
+   * backup, so the drill is the thing that found this rather than the thing
+   * that confirmed it was fine.
+   */
+  const CHUNK = 500;
+  for (let offset = 0; offset < lines.length; offset += CHUNK) {
+    const chunk = lines.slice(offset, offset + CHUNK);
+    await db.batch(
+      chunk.map((line) => ({ sql, args: JSON.parse(line) as never })),
+      'write',
+    );
+
+    // Progress inside a table as well as between them. The largest table is
+    // most of the wait, and silence during it is what looks like a hang.
+    //
+    // Carriage returns only when a person is watching. A restore is usually
+    // run with its output redirected to a file, and rewriting the same line
+    // into a log turns the record of the incident into one long smear.
+    if (lines.length > CHUNK * 4 && (offset / CHUNK) % 20 === 0) {
+      const done = Math.min(offset + CHUNK, lines.length);
+      const line = `  ${table.padEnd(20)} ${String(done).padStart(7)} / ${lines.length} rows`;
+      if (process.stdout.isTTY) process.stdout.write(`\r${line}`);
+      else console.log(line);
+    }
   }
+
   restored += lines.length;
+  if (lines.length > CHUNK * 4 && process.stdout.isTTY) process.stdout.write('\r');
   console.log(`  ${table.padEnd(20)} ${String(lines.length).padStart(7)} rows`);
 }
 

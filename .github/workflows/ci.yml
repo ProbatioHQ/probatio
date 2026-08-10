@@ -1,0 +1,81 @@
+# Everything that can be checked without a network, on every push.
+#
+# The whole point of this repository is that its claims can be checked rather
+# than believed, and the first person that has to be true for is whoever is
+# changing it. A suite that only runs when somebody remembers to run it is a
+# suite that is green because nobody looked.
+#
+# Deliberately offline. The tests that need an RPC are skipped by default and
+# stay that way here — a run that fails because a public Solana endpoint was
+# rate limiting says nothing about the commit that triggered it, and a check
+# that goes red for reasons unrelated to the change is a check people learn to
+# ignore.
+
+name: checks
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A new push supersedes the run already going for the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: types, lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci` rather than `install`: it installs exactly the lockfile and fails
+      # if package.json and the lock have drifted, which is the difference
+      # between testing what will ship and testing something near it.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm --prefix app run lint
+
+      - name: Tests
+        run: npx vitest run
+
+      # The build catches what the tests cannot: a page that throws only when
+      # rendered, and the security headers, which are configuration rather than
+      # code and have broken a page here before.
+      - name: Production build
+        run: npm --prefix app run build
+        env:
+          PROBATIO_DISABLE_FEED: '1'
+          SESSION_SECRET: ci-only-not-a-real-secret-000000000000
+          DATABASE_URL: 'file:./ci.db'
+
+  program:
+    name: on-chain program
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: program
+
+      # litesvm runs the program in-process, so this needs no validator and no
+      # network — which is why it can be a required check rather than a nightly.
+      - name: Program tests
+        working-directory: program
+        run: cargo test
