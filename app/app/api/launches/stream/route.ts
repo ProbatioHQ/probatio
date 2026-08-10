@@ -1,4 +1,6 @@
 import type { Launch } from '@probatio/db';
+import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
+import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import { subscribeToCurves, subscribeToLaunches } from '@/lib/launch-stream';
 import { knownImages } from '@/lib/token-images';
 import { rateLimit } from '@/lib/rate-limit';
@@ -78,7 +80,15 @@ export async function GET(request: Request): Promise<Response> {
           curves.map((curve) => ({
             mint: curve.mint,
             progressBps: curve.progressBps,
-            solRaised: curve.realSolReserves.toString(),
+            // Sent with every update rather than only on the first load, or a
+            // curve event would arrive and blank the column it just moved.
+            marketCap:
+              curve.virtualSolReserves && curve.virtualTokenReserves && curve.virtualTokenReserves > 0n
+                ? marketCapLamports(
+                    priceFromReserves(curve.virtualSolReserves, curve.virtualTokenReserves),
+                    PUMPFUN_TOKEN_TOTAL_SUPPLY,
+                  ).toString()
+                : null,
             complete: curve.complete,
           })),
         );

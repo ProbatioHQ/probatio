@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PriceChart, TIMEFRAME_LABELS } from '@/components/price-chart';
+import { useWallet } from '@/components/wallet';
 import { Positions } from '@/components/positions';
 import { TradePanel } from '@/components/trade-panel';
 import type { PriceUnit } from '@/lib/price-display';
@@ -18,8 +19,13 @@ import type { PriceUnit } from '@/lib/price-display';
 const TIMEFRAMES = ['s15', 'm1', 'm5', 'm15', 'h1'] as const;
 
 export function TokenView({ mint }: { mint: string }) {
+  const { status } = useWallet();
+  const signedIn = status === 'signed-in';
   const [tradeCount, setTradeCount] = useState(0);
-  const [timeframe, setTimeframe] = useState<string>('m1');
+  // Fifteen seconds, not a minute. These tokens do their whole life in
+  // minutes — a fast one puts sixty trades inside a single 1m bucket, which
+  // draws as one candle and looks like a chart that is not working.
+  const [timeframe, setTimeframe] = useState<string>('s15');
   const [unit, setUnit] = useState<PriceUnit>('market-cap');
 
   return (
@@ -73,9 +79,14 @@ export function TokenView({ mint }: { mint: string }) {
 
       <TradePanel mint={mint} onTraded={() => setTradeCount((n) => n + 1)} />
 
-      <div className="positions-slot">
-        <Positions refreshKey={tradeCount} />
-      </div>
+      {/* Only once there is something to show. A bare line of text reading
+          "sign in to see your positions" under a chart is furniture, not
+          information — the trade panel beside it already says how to sign in. */}
+      {signedIn && (
+        <div className="positions-slot">
+          <Positions refreshKey={tradeCount} />
+        </div>
+      )}
     </div>
   );
 }

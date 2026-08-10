@@ -33,6 +33,7 @@ interface CandleResponse {
   timeframe: string;
   tokenDecimals: number;
   totalSupply: string;
+  backfilling?: boolean;
   candles: RawCandle[];
 }
 
@@ -182,7 +183,21 @@ export function PriceChart({
     // Only on the first draw. Refitting on every poll would yank the view back
     // to the whole range each time somebody zoomed in to look at something.
     if (!fitted.current) {
-      chart.current?.timeScale().fitContent();
+      const scale = chart.current?.timeScale();
+      const width = container.current?.clientWidth ?? 0;
+      // How many candles would fit at a sensible width. Fitting three of them
+      // to a 900px canvas draws three enormous blocks that read as a rendering
+      // fault rather than as a token minutes old; pinning them to the right
+      // instead leaves a wall of empty space where history would be.
+      const comfortable = Math.floor(width / 22);
+
+      if (points.length > 0 && points.length < comfortable) {
+        // Data from the left, room to the right. The chart is filling forward,
+        // and that is what it should look like.
+        scale?.setVisibleLogicalRange({ from: -0.5, to: comfortable });
+      } else {
+        scale?.fitContent();
+      }
       fitted.current = true;
     }
   }, [points]);
@@ -216,8 +231,14 @@ export function PriceChart({
         {/* Centred in the plot area rather than under it. An empty 420px box
             with a caption below reads as a chart that failed to load. */}
         {(error || (data && points.length === 0)) && (
-          <p role={error ? 'alert' : undefined} className={error ? 'chart-empty loss' : 'chart-empty dim'}>
-            {error ?? 'No trades yet. The chart fills in as this token trades.'}
+          <p
+            role={error ? 'alert' : undefined}
+            className={error ? 'chart-empty loss' : 'chart-empty dim'}
+          >
+            {error ??
+              (data?.backfilling
+                ? 'Reading this token’s history from the chain…'
+                : 'No trades on this token yet. The chart fills in as it trades.')}
           </p>
         )}
       </div>

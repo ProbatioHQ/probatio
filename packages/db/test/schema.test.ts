@@ -117,6 +117,7 @@ describe('migrations', () => {
       '014_activity.sql',
       '015_sponsored_prize.sql',
       '016_curve_state.sql',
+      '017_curve_virtual_reserves.sql',
     ]);
   });
 

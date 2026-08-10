@@ -1,6 +1,7 @@
 import { readCandles } from '@probatio/db';
 import { TIMEFRAMES, type Timeframe } from '@probatio/candles';
 import { PUMPFUN_TOKEN_DECIMALS, PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
+import { backfillChart, backfillInFlight } from '@/lib/chart-backfill';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -42,9 +43,17 @@ export async function GET(request: Request): Promise<Response> {
 
   const candles = await readCandles(await db(), mint, timeframe, limit);
 
+  // A chart with almost nothing on it means nobody has read this token's
+  // history yet, not that it has never traded. Kicked off in the background:
+  // the walk takes seconds and the caller is not made to wait for it.
+  if (candles.length < 5) backfillChart(mint);
+
   return Response.json({
     mint,
     timeframe,
+    // So the client can say "reading its history" rather than "never traded",
+    // which were the same message before and only one of them was true.
+    backfilling: backfillInFlight(mint),
     // pump.fun mints a fixed supply, which is what turns a price into the
     // market cap figure traders actually read.
     tokenDecimals: PUMPFUN_TOKEN_DECIMALS,

@@ -25,7 +25,8 @@ interface Token {
   image: string | null;
   /** Null when nothing has read this curve yet, which is not the same as zero. */
   progressBps: number | null;
-  solRaised: string | null;
+  /** Lamports, as a digit string. Null when the curve has not been read yet. */
+  marketCap: string | null;
   complete: boolean;
 }
 
@@ -45,6 +46,21 @@ const LANES: { key: LaneKey; title: string; prompt: string; blurb: string }[] = 
 
 /** Kept bounded. A feed left open all day should not grow without limit. */
 const MAX_ROWS = 40;
+
+/**
+ * Market cap, at the width a column can spare.
+ *
+ * Rounded hard on purpose: a trader scanning three columns wants to know
+ * whether something is a four-figure launch or a six-figure one, and four
+ * significant digits of a number that moves every second is noise.
+ */
+function marketCap(lamports: string): string {
+  const sol = Number(BigInt(lamports)) / 1e9;
+  if (sol >= 1_000) return `${(sol / 1_000).toFixed(1)}K`;
+  if (sol >= 100) return sol.toFixed(0);
+  if (sol >= 1) return sol.toFixed(1);
+  return sol.toFixed(2);
+}
 
 function age(launchedAt: number, now: number): string {
   const seconds = Math.max(0, Math.floor(now / 1000) - launchedAt);
@@ -108,10 +124,16 @@ function Row({ token, lane, fresh, now }: { token: Token; lane: LaneKey; fresh: 
           <span className="dim">{token.name}</span>
         </span>
 
-        {/* The right-hand column says something different in each lane: how far
-            along in the bonding one, how old in the other two. Not how much a
-            graduated token raised — every reserve field is zeroed on
-            graduation, so that number is gone by the time it lands here. */}
+        {/* What a token is worth is the one figure worth having in every lane,
+            so it sits in the same place in all three. A dash rather than a
+            zero while the curve has not been read: unknown and worthless are
+            different, and a column of zeroes would say the wrong one. */}
+        <span className="feed-cap mono">
+          {token.marketCap ? `${marketCap(token.marketCap)}◎` : <span className="dim">—</span>}
+        </span>
+
+        {/* And then whichever second figure the lane is actually about: how far
+            along for the ones bonding, how old for the rest. */}
         {lane === 'bonding' && progress !== null ? (
           <span className="feed-progress">
             <span className="track" aria-hidden="true">
@@ -222,7 +244,7 @@ export function LaunchFeedList() {
       const updates = JSON.parse((event as MessageEvent<string>).data) as {
         mint: string;
         progressBps: number;
-        solRaised: string;
+        marketCap: string | null;
         complete: boolean;
       }[];
       if (updates.length === 0) return;
@@ -365,6 +387,16 @@ export function LaunchFeedList() {
                   <span className="lane-blurb">{lane.blurb}</span>
                 </div>
 
+                {/* A column of bare numbers has to say what it is. "399◎" on
+                    its own gets read as a quantity of something unnamed, which
+                    is precisely the ambiguity a header removes for one line of
+                    ten-pixel type. */}
+                <div className="lane-cols" aria-hidden="true">
+                  <span>Token</span>
+                  <span>MCap</span>
+                  <span>{lane.key === 'bonding' ? 'Bonded' : 'Age'}</span>
+                </div>
+
                 {!lanes ? (
                   <p className="dim lane-empty">Loading…</p>
                 ) : lanes[lane.key].length === 0 ? (
@@ -399,13 +431,16 @@ export function LaunchFeedList() {
 
 function merge(
   token: Token,
-  update: { progressBps: number; solRaised: string; complete: boolean } | undefined,
+  update: { progressBps: number; marketCap: string | null; complete: boolean } | undefined,
 ): Token {
   if (!update) return token;
   return {
     ...token,
     progressBps: update.progressBps,
-    solRaised: update.solRaised,
+    // Kept rather than overwritten with nothing. A graduated curve stops
+    // reporting a price, and blanking the column at the moment a token
+    // succeeds is the worst time to lose the number.
+    marketCap: update.marketCap ?? token.marketCap,
     complete: update.complete,
   };
 }

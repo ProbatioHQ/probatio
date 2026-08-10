@@ -211,7 +211,6 @@ export function WalletButton() {
         onClick={() => void signIn()}
         disabled={status === 'working'}
       >
-        <span className="key" aria-hidden="true" />
         {status === 'working' ? 'Waiting…' : 'Connect'}
       </button>
     );
@@ -229,7 +228,16 @@ export function WalletButton() {
         <AddressMark pubkey={pubkey} />
         <span className="addr">{shortenPubkey(pubkey)}</span>
         {balance !== null && (
-          <span className="bal">{(Number(BigInt(balance)) / 1e9).toFixed(2)}◎</span>
+          <span className="bal">
+            {/* Labelled, and the label is not decoration. "10.00" beside a
+                symbol nobody reads as SOL looks like ten thousand of
+                something. The unit has to be a word. */}
+            <span className="bal-k">equity</span>
+            <span className="bal-v">
+              {(Number(BigInt(balance)) / 1e9).toFixed(2)}
+              <span className="unit">SOL</span>
+            </span>
+          </span>
         )}
       </button>
 

@@ -53,6 +53,10 @@ function atProgress(index: number, bps: number, complete = false) {
     mint: mintFor(index),
     realSolReserves: BigInt(bps) * 1_000_000n,
     realTokenReserves: complete ? 0n : INITIAL_REAL_TOKEN_RESERVES - sold,
+    // A graduated curve zeroes everything, which is what makes keeping the
+    // last real price worth testing.
+    virtualSolReserves: complete ? 0n : 30_000_000_000n + BigInt(bps) * 1_000_000n,
+    virtualTokenReserves: complete ? 0n : 1_073_000_000_000_000n - sold,
     complete,
   };
 }
@@ -144,6 +148,21 @@ describe('the lanes', () => {
     expect((await bondingLaunches(db, 5_000, 10)).map((row) => row.mint)).not.toContain(
       mintFor(3),
     );
+  });
+
+  it('keeps the last price when a curve graduates and zeroes its reserves', async () => {
+    await recordCurveStates(db, [atProgress(1, 9_000)], NOW);
+    const priced = (await curveStatesFor(db, [mintFor(1)])).get(mintFor(1));
+    expect(priced?.virtualSolReserves).toBeGreaterThan(0n);
+
+    await recordCurveStates(db, [atProgress(1, 10_000, true)], NOW + 1_000);
+
+    const after = (await curveStatesFor(db, [mintFor(1)])).get(mintFor(1));
+    expect(after?.complete).toBe(true);
+    // Blanking the price at the moment a token succeeds is the worst possible
+    // time to lose the number.
+    expect(after?.virtualSolReserves).toBe(priced?.virtualSolReserves);
+    expect(after?.virtualTokenReserves).toBe(priced?.virtualTokenReserves);
   });
 
   it('replaces a state rather than accumulating rows', async () => {

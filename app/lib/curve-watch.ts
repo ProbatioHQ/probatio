@@ -1,11 +1,20 @@
 import 'server-only';
 import {
   curvesToRefresh,
+  gradsToRefresh,
   progressBpsFor,
   recordCurveStates,
+  writeCandles,
   type CurveWrite,
 } from '@probatio/db';
-import { RpcClient, decodeBondingCurve } from '@probatio/pools';
+import {
+  TIMEFRAMES,
+  buildCandles,
+  priceFromReserves,
+  type Observation,
+  type Timeframe,
+} from '@probatio/candles';
+import { PoolReader, RpcClient, decodeBondingCurve } from '@probatio/pools';
 import { db } from './db';
 import { publishCurves } from './launch-stream';
 import { rpcEndpoint } from './env';
@@ -56,6 +65,10 @@ async function pass(rpc: RpcClient): Promise<void> {
   if (wanted.length === 0) return;
 
   const states: CurveWrite[] = [];
+  // One price observation per curve read. The account carries the virtual
+  // reserves every price in this system derives from, so a chart costs nothing
+  // beyond the read already being made for the lanes.
+  const observations = new Map<string, Observation>();
 
   for (let offset = 0; offset < wanted.length; offset += BATCH) {
     const slice = wanted.slice(offset, offset + BATCH);
@@ -77,8 +90,23 @@ async function pass(rpc: RpcClient): Promise<void> {
           mint: entry.mint,
           realSolReserves: curve.realSolReserves,
           realTokenReserves: curve.realTokenReserves,
+          virtualSolReserves: curve.virtualSolReserves,
+          virtualTokenReserves: curve.virtualTokenReserves,
           complete: curve.complete,
         });
+
+        // A graduated curve zeroes its reserves, so there is no price left to
+        // read — and pricing against a zero token reserve throws.
+        if (!curve.complete && curve.virtualTokenReserves > 0n) {
+          observations.set(entry.mint, {
+            timestamp: Math.floor(now / 1_000),
+            price: priceFromReserves(curve.virtualSolReserves, curve.virtualTokenReserves),
+            // Zero, and deliberately. This is a price we observed, not a trade
+            // we saw. Counting a poll as a trade would inflate every volume
+            // figure on the site with activity that never happened.
+            volumeLamports: 0n,
+          });
+        }
       } catch {
         // A curve that will not decode is one token missing from a lane, not
         // a reason to drop the other ninety-nine in the batch.
@@ -89,6 +117,7 @@ async function pass(rpc: RpcClient): Promise<void> {
   if (states.length === 0) return;
 
   await recordCurveStates(client, states, now);
+  await recordPrices(observations);
   // Pushed to open tabs so a token crossing into another lane moves there
   // without anybody reloading — which is the entire point of the lanes.
   publishCurves(
@@ -100,15 +129,121 @@ async function pass(rpc: RpcClient): Promise<void> {
   );
 }
 
+/**
+ * Turn observed prices into candles.
+ *
+ * This is what makes a chart appear at all. Nothing else in the running system
+ * writes candles — the backfill script is something a person runs — so without
+ * this every token on the site showed an empty chart saying it had never
+ * traded, which was not true of any of them.
+ *
+ * Written to every timeframe, because a bucket merges on write: the same
+ * observation belongs to a 1-second candle and to the hour containing it, and
+ * writing both now costs less than reconstructing one later.
+ */
+async function recordPrices(observations: Map<string, Observation>): Promise<void> {
+  if (observations.size === 0) return;
+  const client = await db();
+
+  for (const [mint, observation] of observations) {
+    for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
+      const candles = buildCandles([observation], timeframe);
+      try {
+        await writeCandles(
+          client,
+          mint,
+          timeframe,
+          // The trade count is zeroed for the same reason the volume is. A
+          // merged bucket then counts only the real trades a backfill found,
+          // rather than however many times we happened to look.
+          candles.map((candle) => ({ ...candle, trades: 0 })),
+        );
+      } catch (error) {
+        console.error('[curves] could not write candles for', mint, error);
+      }
+    }
+  }
+}
+
+/**
+ * Prices for tokens that have already graduated.
+ *
+ * A graduated curve reports zero for every reserve, so there is nothing left to
+ * price against — the market moved to an AMM pool whose address derives from
+ * its creator and therefore has to be searched for. That makes this several
+ * calls per token instead of a hundred tokens per call, so only a few are done
+ * per pass and each is left alone for minutes afterwards.
+ *
+ * Without this the bonded lane is a column of dashes and every graduated token
+ * has an empty chart — which is exactly backwards, since those are the ones
+ * that worked.
+ */
+const GRADS_PER_PASS = 4;
+const GRAD_REFRESH_MS = 4 * 60 * 1_000;
+
+async function gradPass(reader: PoolReader): Promise<void> {
+  const client = await db();
+  const now = Date.now();
+
+  const wanted = await gradsToRefresh(client, GRADS_PER_PASS, now - GRAD_REFRESH_MS);
+  if (wanted.length === 0) return;
+
+  const states: CurveWrite[] = [];
+  const observations = new Map<string, Observation>();
+
+  for (const entry of wanted) {
+    try {
+      const resolution = await reader.resolve(entry.mint);
+      if (!resolution.pool || resolution.pool.tokenReserve <= 0n) continue;
+
+      states.push({
+        mint: entry.mint,
+        // The curve itself really is empty; that is what graduation means.
+        realSolReserves: 0n,
+        realTokenReserves: 0n,
+        // The reserves the token is actually priced against now.
+        virtualSolReserves: resolution.pool.solReserve,
+        virtualTokenReserves: resolution.pool.tokenReserve,
+        complete: true,
+      });
+
+      observations.set(entry.mint, {
+        timestamp: Math.floor(now / 1_000),
+        price: priceFromReserves(resolution.pool.solReserve, resolution.pool.tokenReserve),
+        volumeLamports: 0n,
+      });
+    } catch {
+      // A token whose successor pool cannot be found is one row without a
+      // price, not a reason to abandon the other three.
+    }
+  }
+
+  if (states.length === 0) return;
+
+  await recordCurveStates(client, states, now);
+  await recordPrices(observations);
+  publishCurves(
+    states.map((state) => ({
+      ...state,
+      progressBps: 10_000,
+      updatedAt: now,
+    })),
+  );
+}
+
 export function startCurveWatch(): void {
   if (started) return;
   started = true;
 
   const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 20_000, minIntervalMs: 120 });
+  const reader = new PoolReader(rpc);
 
   const run = (): void => {
     void pass(rpc).catch((error) => {
       console.error('[curves] pass failed', error);
+    });
+    void gradPass(reader).catch((error) => {
+      console.error('[curves] graduated pass failed', error);
     });
   };
 

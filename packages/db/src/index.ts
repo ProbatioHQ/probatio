@@ -93,6 +93,7 @@ export {
   bondingLaunches,
   curveStatesFor,
   curvesToRefresh,
+  gradsToRefresh,
   newLaunches,
   progressBpsFor,
   recordCurveStates,

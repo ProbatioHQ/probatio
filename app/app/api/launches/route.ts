@@ -5,6 +5,8 @@ import {
   searchLaunches,
   type LaunchWithCurve,
 } from '@probatio/db';
+import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
+import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { knownImages, resolveLaunchImages } from '@/lib/token-images';
@@ -31,6 +33,23 @@ const MAX_LIMIT = 100;
  */
 const BONDING_FLOOR_BPS = 5_000;
 
+/**
+ * What a token is worth, from the reserves already read.
+ *
+ * pump.fun mints a fixed supply, which is what turns a price into the market
+ * cap traders actually quote at each other. Null rather than zero when the
+ * curve has not been read: an unknown value and a worthless token are not the
+ * same thing and must not render the same.
+ */
+function marketCapOf(launch: LaunchWithCurve): string | null {
+  const curve = launch.curve;
+  if (!curve?.virtualSolReserves || !curve.virtualTokenReserves) return null;
+  if (curve.virtualTokenReserves <= 0n) return null;
+
+  const price = priceFromReserves(curve.virtualSolReserves, curve.virtualTokenReserves);
+  return marketCapLamports(price, PUMPFUN_TOKEN_TOTAL_SUPPLY).toString();
+}
+
 function shape(launch: LaunchWithCurve, image: string | null) {
   return {
     mint: launch.mint,
@@ -42,7 +61,7 @@ function shape(launch: LaunchWithCurve, image: string | null) {
     // Null means nothing has read this curve yet, which is normal for a token
     // that launched seconds ago and is different from a curve at zero.
     progressBps: launch.curve?.progressBps ?? null,
-    solRaised: launch.curve?.realSolReserves.toString() ?? null,
+    marketCap: marketCapOf(launch),
     complete: launch.curve?.complete ?? false,
   };
 }

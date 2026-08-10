@@ -106,7 +106,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  height: 60px;
+  height: 64px;
 }
 
 .wordmark {
@@ -1450,16 +1450,27 @@ button,
    jump when the answer arrives. */
 .wallet-slot {
   display: inline-block;
-  width: 112px;
-  height: 32px;
+  width: 104px;
+  height: 34px;
 }
 
+/*
+ * `align-self: center`, and it is load-bearing.
+ *
+ * The base `button` rule sets `align-self: flex-start`, which is right for a
+ * button in a column of prose and wrong for one in a header row — it pinned
+ * this to the top of the bar so it sat higher than the nav beside it and its
+ * glow ran off the top edge. Every button that lives in a flex row has to say
+ * so explicitly.
+ */
 .wallet-connect {
   display: inline-flex;
+  align-self: center;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 14px;
+  justify-content: center;
+  min-width: 104px;
+  height: 34px;
+  padding: 0 18px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -1480,23 +1491,14 @@ button,
 
 .wallet-connect:disabled { opacity: 0.6; cursor: progress; }
 
-/* A key drawn rather than an icon font: a bit and a bow, two rectangles. */
-.wallet-connect .key {
-  width: 12px;
-  height: 6px;
-  background:
-    radial-gradient(circle at 3px 3px, var(--accent) 2.4px, transparent 0),
-    linear-gradient(to right, transparent 4px, var(--accent) 4px 12px) 0 2px / 12px 1.5px no-repeat,
-    linear-gradient(to right, transparent 9px, var(--accent) 9px 10.5px) 0 2px / 12px 5px no-repeat;
-}
-
 .wallet { position: relative; }
 
 .wallet-pill {
   display: inline-flex;
+  align-self: center;
   align-items: center;
   gap: 9px;
-  height: 32px;
+  height: 36px;
   padding: 0 11px;
   border-radius: 8px;
   border: 1px solid var(--line-bright);
@@ -1516,11 +1518,44 @@ button,
 
 .wallet-pill .addr { letter-spacing: 0.03em; }
 
+/*
+ * The balance, labelled.
+ *
+ * It read "10.00◎" before, which at a glance is ten thousand of something
+ * unnamed rather than ten SOL of practice money. A stacked label and a spelled
+ * unit costs six pixels of height and removes the ambiguity entirely.
+ */
 .wallet-pill .bal {
-  padding-left: 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding-left: 10px;
+  margin-left: 2px;
   border-left: 1px solid var(--line);
+  line-height: 1.15;
+}
+
+.wallet-pill .bal-k {
+  font-size: 8.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.wallet-pill .bal-v {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 12px;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
+}
+
+.wallet-pill .bal-v .unit {
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 /* Four bars keyed off the address. Not an avatar — something to recognise. */
@@ -1828,7 +1863,7 @@ button:hover:not(:disabled),
 
 .feed-row a {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
@@ -2783,7 +2818,7 @@ button:hover:not(:disabled),
 
 /* The columns hold less, so the row loses its hover label and tightens up. */
 .lane .feed-row a {
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
   gap: 9px;
   padding: 7px 8px;
   font-size: 12.5px;
@@ -2862,3 +2897,39 @@ button:hover:not(:disabled),
   }
   .lane .feed { max-height: 300px; }
 }
+
+/*
+ * Market cap, in every lane.
+ *
+ * Right-aligned with tabular figures and a fixed minimum, so the column reads
+ * as a column: the eye compares three rows down a straight edge rather than
+ * hunting for where each number starts.
+ */
+.feed-cap {
+  min-width: 52px;
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-row:hover .feed-cap { color: var(--text); }
+
+/* Column labels, aligned to the row grid beneath them. */
+.lane-cols {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  gap: 9px;
+  padding: 6px 8px 5px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* The first cell sits over the token image, which needs no label. */
+.lane-cols > span:first-child { grid-column: 2; }
+.lane-cols > span:nth-child(2) { min-width: 52px; text-align: right; }
+.lane-cols > span:last-child { min-width: 52px; text-align: right; }

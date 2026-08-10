@@ -23,6 +23,15 @@ export interface CurveState {
   readonly mint: string;
   readonly realSolReserves: bigint;
   readonly realTokenReserves: bigint;
+  /**
+   * What a price comes from.
+   *
+   * Null on a row written before these were stored, and on a graduated curve
+   * whose reserves have been zeroed. Null means "no price available", which is
+   * different from a price of zero.
+   */
+  readonly virtualSolReserves: bigint | null;
+  readonly virtualTokenReserves: bigint | null;
   /** 0 to 10000. How close the curve is to graduating. */
   readonly progressBps: number;
   readonly complete: boolean;
@@ -34,11 +43,17 @@ export interface LaunchWithCurve extends Launch {
   readonly curve: CurveState | null;
 }
 
+function optionalBigint(value: unknown): bigint | null {
+  return value === null || value === undefined ? null : BigInt(String(value));
+}
+
 function toCurve(row: Record<string, unknown>): CurveState {
   return {
     mint: String(row['mint']),
     realSolReserves: BigInt(String(row['real_sol_reserves'])),
     realTokenReserves: BigInt(String(row['real_token_reserves'])),
+    virtualSolReserves: optionalBigint(row['virtual_sol_reserves']),
+    virtualTokenReserves: optionalBigint(row['virtual_token_reserves']),
     progressBps: Number(row['progress_bps']),
     complete: Number(row['complete']) === 1,
     updatedAt: Number(row['updated_at']),
@@ -68,6 +83,8 @@ export interface CurveWrite {
   readonly mint: string;
   readonly realSolReserves: bigint;
   readonly realTokenReserves: bigint;
+  readonly virtualSolReserves: bigint;
+  readonly virtualTokenReserves: bigint;
   readonly complete: boolean;
 }
 
@@ -82,18 +99,31 @@ export async function recordCurveStates(
   const result = await db.batch(
     states.map((state) => ({
       sql: `INSERT INTO curve_state
-              (mint, real_sol_reserves, real_token_reserves, progress_bps, complete, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+              (mint, real_sol_reserves, real_token_reserves,
+               virtual_sol_reserves, virtual_token_reserves,
+               progress_bps, complete, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (mint) DO UPDATE SET
-              real_sol_reserves   = excluded.real_sol_reserves,
-              real_token_reserves = excluded.real_token_reserves,
-              progress_bps        = excluded.progress_bps,
-              complete            = excluded.complete,
-              updated_at          = excluded.updated_at`,
+              real_sol_reserves      = excluded.real_sol_reserves,
+              real_token_reserves    = excluded.real_token_reserves,
+              -- A graduated curve reports zero for everything, which is not a
+              -- price of zero. Keeping the last real reading means a token
+              -- that just bonded still shows what it was worth.
+              virtual_sol_reserves   = CASE WHEN excluded.virtual_token_reserves = '0'
+                                            THEN curve_state.virtual_sol_reserves
+                                            ELSE excluded.virtual_sol_reserves END,
+              virtual_token_reserves = CASE WHEN excluded.virtual_token_reserves = '0'
+                                            THEN curve_state.virtual_token_reserves
+                                            ELSE excluded.virtual_token_reserves END,
+              progress_bps           = excluded.progress_bps,
+              complete               = excluded.complete,
+              updated_at             = excluded.updated_at`,
       args: [
         state.mint,
         state.realSolReserves.toString(),
         state.realTokenReserves.toString(),
+        state.virtualSolReserves.toString(),
+        state.virtualTokenReserves.toString(),
         progressBpsFor(state.realTokenReserves, state.complete),
         state.complete ? 1 : 0,
         now,
@@ -152,7 +182,8 @@ function joined(rows: readonly Record<string, unknown>[]): LaunchWithCurve[] {
  */
 export async function newLaunches(db: Client, limit: number): Promise<LaunchWithCurve[]> {
   const result = await db.execute({
-    sql: `SELECT l.*, c.real_sol_reserves, c.real_token_reserves, c.progress_bps,
+    sql: `SELECT l.*, c.real_sol_reserves, c.real_token_reserves,
+                 c.virtual_sol_reserves, c.virtual_token_reserves, c.progress_bps,
                  c.complete, c.updated_at
           FROM launches l
           LEFT JOIN curve_state c ON c.mint = l.mint
@@ -176,7 +207,8 @@ export async function bondingLaunches(
   limit: number,
 ): Promise<LaunchWithCurve[]> {
   const result = await db.execute({
-    sql: `SELECT l.*, c.real_sol_reserves, c.real_token_reserves, c.progress_bps,
+    sql: `SELECT l.*, c.real_sol_reserves, c.real_token_reserves,
+                 c.virtual_sol_reserves, c.virtual_token_reserves, c.progress_bps,
                  c.complete, c.updated_at
           FROM launches l
           JOIN curve_state c ON c.mint = l.mint
@@ -191,7 +223,8 @@ export async function bondingLaunches(
 /** Graduated, most recently confirmed first. */
 export async function bondedLaunches(db: Client, limit: number): Promise<LaunchWithCurve[]> {
   const result = await db.execute({
-    sql: `SELECT l.*, c.real_sol_reserves, c.real_token_reserves, c.progress_bps,
+    sql: `SELECT l.*, c.real_sol_reserves, c.real_token_reserves,
+                 c.virtual_sol_reserves, c.virtual_token_reserves, c.progress_bps,
                  c.complete, c.updated_at
           FROM launches l
           JOIN curve_state c ON c.mint = l.mint
@@ -224,6 +257,36 @@ export async function curvesToRefresh(
           ORDER BY COALESCE(c.updated_at, 0) ASC, l.launched_at DESC
           LIMIT ?`,
     args: [launchedAfter, limit],
+  });
+
+  return result.rows.map((row) => ({
+    mint: String(row['mint']),
+    bondingCurve: String(row['bonding_curve']),
+  }));
+}
+
+/**
+ * Graduated tokens whose price is stalest.
+ *
+ * Separate from {@link curvesToRefresh} because they are read a different way
+ * and cost far more. A graduated curve zeroes its reserves, so there is no
+ * price left on it — the market moved to an AMM pool whose address is not
+ * derivable and has to be searched for. That is several calls per token rather
+ * than a hundred tokens per call, so this hands back a handful at a time.
+ */
+export async function gradsToRefresh(
+  db: Client,
+  limit: number,
+  stalerThan: number,
+): Promise<{ mint: string; bondingCurve: string }[]> {
+  const result = await db.execute({
+    sql: `SELECT l.mint, l.bonding_curve
+          FROM launches l
+          JOIN curve_state c ON c.mint = l.mint
+          WHERE c.complete = 1 AND c.updated_at < ?
+          ORDER BY c.updated_at ASC
+          LIMIT ?`,
+    args: [stalerThan, limit],
   });
 
   return result.rows.map((row) => ({
