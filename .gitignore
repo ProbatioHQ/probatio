@@ -24,7 +24,14 @@ keypair*.json
 id.json
 
 # Local development database
+#
+# Every sidecar, not just the database. A rollback journal holds the original
+# contents of the pages being overwritten and a WAL holds the new ones, so
+# either can carry real rows — wallet addresses and trade history — even when
+# the .db itself is ignored. The journal was the one missing, and a file of
+# that name was tracked.
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
 backups/
