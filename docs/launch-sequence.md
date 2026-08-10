@@ -79,7 +79,7 @@ the sequence stops here.
 
 ### 2. Ship (49–52)
 
-9. Push to the new GitHub account. Never SeierkDev.
+9. Push to the new GitHub account.
 10. CI running the full suite plus the program tests.
 11. Deploy the program to mainnet.
 12. Record the deployment: `verify-deployment.mts` writes down the authority and
