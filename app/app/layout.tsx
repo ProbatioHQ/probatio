@@ -44,6 +44,12 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <div className="rails" aria-hidden="true" />
         <span className="rail-pulse left" aria-hidden="true" />
         <span className="rail-pulse right" aria-hidden="true" />
+        {/* First thing in the tab order, and the only way past the header
+            without walking every link in it. */}
+        <a href="#content" className="skip-link">
+          Skip to content
+        </a>
+
         <WalletProvider>
         <HeaderScroll />
         <header className="site-header">
@@ -73,7 +79,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <StatusBanner />
 
         <PageTransition>
-          <div className="shell">{children}</div>
+          <div className="shell" id="content">
+            {children}
+          </div>
         </PageTransition>
 
         </WalletProvider>

@@ -663,7 +663,9 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
                 <div className="lane" key={lane.key}>
                   <div className="lane-head">
                     <span className="prompt">{lane.prompt}</span>
-                    <h3>{lane.title}</h3>
+                    {/* h2: these sit directly under the page heading, and as
+                        h3 they skipped a level with nothing in between. */}
+                    <h2>{lane.title}</h2>
                     <span className="lane-blurb">
                       {terminal && lanes ? `${rows.length} shown` : lane.blurb}
                     </span>

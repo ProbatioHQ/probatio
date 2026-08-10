@@ -100,7 +100,7 @@ export default function Home() {
       <section className="term">
         <div className="term-bar">
           <span className="prompt">~/trade</span>
-          <span>what happens when you trade</span>
+          <h2>what happens when you trade</h2>
           <span className="lights">
             <i />
             <i />
@@ -129,7 +129,7 @@ export default function Home() {
       <section className="term">
         <div className="term-bar">
           <span className="prompt">~/why</span>
-          <span>why this is different</span>
+          <h2>why this is different</h2>
           <span className="lights">
             <i />
             <i />

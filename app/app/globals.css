@@ -24,7 +24,21 @@
 
   --text: #e6e8eb;
   --text-dim: #99a0ab;
-  --text-faint: #6b7280;
+  /*
+   * Lightened from #6b7280 to clear WCAG AA.
+   *
+   * This one token was every colour-contrast failure on the site — ninety-two
+   * elements across six pages, at ratios between 3.41 and 4.19 where 4.5 is
+   * the floor for text this size. It is the colour under every column header,
+   * every timestamp in the feed, the lane captions and the footer, so the
+   * places it failed were the small print people squint at already.
+   *
+   * This is the smallest step along the same blue-grey that clears 4.5:1
+   * against every background it is used on — the darkest panel through to the
+   * lightest border fill. The other tokens were already fine: dim 6.25,
+   * accent 9.60, loss 5.51, text 13.42 against their worst case.
+   */
+  --text-faint: #7f8694;
 
   /*
    * Phosphor green, not blue.
@@ -819,11 +833,14 @@ hr {
  * Lifts the real content above the fixed decorative layers.
  *
  * The exclusions are load-bearing rather than tidy. This selector outweighs a
- * single class, so anything fixed that is not named here gets `position:
- * relative` forced onto it, drops into normal flow, and — at viewport size —
- * pushes the entire page below the fold.
+ * single class, so anything positioned that is not named here gets `position:
+ * relative` forced onto it and drops into normal flow. That put a
+ * viewport-sized canvas into the page and pushed everything below the fold
+ * once, and later pinned the skip link off screen so it could never slide in
+ * when focused. Anything absolutely positioned directly under `body` belongs
+ * on this list.
  */
-body > *:not(.grain):not(.glow):not(.ambient) {
+body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link) {
   position: relative;
   z-index: 1;
 }
@@ -1213,6 +1230,23 @@ button,
 
 .term > .term-bar .prompt {
   color: var(--accent);
+}
+
+/*
+ * A panel's title is a heading, not a caption.
+ *
+ * The bar sets the font, the tracking and the case on itself, so a heading
+ * inside it only has to stop being a heading visually. Doing this the other way
+ * round — leaving them as spans — meant a screen reader had no way to move
+ * between the site's main sections, and the pages skipped from h1 straight to
+ * h3 because the level in between was drawn but never marked up.
+ */
+.term > .term-bar h2 {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
 }
 
 .term > .term-bar .lights {
@@ -2835,7 +2869,7 @@ button:hover:not(:disabled),
   background: var(--ink-sunken);
 }
 
-.lane-head h3 {
+.lane-head h2 {
   font-size: 13px;
   font-weight: 600;
 }
@@ -3277,4 +3311,31 @@ body:has(main.wide) .site-footer .shell {
   .hero-canvas {
     opacity: 0.5;
   }
+}
+
+
+/*
+ * Skip to the content.
+ *
+ * Off screen until focused. Without it a keyboard user on the terminal had to
+ * tab through the wordmark, five nav links and the wallet before reaching the
+ * search box — and past every row of three lanes to reach anything after them.
+ */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 50;
+  padding: 10px 16px;
+  border-radius: 0 0 8px 8px;
+  background: var(--accent);
+  color: var(--ink);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top 140ms ease;
+}
+
+.skip-link:focus {
+  top: 0;
 }
