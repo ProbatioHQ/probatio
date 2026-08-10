@@ -1,108 +1,174 @@
 # Probatio
 
-A proving ground for traders.
+**Trade fake money on real tokens. Prove you're good.**
 
-Trade live Solana markets with simulated money, against fills that model real
-slippage and real latency. Every trade is committed on chain as it happens, so
-the record cannot be backdated, edited, or cherry-picked. An AI coach reads
-your closed trades and tells you what is actually costing you money. Ranked
-seasons put that record on a leaderboard where the conditions themselves are
-provable.
+A trading simulator on live Solana markets, with fills that model real slippage
+and real delay — and every trade committed to the chain as it is made, so a
+record cannot be edited afterwards.
 
-*Probatio* is Latin for a proving — a trial that establishes what something
-really is.
+The point is not the practice. It is that the result is checkable by anybody,
+without trusting the site that produced it.
 
-## Why the fills matter more than anything else
+---
 
-Every paper trading tool fills you at mid-price, instantly, with no slippage.
-That makes their results fantasy and their leaderboards meaningless. Probatio
-quotes against actual pool reserves at a specific slot, applies a latency
-penalty between click and fill, and partially fills when depth is thin.
+## The claim, and how to check it
 
-The engine is validated by replaying real historical swaps and comparing its
-output against what actually happened on chain. If that comparison fails,
-nothing built on top of it is worth anything.
+Two claims, and each has a command rather than an argument.
 
-**Last measured: 169 of 169 trades reproduced exactly.** Median, 95th
-percentile and maximum error were all 0 basis points, across 67 buys and 102
-sells on two tokens, at engine version 1.
+### The fills are accurate
 
-Pairs are only scored once reserve arithmetic proves one trade genuinely
-followed the other, so a gap in the history is skipped rather than counted as a
-near miss. A harness that tolerated unrelated pairs and then reported a low
-median would only be measuring its own leniency.
-
-Run it yourself:
+The engine is replayed against trades that actually happened: real swaps pulled
+from the chain, each re-quoted from the reserves that stood immediately before
+it, and compared against what the market produced.
 
 ```
 RPC_VALIDATION=1 npx vitest run packages/validation/test/mainnet.test.ts
 ```
 
+Most recent run — 221 events off mainnet:
+
+| | |
+|---|---|
+| Scored pairs | 128 |
+| Median error | **0 bps** |
+| 95th percentile | **0 bps** |
+| Worst case | **0 bps** |
+| Exact matches | **128 of 128** |
+
+Not close. Identical, to the lamport, on every sample.
+
+A pair is only scored when the reserves prove the two trades were consecutive —
+that nothing happened in between that we did not see. That run discarded 91 of
+221 events for that reason. Throwing away most of the data is what makes the
+number mean anything.
+
+The harness reads live trades, so the sample differs every run and the error
+does not.
+
+### The records cannot be revised
+
+Each fill is hashed into a fixed-width leaf carrying the pool reserves it was
+quoted against — so a verifier needs nothing from us. Leaves are batched into a
+merkle root, and roots are folded one at a time into a running value:
+
+```
+accumulator = sha256(accumulator ‖ root ‖ leaves ‖ engine_version)
+```
+
+Thirty-two bytes on chain covering every trade in order. Changing an old trade
+changes every value after it, and those were already witnessed publicly at the
+time.
+
+The `/verify` page rebuilds every trade from its own recorded inputs, recomputes
+each root, folds the chain, and compares against Solana — in the reader's
+browser, against an endpoint they choose. It never asks this server whether the
+record is valid, because a server vouching for its own records is worth nothing.
+
+---
+
+## Running it
+
+Requires Node 22 or later. A Solana RPC endpoint is needed for anything that
+touches the chain; the public cluster works for trying it out and rate-limits
+hard.
+
+```bash
+npm install
+cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
+npm test                                # 1088 tests, no network
+npm --prefix app run dev
+```
+
+The Anchor program is separate and needs the Solana toolchain:
+
+```bash
+cd program && cargo test               # 52 tests, under litesvm
+```
+
+Note that `cargo build` does **not** rebuild the binary the tests load. Use
+`cargo build-sbf`, or the tests run against a stale program.
+
+---
+
 ## Layout
 
-```
-packages/sim         Fill engine. Pure functions, no network, no clock, no I/O.
-packages/pools       Venue account decoding and pool state.
-packages/candles     OHLCV aggregation and historical reconstruction.
-packages/feed        Demand-driven polling, with a hard ceiling on cost.
-packages/metadata    Token names, symbols and images.
-packages/validation  Replays real swaps through the engine. The gate.
-packages/db          Schema and data access.
-packages/auth        Sign-In With Solana.
-app                  Next.js front end.
-program              Anchor program for season and trade commitments.
-```
+An npm workspace. Most packages are pure — no clock, no network, no database —
+which is why the whole suite runs offline in about ten seconds. The ones that
+reach outside are marked, and they are the only ones that can.
 
-`packages/sim` is sealed off deliberately. The replay harness compares its
-output against real chain history, and that comparison only means something if
-the engine cannot reach anything the replay does not control.
+| Package | | |
+|---|---|---|
+| `sim` | Fixed-point arithmetic and the fill engine. No clock, no network |  |
+| `trading` | Applying fills to balances and positions |  |
+| `pools` | Venue decoding and the only RPC client | network |
+| `candles` | Prices and chart series from pool reserves | network |
+| `metadata` | Token names, on-chain and off, with the untrusted half fenced off | network |
+| `feed` | The live launch websocket | network |
+| `commit` | Leaf encoding, merkle trees, the accumulator chain |  |
+| `keeper` | Batching and committing, reconcilable after a crash | network, database |
+| `validation` | The accuracy harness above | network |
+| `analytics` | What a trade log says about the trader |  |
+| `coach` | Turning that into advice without letting a model invent a number | network |
+| `seasons` | Rulesets, their hash, lifecycle and payout maths |  |
+| `scoring` | Ranking and the results commitment |  |
+| `payments` | Solana transactions, built and verified by hand |  |
+| `sybil` | Making a track record expensive to fake | network |
+| `profile` | Display names and the rules against impersonation |  |
+| `limits` | Rate limiting |  |
+| `health` | What is working, and how long it has not been |  |
+| `retention` | Whether people come back |  |
+| `auth` | Sign-in with Solana, and sessions. No email anywhere |  |
+| `db` | Schema, migrations, and every query | database |
 
-## Two rules that are not negotiable
+Plus `app` (Next.js) and `program` (Anchor).
 
-**Amounts are fixed-point integers.** Never floats, anywhere, for any balance,
-fill, fee or PnL figure. A double carries about 15 significant digits and a
-lamport balance can need 19. The whole claim of this project is that a record
-can be independently recomputed and will match, and it cannot match if the
-arithmetic drifts.
+Amounts are integers everywhere — `bigint` in TypeScript, fixed-point on chain.
+Nothing in this repository stores money in a float.
 
-**The engine is versioned.** `ENGINE_VERSION` goes into every merkle leaf
-committed on chain. Anyone can re-check a trade against the exact rules in
-force when it happened, rather than whatever the engine does today.
+---
 
-## Development
+## Documentation
 
-```
-npm install
-npm test          # vitest, all packages
-npm run typecheck
-```
+The [docs](docs/) directory is written for whoever operates this, and the
+reasoning is in it rather than in commit messages.
 
-Bring a local database to life with real tokens:
+- [Void policy](docs/void-policy.md) — when a season does not count, decided in
+  advance and measured rather than judged
+- [Program review](docs/program-review.md) — five findings, two critical, and
+  what is still open
+- [Upgrade authority](docs/upgrade-authority.md) — why "unfakeable" is a weaker
+  claim than it sounds, and what would make it stronger
+- [Keeper key](docs/keeper-key.md) — the blast radius of the one hot key
+- [Downtime](docs/downtime.md) — what degrades, and the one thing that never does
+- [Backups](docs/backup-and-restore.md) — including the drill and the two bugs
+  it found
+- [Load](docs/load.md), [rate limits](docs/rate-limits.md),
+  [fee treasury](docs/fee-treasury.md), [analytics](docs/analytics.md)
 
-```
-cd app && cp .env.example .env.local   # fill in SESSION_SECRET
-cd ..
-npx tsx scripts/seed-launches.mts <mint> [mint...]   # names and symbols
-npx tsx scripts/seed-candles.mts <mint>              # a token's chart
-cd app && npm run dev
-```
+The user-facing explanations live at `/docs` on the site.
 
-Open `/` for the feed, or `/t/<mint>` for a token.
-
-The app:
-
-```
-cd app && npm run dev
-```
-
-Anchor is not yet installed on this machine — see `program/README.md`. It is
-not needed until the on-chain program work begins.
+---
 
 ## Status
 
-Early. Foundations only. Nothing is deployed anywhere.
+Not deployed. The program has never been on mainnet, and until it is, every
+claim about what it does is a claim about source code.
 
-## License
+Two things are known to be missing and are written down rather than left to be
+discovered:
 
-AGPL-3.0. The name, logo and token are reserved and cannot be reused in public
-deployments.
+- **The keeper has no concrete chain gateway.** `ChainGateway` is an interface
+  whose only implementations are test doubles, so nothing is committed yet.
+- **There is no refund instruction**, so no season can take money until there
+  is one. The void policy promises full refunds and the program cannot pay one.
+
+See [the launch sequence](docs/launch-sequence.md) for the order these have to
+happen in and why.
+
+---
+
+## Licence
+
+[AGPL-3.0](LICENSE). If you run a modified version as a service, the source of
+your version has to be available too — which is the point, for a product whose
+argument is that it can be checked.
