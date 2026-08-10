@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DexChart } from '@/components/dex-chart';
 import { PriceChart, TIMEFRAME_LABELS } from '@/components/price-chart';
 import { useWallet } from '@/components/wallet';
 import { Positions } from '@/components/positions';
@@ -26,6 +27,13 @@ export function TokenView({ mint }: { mint: string }) {
   // minutes — a fast one puts sixty trades inside a single 1m bucket, which
   // draws as one candle and looks like a chart that is not working.
   const [timeframe, setTimeframe] = useState<string>('s15');
+  /**
+   * TradingView first, because it is what a trader already knows how to use.
+   * The native chart stays one click away: it is drawn from the same reserves
+   * this site quotes fills against, which is the chart the product's claims are
+   * actually about.
+   */
+  const [source, setSource] = useState<'tradingview' | 'native'>('tradingview');
   const [unit, setUnit] = useState<PriceUnit>('market-cap');
 
   return (
@@ -34,6 +42,30 @@ export function TokenView({ mint }: { mint: string }) {
         <div className="term-bar">
           <span className="prompt">~/chart</span>
           <div className="chart-controls">
+            <div role="group" aria-label="Chart source" className="segmented">
+              <button
+                type="button"
+                className={source === 'tradingview' ? 'on' : undefined}
+                aria-pressed={source === 'tradingview'}
+                onClick={() => setSource('tradingview')}
+              >
+                TRADINGVIEW
+              </button>
+              <button
+                type="button"
+                className={source === 'native' ? 'on' : undefined}
+                aria-pressed={source === 'native'}
+                onClick={() => setSource('native')}
+              >
+                NATIVE
+              </button>
+            </div>
+
+            {/* TradingView carries its own timeframe and unit controls, so
+                showing ours beside them would be two sets of switches for one
+                chart, disagreeing. */}
+            {source === 'native' && (
+            <>
             <div role="group" aria-label="Timeframe" className="segmented">
               {TIMEFRAMES.map((frame) => (
                 <button
@@ -65,6 +97,8 @@ export function TokenView({ mint }: { mint: string }) {
                 PRICE
               </button>
             </div>
+            </>
+            )}
           </div>
           <span className="lights">
             <i />
@@ -73,7 +107,21 @@ export function TokenView({ mint }: { mint: string }) {
           </span>
         </div>
         <div className="term-body">
-          <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={560} />
+          {source === 'tradingview' ? (
+            <>
+              <DexChart mint={mint} height={620} />
+              <p className="dim chart-note">
+                TradingView charts, with pump.fun and PumpSwap trades, served by DEX Screener.
+                Your fills are quoted against the reserves this site reads directly —{' '}
+                <button type="button" className="linklike" onClick={() => setSource('native')}>
+                  see that chart
+                </button>
+                .
+              </p>
+            </>
+          ) : (
+            <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={560} />
+          )}
         </div>
       </section>
 

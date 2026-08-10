@@ -28,7 +28,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   const image = images.get(mint) ?? null;
 
   return (
-    <main className="token-page">
+    <main className="token-page wide">
       <div className="token-head">
         {image ? (
           // Not next/image: an arbitrary host chosen by whoever launched the
