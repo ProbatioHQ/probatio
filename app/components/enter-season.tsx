@@ -126,7 +126,7 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
 
   if (stage === 'entered') {
     return (
-      <section aria-label="Season entry">
+      <section aria-label="Season entry" style={{ gap: 12 }}>
         <h2>Entered</h2>
         <p>{message}</p>
       </section>
@@ -134,8 +134,10 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
   }
 
   return (
-    <section aria-label="Season entry">
-      <h2>Ranked season</h2>
+    // No heading of its own: this renders inside the season panel, which has
+    // already said which season it is. A second heading there read as a
+    // separate section attached to nothing.
+    <section aria-label="Season entry" style={{ gap: 12 }}>
       <p>
         {free
           ? 'Free to enter. The prize is put up rather than paid for by entries, so nothing ' +

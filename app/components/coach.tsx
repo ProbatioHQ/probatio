@@ -83,7 +83,7 @@ export function Coach() {
   if (!state) return null;
 
   return (
-    <section aria-label="Coach">
+    <section aria-label="Coach" className="panel">
       <h2>Coach</h2>
 
       {state.report ? (

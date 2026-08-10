@@ -53,7 +53,11 @@ export function LaunchFeedList() {
   }, [query, load]);
 
   return (
-    <section aria-label="Tokens">
+    <section aria-label="Tokens" className="panel">
+      <div className="panel-head">
+        <h2>Live launches</h2>
+        <span className="pill live">streaming</span>
+      </div>
       <label>
         Search
         <input
@@ -73,13 +77,21 @@ export function LaunchFeedList() {
             : 'No launches yet. The feed fills as tokens are created.'}
         </p>
       ) : (
-        <ul>
+        <ul
+          className="bare scroller"
+          // Capped rather than paginated. The feed is continuous and a page
+          // number on a list that reorders itself every few seconds is a
+          // control that fights its own contents.
+          style={{ maxHeight: 360, overflowY: 'auto', paddingRight: 8 }}
+        >
           {launches.map((launch) => (
-            <li key={launch.mint}>
+            <li key={launch.mint} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
               <a href={`/t/${launch.mint}`}>
                 <strong>{launch.symbol}</strong> {launch.name}
               </a>{' '}
-              <span>{age(launch.launchedAt)}</span>
+              <span className="dim mono" style={{ fontSize: 12, marginLeft: 'auto' }}>
+                {age(launch.launchedAt)}
+              </span>
             </li>
           ))}
         </ul>

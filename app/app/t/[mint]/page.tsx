@@ -26,10 +26,13 @@ export default async function TokenPage({
     <main>
       <h1>
         {token.symbol ?? token.name}
-        {token.symbol && token.name !== token.symbol && <span> {token.name}</span>}
+        {token.symbol && token.name !== token.symbol && (
+          <span className="dim" style={{ fontWeight: 400 }}> {token.name}</span>
+        )}
       </h1>
-      <p>{shortMint(mint)}</p>
-      <p>Market cap, in SOL</p>
+      <p className="mono dim" style={{ fontSize: 13 }}>
+        {shortMint(mint)} · market cap in SOL
+      </p>
       {/* Compact here: someone on a token page has already found one. */}
       <Onboarding compact />
       <TokenView mint={mint} signedIn={user !== null} />

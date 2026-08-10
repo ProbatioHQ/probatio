@@ -56,7 +56,7 @@ export function NameClaim() {
   }
 
   return (
-    <section aria-label="Display name">
+    <section aria-label="Display name" className="panel">
       <h2>Display name</h2>
       {current ? (
         <p>You appear as {current}.</p>

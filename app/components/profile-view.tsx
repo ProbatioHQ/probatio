@@ -69,17 +69,21 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
   return (
     <>
       {profile.seasons.map((season) => (
-        <section key={season.seasonId} aria-label={`Season ${season.seasonId}`}>
+        <section key={season.seasonId} aria-label={`Season ${season.seasonId}`} className="panel">
           <h2>{season.freePlay ? 'Free play' : season.ranked ? 'Ranked season' : 'Past season'}</h2>
           <dl>
             <dt>Trades</dt>
-            <dd>{season.trades}</dd>
+            <dd className="mono">{season.trades}</dd>
             <dt>Closed positions</dt>
-            <dd>{season.roundTrips}</dd>
+            <dd className="mono">{season.roundTrips}</dd>
             <dt>Win rate</dt>
-            <dd>{season.winRateBps === null ? '—' : `${(season.winRateBps / 100).toFixed(1)}%`}</dd>
+            <dd className="mono">
+              {season.winRateBps === null ? '—' : `${(season.winRateBps / 100).toFixed(1)}%`}
+            </dd>
             <dt>Profit and loss</dt>
-            <dd>{sol(season.netPnl)} SOL</dd>
+            <dd className={`mono ${season.netPnl.startsWith('-') ? 'loss' : 'gain'}`}>
+              {sol(season.netPnl)} SOL
+            </dd>
             <dt>Committed on chain</dt>
             <dd>
               {season.committedTrades} of {season.trades} trades

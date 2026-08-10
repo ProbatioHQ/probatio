@@ -71,8 +71,13 @@ export function Season() {
   const closed = season.status === 'closed' || season.status === 'finalized';
 
   return (
-    <section aria-label="Season">
-      <h2>{season.name}</h2>
+    <section aria-label="Season" className="panel">
+      <div className="panel-head">
+        <h2>{season.name}</h2>
+        <span className={`pill ${closed ? 'closed' : 'live'}`}>
+          {closed ? 'closed' : season.status === 'pending' ? 'opens soon' : 'open'}
+        </span>
+      </div>
 
       {season.status === 'pending' && (
         <p>Opens {new Date(season.startsAt).toLocaleString()}.</p>
@@ -82,16 +87,16 @@ export function Season() {
 
       <dl>
         <dt>Prize pool</dt>
-        <dd>
+        <dd className="mono">
           {sol(season.potLamports)} SOL
           {BigInt(season.entryCost) === 0n && <span> · put up, not paid for by entries</span>}
         </dd>
         <dt>Entrants</dt>
-        <dd>{season.entrants}</dd>
+        <dd className="mono">{season.entrants}</dd>
         {season.entryClosesInMs !== null && (
           <>
             <dt>Entry closes in</dt>
-            <dd>{remaining(season.entryClosesInMs)}</dd>
+            <dd className="mono">{remaining(season.entryClosesInMs)}</dd>
           </>
         )}
       </dl>
@@ -99,7 +104,7 @@ export function Season() {
       {season.payouts.length > 0 && (
         <>
           <h3>Paid now</h3>
-          <ol>
+          <ol className="mono">
             {season.payouts.map((payout) => (
               <li key={payout.place}>
                 {ORDINALS[payout.place - 1] ?? `${payout.place}th`} — {sol(payout.lamports)} SOL
@@ -121,6 +126,11 @@ export function Season() {
         Highest return wins. Everyone starts with the same balance and the same fill conditions.
       </p>
 
+      {/* Ruled off from the description above it: the entry action is the one
+          thing in this panel a reader is meant to do, and it was running
+          together with the rules as a single block of text. */}
+      <hr />
+
       {season.entered ? (
         <p>You are entered.</p>
       ) : season.status === 'entry_open' ? (
@@ -130,7 +140,7 @@ export function Season() {
       )}
 
       <p>
-        <small>Ruleset {season.rulesetHash.slice(0, 16)}…</small>
+        <small className="mono">Ruleset {season.rulesetHash.slice(0, 16)}…</small>
       </p>
     </section>
   );

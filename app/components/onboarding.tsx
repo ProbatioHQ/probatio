@@ -63,9 +63,9 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
   const current = !progress.signedIn ? 0 : compact ? 2 : 1;
 
   return (
-    <aside aria-label="Getting started">
+    <aside aria-label="Getting started" className="panel">
       <h2>Getting started</h2>
-      <ol>
+      <ol className="steps">
         {STEPS.map((step, index) => {
           const state = index < current ? 'done' : index === current ? 'current' : 'todo';
           return (

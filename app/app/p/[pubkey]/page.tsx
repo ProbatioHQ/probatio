@@ -33,7 +33,9 @@ export default async function ProfilePage({
     <main>
       <h1>{name ?? shortAddressSafe(pubkey)}</h1>
       {/* The address is always shown. It is the identity; the name is not. */}
-      <p>{pubkey}</p>
+      <p className="mono dim" style={{ fontSize: 13, wordBreak: 'break-all' }}>
+        {pubkey}
+      </p>
       <ProfileView pubkey={pubkey} />
     </main>
   );

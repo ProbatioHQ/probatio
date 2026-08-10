@@ -1,26 +1,516 @@
 @import "tailwindcss";
 
+/*
+ * One dark theme, committed to deliberately.
+ *
+ * This is a trading surface that people will sit in front of at night, beside
+ * charts that are already dark. A light variant would be a second design to
+ * keep correct rather than a courtesy, and the shareable card is painted in
+ * these exact colours — a site that did not match its own card would look like
+ * two products.
+ *
+ * Every colour is a token and nothing is left to a browser default, so the page
+ * renders the same whatever the reader's system is set to.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --ink: #0b0d10;
+  --ink-raised: #12151a;
+  --ink-sunken: #08090c;
+  --line: #1e232b;
+  --line-bright: #2b323d;
+
+  --text: #e6e8eb;
+  --text-dim: #99a0ab;
+  --text-faint: #6b7280;
+
+  --gain: #3fb950;
+  --loss: #f85149;
+  --accent: #58a6ff;
+
+  --radius: 10px;
+  --measure: 68ch;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--ink);
+  --color-foreground: var(--text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.shell {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: 48px 0 96px;
+}
+
+/* A page that is mostly prose gets a readable measure; a dashboard does not. */
+.prose {
+  max-width: var(--measure);
+}
+
+.prose p,
+.prose li {
+  color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ header */
+
+.site-header {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 85%, transparent);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.site-header .shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 60px;
+}
+
+.wordmark {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.site-nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  color: var(--text);
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 28px 0;
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.site-footer .shell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-footer a {
+  color: var(--text-faint);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--text-dim);
+}
+
+/* -------------------------------------------------------------------- type */
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+  font-weight: 650;
+}
+
+h1 {
+  font-size: clamp(30px, 4.2vw, 44px);
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 16px;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+small {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+code,
+.mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+pre {
+  background: var(--ink-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------------- surface */
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Anything that is a panel rather than a run of prose. */
+.panel {
+  background: var(--ink-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+button {
+  font: inherit;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--text);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 9px 18px;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: opacity 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line-bright);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 460px;
+}
+
+input,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--ink-sunken);
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  padding: 9px 12px;
+  width: 100%;
+}
+
+input::placeholder {
+  color: var(--text-faint);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* -------------------------------------------------------------------- data */
+
+dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 20px;
+  align-items: baseline;
+}
+
+dt {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+tr[aria-current] td {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Wide content scrolls inside its own box; the page never scrolls sideways. */
+.scroller {
+  overflow-x: auto;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+ul.bare {
+  list-style: none;
+  padding-left: 0;
+}
+
+/* --------------------------------------------------------------- meaning */
+
+.gain {
+  color: var(--gain);
+}
+
+.loss {
+  color: var(--loss);
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+/* A short status word beside a number, so state reads without being read. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border: 1px solid var(--line-bright);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.pill.live::before {
+  background: var(--gain);
+}
+
+.pill.closed::before {
+  background: var(--loss);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ----------------------------------------------------------------- steps */
+
+/*
+ * The getting-started sequence.
+ *
+ * Numbered explicitly rather than by the list marker. A default marker sits
+ * outside the content box and disappears against a panel edge, which left
+ * three indented headings reading as a broken list rather than a sequence.
+ */
+.steps {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: step;
+  gap: 14px;
+}
+
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--line-bright);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+.steps li[aria-current] ::before,
+.steps li[aria-current]::before {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.steps li > * {
+  grid-column: 2;
+}
+
+.steps li p {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------- narrow */
+
+/*
+ * Most of this audience arrives on a phone, so the narrow case is the one that
+ * has to be right rather than the one that has to survive.
+ */
+@media (max-width: 640px) {
+  body {
+    font-size: 14.5px;
+  }
+
+  .shell {
+    padding: 0 16px;
+  }
+
+  main {
+    gap: 32px;
+    padding: 32px 0 64px;
+  }
+
+  .panel {
+    padding: 18px 16px;
+  }
+
+  /* Labels above values rather than beside them: a two-column grid at this
+     width leaves the numbers with no room and wraps them mid-figure. */
+  dl {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  dl dt:not(:first-child) {
+    margin-top: 10px;
+  }
+
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  button {
+    width: 100%;
+    align-self: stretch;
+  }
+
+  .site-footer .shell {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

@@ -46,8 +46,10 @@ function Standing({ row, you = false }: { row: Row; you?: boolean }) {
   return (
     <tr aria-current={you ? 'true' : undefined}>
       <td>{row.rank}</td>
-      <td>{you ? 'You' : short(row.trader)}</td>
-      <td>{percent(row.returnBps)}</td>
+      <td className="mono">{you ? 'You' : short(row.trader)}</td>
+      <td className={row.returnBps > 0 ? 'gain' : row.returnBps < 0 ? 'loss' : 'dim'}>
+        {percent(row.returnBps)}
+      </td>
       <td>{row.tradeCount}</td>
       <td>{row.payoutLamports === '0' ? '' : `${sol(row.payoutLamports)} SOL`}</td>
     </tr>
@@ -74,14 +76,18 @@ export function Leaderboard() {
   if (!board?.season) return null;
 
   return (
-    <section aria-label="Leaderboard">
-      <h2>Standings</h2>
+    <section aria-label="Leaderboard" className="panel">
+      <div className="panel-head">
+        <h2>Standings</h2>
+        <span className="pill">{board.final ? 'final' : 'live'}</span>
+      </div>
 
       {board.standings.length === 0 ? (
         <p>Nobody has entered yet. First in is first on the board.</p>
       ) : (
         <>
-          <table>
+          <div className="scroller">
+            <table>
             <thead>
               <tr>
                 <th scope="col">#</th>
@@ -97,9 +103,10 @@ export function Leaderboard() {
               ))}
               {board.you && <Standing row={board.you} you />}
             </tbody>
-          </table>
+            </table>
+          </div>
 
-          <p>
+          <p className="dim">
             {board.final
               ? 'Final.'
               : 'Live. Open positions are marked at the current price, so these move with the market.'}

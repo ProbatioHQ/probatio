@@ -199,7 +199,7 @@ export function Verifier() {
   }
 
   return (
-    <section aria-label="Verifier">
+    <section aria-label="Verifier" className="panel">
       <label>
         Wallet address
         <input
@@ -225,10 +225,13 @@ export function Verifier() {
       {note && <p role="status">{note}</p>}
 
       {checks && (
-        <ol>
+        <ol className="bare">
           {checks.map((check) => (
             <li key={check.label}>
-              <strong>{check.passed ? 'Pass' : 'Not verified'}</strong> — {check.label}: {check.detail}
+              <span className={check.passed ? 'gain' : 'dim'}>
+                {check.passed ? 'Pass' : 'Not verified'}
+              </span>{' '}
+              — {check.label}: <span className="dim">{check.detail}</span>
             </li>
           ))}
         </ol>
