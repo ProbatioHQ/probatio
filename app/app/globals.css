@@ -549,3 +549,29 @@ hr {
     align-items: flex-start;
   }
 }
+
+/* --------------------------------------------------------------- status */
+
+/*
+ * Shown only when something is actually wrong.
+ *
+ * A permanent "all systems operational" strip is furniture people stop
+ * reading, and then it is not read on the day it changes.
+ */
+.status-banner {
+  border-bottom: 1px solid var(--line-bright);
+  background: color-mix(in srgb, var(--loss) 10%, var(--ink));
+  font-size: 13.5px;
+  padding: 10px 0;
+}
+
+.status-banner .shell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.status-banner.stopped {
+  background: color-mix(in srgb, var(--loss) 18%, var(--ink));
+}
