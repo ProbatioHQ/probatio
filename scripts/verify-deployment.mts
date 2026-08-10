@@ -15,9 +15,25 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { RpcClient, decodeProgramData, findProgramAddress, BPF_UPGRADEABLE_LOADER } from '@probatio/pools';
+import { PROGRAM_ID } from '@probatio/keeper';
 import bs58 from 'bs58';
 
-const programId = process.argv[2] ?? 'HZvgzZ6JvBtcUBYuLEkQQJ5hbwx1ZACss52LjFLd4UPX';
+/*
+ * Imported, never copied.
+ *
+ * This carried its own hardcoded address, and it was the wrong one — the id
+ * the source used before `anchor keys sync` corrected it to match the program
+ * keypair. So the one command the trust page tells a sceptic to run looked at
+ * an address nothing was ever deployed to. It would have reported NOT DEPLOYED
+ * forever, including the day after a real mainnet deployment, and if anybody
+ * else ever deployed to that address it would have reported their upgrade
+ * authority as ours.
+ *
+ * A second copy of a constant is a second thing to keep correct, and this is
+ * the second time that copy has been wrong. There is now one source and a test
+ * that it still matches `declare_id!`.
+ */
+const programId = process.argv[2] ?? PROGRAM_ID;
 const endpoint = process.env['RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
 const localBinary = 'program/target/deploy/probatio.so';
 

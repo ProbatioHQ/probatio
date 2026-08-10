@@ -56,6 +56,20 @@ Local file database, one process, on a laptop.
 | 3000 concurrent trades | 3000 succeeded, 220 writes/sec |
 | 6000 read requests, 30 callers | 787 req/sec, p95 57ms, p99 89ms |
 
+Re-measured after trade writes became conditional on the balance and holding
+they were quoted against: 3000 trades across 60 traders, all 3000 succeeded,
+every invariant held, and throughput was unchanged. The compare-and-swap costs
+nothing at this concurrency because it adds a predicate to an update the
+transaction was already doing.
+
+The shape of the load changed with it, and the change is the honest one. The
+harness used to fire a single trader's whole run at once, which no person does
+and which the write path now correctly refuses as a double-spend — nineteen of
+every twenty rejected, on a database that was working perfectly. Traders are
+concurrent with each other and sequential within themselves now, which is both
+what real traffic looks like and the only contention worth measuring: separate
+traders share nothing but the database.
+
 Write throughput is flat as concurrency grows, which is what a queue should
 look like. Reported latency is mostly queueing: 3000 writes in 13.7 seconds is
 about 4.5ms of actual work each, and a p50 of 6.7 seconds is the wait for a turn

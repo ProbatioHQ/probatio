@@ -73,7 +73,7 @@ const traders = await Promise.all(
     const pubkey = key(i);
     await upsertUser(db, pubkey, START);
     const account = await ensureAccount(db, seasonId, pubkey, START);
-    return { pubkey, accountId: account.id };
+    return { pubkey, accountId: account.id, balance: BigInt(account.solBalance), held: 0n };
   }),
 );
 
@@ -82,7 +82,7 @@ const failures: string[] = [];
 let slot = 500_000;
 
 async function placeTrade(
-  trader: { pubkey: string; accountId: number },
+  trader: { pubkey: string; accountId: number; balance: bigint; held: bigint },
   index: number,
 ): Promise<void> {
   const mySlot = (slot += 1);
@@ -145,34 +145,71 @@ async function placeTrade(
       position: {
         accountId: trader.accountId,
         mint: MINT,
-        tokenAmount: String(tokenAmount * BigInt(index + 1)),
+        tokenAmount: String(trader.held + tokenAmount),
         costBasis: String(solAmount * BigInt(index + 1)),
         realizedPnl: '0',
         closed: false,
       },
       // Each trade is quoted against what the one before it left behind.
-      expected: { solBalance: String(10_000_000_000n - solAmount * BigInt(index)), tokenAmount: null },
-      newBalance: String(10_000_000_000n - solAmount * BigInt(index + 1)),
+      /*
+       * The balance this trade was quoted against, carried forward.
+       *
+       * It was computed as `start - solAmount * index`, which is only correct
+       * if every trade is the same size — and these deliberately are not, they
+       * grow with the index. So every trade after the first expected a balance
+       * that had never existed and was refused, and the run reported the write
+       * path as broken when the arithmetic in the harness was.
+       *
+       * Tracked rather than derived now, which is what a real caller has to do
+       * anyway: read the state, then write conditional on it.
+       */
+      expected: {
+        solBalance: String(trader.balance),
+        // Null only before there is a position. After the first fill the write
+        // is conditional on the holding it was computed against, and passing
+        // null there says "I expected to hold nothing" — which stopped being
+        // true one trade in.
+        tokenAmount: index === 0 ? null : String(trader.held),
+      },
+      newBalance: String(trader.balance - solAmount),
       leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
       now: START + mySlot,
     });
+    // Only once the write has landed. A refused trade changed nothing, so the
+    // next one must still be quoted against the balance that is really there.
+    trader.balance -= solAmount;
+    trader.held += tokenAmount;
     latencies.push(performance.now() - began);
   } catch (error) {
     failures.push(error instanceof Error ? error.message.slice(0, 120) : String(error));
   }
 }
 
-console.log(`${concurrency} traders x ${tradesEach} trades, all at once\n`);
+console.log(`${concurrency} traders trading at once, ${tradesEach} trades each in sequence\n`);
 const wallBegan = performance.now();
 
 // Every trader's trades fired concurrently, and all traders concurrent with
 // each other. Nothing is serialized by the harness, so anything that holds is
 // holding because the code makes it hold.
 await Promise.all(
-  traders.map((trader) =>
-    Promise.all(Array.from({ length: tradesEach }, (_, i) => placeTrade(trader, i))),
-  ),
+  traders.map(async (trader) => {
+    /*
+     * Concurrent across traders, sequential within one.
+     *
+     * This used to fire a single trader's twenty trades at once. That was
+     * measuring something nobody does — a person clicks one at a time — and
+     * once the write became conditional on the balance it was quoted against,
+     * it stopped measuring anything at all: nineteen of every twenty were
+     * correctly refused as a double-spend, and the run reported 570 failures
+     * out of 600 while the write path was perfectly healthy.
+     *
+     * The contention worth loading is between traders, who genuinely do arrive
+     * at the same moment and share nothing but the database.
+     */
+    for (let i = 0; i < tradesEach; i += 1) await placeTrade(trader, i);
+  }),
 );
+
 
 const wall = performance.now() - wallBegan;
 const expected = concurrency * tradesEach;
