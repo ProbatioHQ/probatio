@@ -16,19 +16,28 @@
 :root {
   color-scheme: dark;
 
-  --ink: #0b0d10;
-  --ink-raised: #12151a;
-  --ink-sunken: #08090c;
-  --line: #1e232b;
-  --line-bright: #2b323d;
+  --ink: #07090b;
+  --ink-raised: #0d1114;
+  --ink-sunken: #050607;
+  --line: #182027;
+  --line-bright: #24313a;
 
   --text: #e6e8eb;
   --text-dim: #99a0ab;
   --text-faint: #6b7280;
 
-  --gain: #3fb950;
-  --loss: #f85149;
-  --accent: #58a6ff;
+  /*
+   * Phosphor green, not blue.
+   *
+   * The subject is a trading terminal, so the accent is the colour a terminal
+   * has always been. Blue read as a generic dashboard and left the palette
+   * saying nothing about what this is.
+   */
+  --gain: #3fe08a;
+  --loss: #ff5f56;
+  --accent: #3fe08a;
+  --accent-dim: #1d7a4a;
+  --phosphor: color-mix(in srgb, var(--accent) 18%, transparent);
 
   --radius: 10px;
   --measure: 68ch;
@@ -443,56 +452,7 @@ ul.bare li + li {
 
 /* ----------------------------------------------------------------- steps */
 
-/*
- * The getting-started sequence.
- *
- * Numbered explicitly rather than by the list marker. A default marker sits
- * outside the content box and disappears against a panel edge, which left
- * three indented headings reading as a broken list rather than a sequence.
- */
-.steps {
-  list-style: none;
-  padding-left: 0;
-  counter-reset: step;
-  gap: 14px;
-}
 
-.steps li {
-  counter-increment: step;
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.steps li::before {
-  content: counter(step);
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid var(--line-bright);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-faint);
-}
-
-.steps li[aria-current] ::before,
-.steps li[aria-current]::before {
-  border-color: var(--text-dim);
-  color: var(--text);
-}
-
-.steps li > * {
-  grid-column: 2;
-}
-
-.steps li p {
-  margin-top: 4px;
-  color: var(--text-dim);
-  font-size: 14px;
-}
 
 hr {
   border: 0;
@@ -1175,4 +1135,822 @@ button,
 .page-prose {
   padding: 56px 0 96px;
   max-width: 72ch;
+}
+
+/* ============================================================ terminal */
+
+/*
+ * The house style.
+ *
+ * Everything that carries data is a terminal window: a title bar with a
+ * prompt, a body in monospace, phosphor green where a value matters. It is not
+ * decoration for its own sake. A trading surface that looks like a document is
+ * telling the reader it is a document, and this one spent its first two
+ * versions doing exactly that.
+ */
+
+.term {
+  position: relative;
+  border: 1px solid var(--line-bright);
+  border-radius: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 2.5%, var(--ink-raised)), var(--ink-sunken));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 4%, transparent),
+    0 20px 50px -24px rgb(0 0 0 / 0.9);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* The title bar. Reads as a window rather than a div. */
+.term > .term-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink-sunken) 70%, transparent);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.term > .term-bar .prompt {
+  color: var(--accent);
+}
+
+.term > .term-bar .lights {
+  display: flex;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.term > .term-bar .lights i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-bright);
+}
+
+.term > .term-bar .lights i:last-child {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.term > .term-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* A section heading written the way a terminal writes one. */
+.cmd {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.cmd::before {
+  content: "$";
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.cmd .caret {
+  width: 7px;
+  height: 13px;
+  background: var(--accent);
+  display: inline-block;
+  animation: blink 1.1s step-end infinite;
+  box-shadow: 0 0 10px var(--accent);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Scanlines. Barely visible, and the thing that makes a dark panel feel like a
+   screen rather than a rectangle. */
+.scan {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 2px,
+    rgb(0 0 0 / 0.22) 2px 3px
+  );
+}
+
+/* Rails down the page edges, with a pulse travelling through them. */
+.rails {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.rails::before,
+.rails::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 22%, transparent) 18%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 55%,
+    transparent
+  );
+}
+
+.rails::before { left: max(14px, calc(50% - 620px)); }
+.rails::after { right: max(14px, calc(50% - 620px)); }
+
+.rail-pulse {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 140px;
+  background: linear-gradient(180deg, transparent, var(--accent), transparent);
+  opacity: 0.55;
+  filter: blur(0.4px);
+  animation: rail 7s linear infinite;
+}
+
+.rail-pulse.left { left: max(14px, calc(50% - 620px)); }
+.rail-pulse.right { right: max(14px, calc(50% - 620px)); animation-delay: 3.5s; }
+
+@keyframes rail {
+  from { top: -140px; }
+  to { top: 100vh; }
+}
+
+@media (max-width: 1100px) {
+  .rails,
+  .rail-pulse { display: none; }
+}
+
+/* ============================================================ values */
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat .k {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.stat .v {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.stat .v.hot {
+  color: var(--accent);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+}
+
+/* ============================================================ header */
+
+/*
+ * The bar sits on the page rather than above it.
+ *
+ * A solid strip across the top cut the hero off from its own light. Now it is
+ * transparent until you scroll past it, so the glow runs behind the wordmark
+ * and the page reads as one surface.
+ */
+.site-header {
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  backdrop-filter: none;
+  transition: background 260ms ease, border-color 260ms ease, backdrop-filter 260ms ease;
+}
+
+.site-header.stuck {
+  background: color-mix(in srgb, var(--ink) 78%, transparent);
+  border-bottom-color: var(--line);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Three bars of growing length. The same mark as the favicon. */
+.wordmark .mark {
+  width: 14px;
+  height: 14px;
+  background:
+    linear-gradient(to right, var(--text-faint) 6px, transparent 0) 0 1px / 14px 2px no-repeat,
+    linear-gradient(to right, var(--text-dim) 10px, transparent 0) 0 6px / 14px 2px no-repeat,
+    linear-gradient(to right, var(--accent) 14px, transparent 0) 0 11px / 14px 2px no-repeat;
+}
+
+.site-nav a {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+}
+
+.site-nav a::after {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.site-footer {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================ hero */
+
+.hero {
+  padding: 132px 0 96px;
+}
+
+.badge {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--accent);
+}
+
+.badge .dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), 0 0 12px var(--accent);
+}
+
+.glow {
+  background:
+    radial-gradient(72% 50% at 20% -6%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(56% 40% at 86% 4%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 58%);
+}
+
+a {
+  color: var(--accent);
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+button,
+.button-link {
+  background: var(--accent);
+  color: #04120a;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent),
+    0 0 24px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+button:hover:not(:disabled),
+.button-link:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+  opacity: 1;
+}
+
+.pill.live::before,
+.card::before {
+  background: var(--accent);
+}
+
+.pill.live::before {
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* ============================================================ steps */
+
+/*
+ * Rebuilt. The old version numbered the steps in a circle, showed the body of
+ * only the current one, and left the closing paragraph outside the list on a
+ * different left edge. The result read as three headings and an orphan.
+ *
+ * Every step now shows its text, so the panel explains the whole thing rather
+ * than one third of it, and state is carried by a checkbox the way a terminal
+ * carries it.
+ */
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  counter-reset: none;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+
+.steps li:last-child {
+  border-bottom: 0;
+}
+
+.steps li::before {
+  content: none;
+}
+
+.steps .tick {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+.steps li[data-state='current'] .tick {
+  color: var(--accent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.steps li[data-state='done'] .tick {
+  color: var(--accent-dim);
+}
+
+.steps .step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.steps li[data-state='todo'] strong {
+  color: var(--text-dim);
+}
+
+.steps .step-text p {
+  font-size: 13.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+.steps li[data-state='current'] .step-text p {
+  color: var(--text-dim);
+}
+
+.footnote {
+  font-size: 13px;
+  color: var(--text-faint);
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+/* ============================================================ season */
+
+.season-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.payouts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink-sunken);
+}
+
+.payouts ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.payouts li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.payouts .place {
+  color: var(--text-faint);
+}
+
+/* The prize as a length, so first place reads as bigger before it is read. */
+.payouts .bar {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  box-shadow: 0 0 14px -2px color-mix(in srgb, var(--accent) 70%, transparent);
+  animation: grow 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: left;
+}
+
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.payouts .amount {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.nudge {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 0 6px 6px 0;
+}
+
+.accent { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .payouts .bar { animation: none; }
+}
+
+/* ============================================================ feed */
+
+.feed-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.feed-row:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border-left-color: var(--accent);
+}
+
+.feed-row a {
+  text-decoration: none;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.feed-row a strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.feed-row span:last-child {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* Terminal tables. */
+.term table th {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--text-faint);
+  border-bottom-color: var(--line-bright);
+}
+
+.term table td {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.term tbody tr {
+  transition: background 140ms ease;
+}
+
+.term tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+/* ============================================================ flow */
+
+/*
+ * A sequence, drawn as one.
+ *
+ * Four identical boxes in a row told a reader they were four unrelated things.
+ * They are four steps of one trade, so they are numbered and joined by a line
+ * running down the left.
+ */
+.flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0;
+}
+
+.flow li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 20px 4px 0;
+}
+
+/* The rail joining the steps, with a node on each. */
+.flow li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 1px;
+  background: var(--line-bright);
+}
+
+.flow li:first-child::before { left: 9px; }
+.flow li:last-child::before { right: 20px; }
+
+.flow li::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-sunken);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 12px -2px var(--accent);
+}
+
+.flow .n {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  padding-top: 22px;
+}
+
+.flow .flow-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.flow h3 {
+  font-size: 15px;
+}
+
+.flow p {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+
+@media (max-width: 720px) {
+  .flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .flow li {
+    padding: 10px 0 10px 22px;
+  }
+
+  .flow li::before {
+    left: 4px;
+    right: auto;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    height: auto;
+  }
+
+  .flow li::after { top: 14px; }
+  .flow .n { padding-top: 0; }
+}
+
+/* ============================================================ objections */
+
+.objections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.objections > div {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.4fr);
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+
+.objections > div:last-child { border-bottom: 0; }
+
+.objections dt {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  position: relative;
+  padding-left: 18px;
+}
+
+/* The objection is what somebody would say back. Marked as such. */
+.objections dt::before {
+  content: ">";
+  position: absolute;
+  left: 0;
+  color: var(--loss);
+}
+
+.objections dd {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .objections > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+.check {
+  border: 1px solid var(--line-bright);
+  border-radius: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--ink-raised)), var(--ink-sunken));
+  padding: 22px;
+}
+
+/* ============================================================ written pages */
+
+/*
+ * The docs, trust and verify pages get the same treatment. They were plain
+ * text on a flat ground, which is what they looked like.
+ */
+
+.prose h1 {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* A heading that reads as a command rather than a title. */
+.prose h2 {
+  font-size: 19px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: -0.005em;
+  border-top: 1px solid var(--line);
+  padding-top: 26px;
+  margin-top: 30px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.prose h2::before {
+  content: "//";
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.prose h3 {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.prose pre {
+  border-color: var(--line-bright);
+  background: var(--ink-sunken);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 5%, transparent);
+  position: relative;
+  padding-left: 40px;
+}
+
+/* Commands look like commands. */
+.prose pre::before {
+  content: "$";
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  color: var(--accent);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.prose code {
+  color: var(--accent);
+}
+
+.prose pre code {
+  color: var(--text);
+}
+
+.prose table {
+  background: var(--ink-sunken);
+  border-color: var(--line-bright);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.prose table th {
+  background: color-mix(in srgb, var(--ink-raised) 80%, transparent);
+  color: var(--text-faint);
+}
+
+.prose table tr:last-child td {
+  border-bottom: 0;
+}
+
+.prose table strong {
+  color: var(--accent);
+}
+
+.prose li::marker {
+  color: var(--accent-dim);
+}
+
+/* A panel inside prose, for the figures that carry a page. */
+.prose .panel {
+  border-color: var(--line-bright);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--ink-raised)), var(--ink-sunken));
+}
+
+.prose .panel dt {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.prose .panel dd {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 16px;
+}
+
+.prose .panel dd.gain {
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.docs-nav a[aria-current='page'] {
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--ink-raised));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
+    -2px 0 0 0 var(--accent);
+}
+
+.docs-nav .label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.docs-nav a[aria-current='page'] .label {
+  color: var(--accent);
+}
+
+.eyebrow {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--accent);
+  opacity: 0.85;
 }

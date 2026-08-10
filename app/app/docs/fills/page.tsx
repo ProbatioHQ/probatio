@@ -59,7 +59,7 @@ export default function FillsDoc() {
         the engine produces and what the market produced is the error.
       </p>
 
-      <div className="panel">
+      <div className="panel" role="group" aria-label="Measured accuracy">
         <dl>
           <dt>Samples</dt>
           <dd className="mono">128 real fills</dd>

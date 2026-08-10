@@ -90,16 +90,28 @@ export default function Home() {
         </div>
       </section>
 
-      <section>
-        <span className="eyebrow">What happens when you trade</span>
-        <div className="rule" />
-        <div className="grid stagger">
-          {HOW.map((entry) => (
-            <article key={entry.step} className="card">
-              <h3>{entry.step}</h3>
-              <p>{entry.body}</p>
-            </article>
-          ))}
+      <section className="term">
+        <div className="term-bar">
+          <span className="prompt">~/trade</span>
+          <span>what happens when you trade</span>
+          <span className="lights">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+        <div className="term-body">
+          <ol className="flow">
+            {HOW.map((entry, index) => (
+              <li key={entry.step}>
+                <span className="n">{String(index + 1).padStart(2, '0')}</span>
+                <div className="flow-text">
+                  <h3>{entry.step}</h3>
+                  <p>{entry.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
@@ -109,25 +121,35 @@ export default function Home() {
       <Coach />
       <NameClaim />
 
-      <section>
-        <span className="eyebrow">Why this is different</span>
-        <div className="rule" />
-        <div className="grid stagger">
-          {AGAINST.map((entry) => (
-            <article key={entry.claim} className="card">
-              <h3 className="dim" style={{ fontWeight: 500 }}>
-                {entry.claim}
-              </h3>
-              <p style={{ color: 'var(--text)' }}>{entry.answer}</p>
-            </article>
-          ))}
+      <section className="term">
+        <div className="term-bar">
+          <span className="prompt">~/why</span>
+          <span>why this is different</span>
+          <span className="lights">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+        <div className="term-body">
+          <dl className="objections">
+            {AGAINST.map((entry) => (
+              <div key={entry.claim}>
+                <dt>{entry.claim}</dt>
+                <dd>{entry.answer}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
       <LaunchFeedList />
 
-      <section className="card" style={{ alignItems: 'flex-start', gap: 12 }}>
-        <span className="eyebrow">Check it yourself</span>
+      <section className="term-body check" style={{ alignItems: 'flex-start', gap: 12 }}>
+        <span className="cmd">
+          check it yourself
+          <span className="caret" />
+        </span>
         <p style={{ maxWidth: '58ch' }}>
           The verify page runs in your browser against an endpoint you pick. It never asks this
           server whether a record is valid, because a server vouching for its own records is worth

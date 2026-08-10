@@ -56,7 +56,13 @@ export function NameClaim() {
   }
 
   return (
-    <section aria-label="Display name" className="panel">
+    <section aria-label="Display name" className="term">
+      <div className="term-bar">
+        <span className="prompt">~/name</span>
+        <span>display name</span>
+        <span className="lights"><i /><i /><i /></span>
+      </div>
+      <div className="term-body">
       <h2>Display name</h2>
       {current ? (
         <p>You appear as {current}.</p>
@@ -86,6 +92,7 @@ export function NameClaim() {
           changing or losing a name never changes a result.
         </small>
       </p>
+    </div>
     </section>
   );
 }

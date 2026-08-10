@@ -53,8 +53,18 @@ export function LaunchFeedList() {
   }, [query, load]);
 
   return (
-    <section aria-label="Tokens" className="panel">
-      <div className="panel-head">
+    <section aria-label="Tokens" className="term">
+      <div className="term-bar">
+        <span className="prompt">~/feed</span>
+        <span>pump.fun launches</span>
+        <span className="lights">
+          <i />
+          <i />
+          <i />
+        </span>
+      </div>
+      <div className="term-body">
+      <div className="season-head">
         <h2>Live launches</h2>
         <span className="pill live">streaming</span>
       </div>
@@ -85,7 +95,7 @@ export function LaunchFeedList() {
           style={{ maxHeight: 360, overflowY: 'auto', paddingRight: 8 }}
         >
           {launches.map((launch) => (
-            <li key={launch.mint} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+            <li key={launch.mint} className="feed-row">
               <a href={`/t/${launch.mint}`}>
                 <strong>{launch.symbol}</strong> {launch.name}
               </a>{' '}
@@ -98,6 +108,7 @@ export function LaunchFeedList() {
       )}
 
       {searching && <span aria-live="polite" />}
+      </div>
     </section>
   );
 }

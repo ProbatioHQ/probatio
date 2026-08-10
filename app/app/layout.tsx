@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { HeaderScroll } from '@/components/header-scroll';
 import { PageTransition } from '@/components/page-transition';
 import { StatusBanner } from '@/components/status-banner';
 
@@ -36,9 +37,15 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body>
         <div className="grain" aria-hidden="true" />
         <div className="glow" aria-hidden="true" />
+        <div className="scan" aria-hidden="true" />
+        <div className="rails" aria-hidden="true" />
+        <span className="rail-pulse left" aria-hidden="true" />
+        <span className="rail-pulse right" aria-hidden="true" />
+        <HeaderScroll />
         <header className="site-header">
           <div className="shell">
             <a href="/" className="wordmark">
+              <span className="mark" aria-hidden="true" />
               Probatio
             </a>
             <nav className="site-nav" aria-label="Main">

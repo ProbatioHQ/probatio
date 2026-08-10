@@ -71,77 +71,103 @@ export function Season() {
   const closed = season.status === 'closed' || season.status === 'finalized';
 
   return (
-    <section aria-label="Season" className="panel">
-      <div className="panel-head">
-        <h2>{season.name}</h2>
-        <span className={`pill ${closed ? 'closed' : 'live'}`}>
-          {closed ? 'closed' : season.status === 'pending' ? 'opens soon' : 'open'}
+    <section aria-label="Season" className="term">
+      <div className="term-bar">
+        <span className="prompt">~/season</span>
+        <span>{season.name.toLowerCase()}</span>
+        <span className="lights">
+          <i />
+          <i />
+          <i />
         </span>
       </div>
 
-      {season.status === 'pending' && (
-        <p>Opens {new Date(season.startsAt).toLocaleString()}.</p>
-      )}
+      <div className="term-body">
+        <div className="season-head">
+          <h2>{season.name}</h2>
+          <span className={`pill ${closed ? 'closed' : 'live'}`}>
+            {closed ? 'closed' : season.status === 'pending' ? 'opens soon' : 'open'}
+          </span>
+        </div>
 
-      {closed && <p>This season is over.</p>}
-
-      <dl>
-        <dt>Prize pool</dt>
-        <dd className="mono">
-          {sol(season.potLamports)} SOL
-          {BigInt(season.entryCost) === 0n && <span> · put up, not paid for by entries</span>}
-        </dd>
-        <dt>Entrants</dt>
-        <dd className="mono">{season.entrants}</dd>
-        {season.entryClosesInMs !== null && (
-          <>
-            <dt>Entry closes in</dt>
-            <dd className="mono">{remaining(season.entryClosesInMs)}</dd>
-          </>
+        {season.status === 'pending' && (
+          <p className="dim">Opens {new Date(season.startsAt).toLocaleString()}.</p>
         )}
-      </dl>
+        {closed && <p className="dim">This season is over.</p>}
 
-      {season.payouts.length > 0 && (
-        <>
-          <h3>Paid now</h3>
-          <ol className="mono bare">
-            {season.payouts.map((payout) => (
-              <li key={payout.place}>
-                {ORDINALS[payout.place - 1] ?? `${payout.place}th`}, {sol(payout.lamports)} SOL
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
+        {/* The three numbers somebody actually came for, at a size that says so. */}
+        <div className="stat-row">
+          <div className="stat">
+            <span className="k">Prize pool</span>
+            <span className="v hot">{sol(season.potLamports)} SOL</span>
+          </div>
+          <div className="stat">
+            <span className="k">Entrants</span>
+            <span className="v">{season.entrants}</span>
+          </div>
+          {season.entryClosesInMs !== null && (
+            <div className="stat">
+              <span className="k">Entry closes in</span>
+              <span className="v">{remaining(season.entryClosesInMs)}</span>
+            </div>
+          )}
+        </div>
 
-      {season.nextBand && !closed && (
-        <p>
-          {season.nextBand.entriesAway} more{' '}
-          {season.nextBand.entriesAway === 1 ? 'entry' : 'entries'} and the top{' '}
-          {season.nextBand.places} all get paid.
+        {season.payouts.length > 0 && (
+          <div className="payouts">
+            <span className="cmd">
+              payouts
+              <span className="caret" />
+            </span>
+            <ul className="bare">
+              {season.payouts.map((payout) => (
+                <li key={payout.place}>
+                  <span className="place">{ORDINALS[payout.place - 1] ?? `${payout.place}th`}</span>
+                  <span className="bar" style={{ width: `${share(payout.lamports, season)}%` }} />
+                  <span className="amount">{sol(payout.lamports)} SOL</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {season.nextBand && !closed && (
+          <p className="nudge">
+            <span className="accent">{season.nextBand.entriesAway} more</span>{' '}
+            {season.nextBand.entriesAway === 1 ? 'entry' : 'entries'} and the top{' '}
+            {season.nextBand.places} all get paid.
+          </p>
+        )}
+
+        <p className="dim" style={{ fontSize: 13.5 }}>
+          Highest return wins. Everyone starts with the same balance and the same fill
+          conditions.
         </p>
-      )}
 
-      <p>
-        Highest return wins. Everyone starts with the same balance and the same fill conditions.
-      </p>
+        <hr />
 
-      {/* Ruled off from the description above it: the entry action is the one
-          thing in this panel a reader is meant to do, and it was running
-          together with the rules as a single block of text. */}
-      <hr />
+        {season.entered ? (
+          <p className="accent mono">You are entered.</p>
+        ) : season.status === 'entry_open' ? (
+          <EnterSeason free={BigInt(season.entryCost) === 0n} />
+        ) : (
+          !closed && <p className="dim">Entries are closed for this season. Free play is always open.</p>
+        )}
 
-      {season.entered ? (
-        <p>You are entered.</p>
-      ) : season.status === 'entry_open' ? (
-        <EnterSeason free={BigInt(season.entryCost) === 0n} />
-      ) : (
-        !closed && <p>Entries are closed for this season. Free play is always open.</p>
-      )}
-
-      <p>
-        <small className="mono">Ruleset {season.rulesetHash.slice(0, 16)}…</small>
-      </p>
+        <p>
+          <small className="mono">ruleset {season.rulesetHash.slice(0, 16)}…</small>
+        </p>
+      </div>
     </section>
   );
+}
+
+/** A payout as a share of the largest one, for the bar width. */
+function share(lamports: string, season: Ranked): number {
+  const top = season.payouts.reduce((max, payout) => {
+    const value = BigInt(payout.lamports);
+    return value > max ? value : max;
+  }, 1n);
+  const ratio = Number((BigInt(lamports) * 100n) / top);
+  return Math.max(6, Math.min(100, ratio));
 }

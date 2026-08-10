@@ -56,31 +56,57 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
     };
   }, []);
 
-  // Nothing at all until the state is known — a guide that flashes the wrong
+  // Nothing at all until the state is known: a guide that flashes the wrong
   // step and then corrects itself is worse than a moment of quiet.
   if (!progress || progress.done) return null;
 
   const current = !progress.signedIn ? 0 : compact ? 2 : 1;
 
   return (
-    <aside aria-label="Getting started" className="panel">
-      <h2>Getting started</h2>
-      <ol className="steps">
-        {STEPS.map((step, index) => {
-          const state = index < current ? 'done' : index === current ? 'current' : 'todo';
-          return (
-            <li key={step.title} aria-current={state === 'current' ? 'step' : undefined}>
-              <strong>{step.title}</strong>
-              {state === 'done' && <span aria-label="done">, done</span>}
-              {state === 'current' && <p>{step.body}</p>}
-            </li>
-          );
-        })}
-      </ol>
-      <p>
-        Free, and nothing here risks real money. Your record is written to the chain as you
-        trade, so it can be checked later by anyone, including against us.
-      </p>
+    <aside aria-label="Getting started" className="term">
+      <div className="term-bar">
+        <span className="prompt">~/start</span>
+        <span>getting started</span>
+        <span className="lights">
+          <i />
+          <i />
+          <i />
+        </span>
+      </div>
+
+      <div className="term-body">
+        {/*
+          Every step shows its text now. The old version revealed only the
+          current one, which left two headings with nothing under them and a
+          closing paragraph on a different left edge, so the panel read as
+          broken rather than as a sequence in progress.
+        */}
+        <ol className="steps">
+          {STEPS.map((step, index) => {
+            const state = index < current ? 'done' : index === current ? 'current' : 'todo';
+            return (
+              <li
+                key={step.title}
+                data-state={state}
+                aria-current={state === 'current' ? 'step' : undefined}
+              >
+                <span className="tick" aria-hidden="true">
+                  {state === 'done' ? '[x]' : state === 'current' ? '[>]' : '[ ]'}
+                </span>
+                <div className="step-text">
+                  <strong>{step.title}</strong>
+                  <p>{step.body}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+
+        <p className="footnote">
+          Free, and nothing here risks real money. Your record is written to the chain as you
+          trade, so it can be checked later by anyone, including against us.
+        </p>
+      </div>
     </aside>
   );
 }

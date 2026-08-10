@@ -76,14 +76,24 @@ export function Leaderboard() {
   if (!board?.season) return null;
 
   return (
-    <section aria-label="Leaderboard" className="panel">
-      <div className="panel-head">
+    <section aria-label="Leaderboard" className="term">
+      <div className="term-bar">
+        <span className="prompt">~/standings</span>
+        <span>season {board.season.ordinal}</span>
+        <span className="lights">
+          <i />
+          <i />
+          <i />
+        </span>
+      </div>
+      <div className="term-body">
+      <div className="season-head">
         <h2>Standings</h2>
-        <span className="pill">{board.final ? 'final' : 'live'}</span>
+        <span className={`pill ${board.final ? '' : 'live'}`}>{board.final ? 'final' : 'live'}</span>
       </div>
 
       {board.standings.length === 0 ? (
-        <p>Nobody has entered yet. First in is first on the board.</p>
+        <p className="dim">Nobody has entered yet. First in is first on the board.</p>
       ) : (
         <>
           <div className="scroller">
@@ -106,13 +116,14 @@ export function Leaderboard() {
             </table>
           </div>
 
-          <p className="dim">
+          <p className="dim" style={{ fontSize: 13 }}>
             {board.final
               ? 'Final.'
               : 'Live. Open positions are marked at the current price, so these move with the market.'}
           </p>
         </>
       )}
+      </div>
     </section>
   );
 }

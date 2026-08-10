@@ -83,7 +83,13 @@ export function Coach() {
   if (!state) return null;
 
   return (
-    <section aria-label="Coach" className="panel">
+    <section aria-label="Coach" className="term">
+      <div className="term-bar">
+        <span className="prompt">~/coach</span>
+        <span>your trades</span>
+        <span className="lights"><i /><i /><i /></span>
+      </div>
+      <div className="term-body">
       <h2>Coach</h2>
 
       {state.report ? (
@@ -125,6 +131,7 @@ export function Coach() {
       )}
 
       {error && <p role="alert">{error}</p>}
+    </div>
     </section>
   );
 }
