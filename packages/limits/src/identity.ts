@@ -15,6 +15,10 @@
  * not symmetric: too many hops limits a shared proxy as one caller, too few
  * lets a caller pick their own key. Too many is the safe error, so the default
  * is one and it is stated rather than guessed at.
+ *
+ * Zero is its own case. It means nothing sits in front of this server, so every
+ * header here is written by the caller and none of them can be believed — not
+ * `x-forwarded-for`, and not the vendor headers either.
  */
 
 export interface IdentityOptions {
@@ -30,6 +34,24 @@ export function clientAddress(
 ): string | null {
   const trusted = Math.max(0, options.trustedProxies ?? 1);
 
+  /*
+   * No proxy means no trustworthy header, full stop.
+   *
+   * Every header below is written by a proxy. With none in front of this
+   * server, all of them arrive exactly as the caller typed them — including
+   * `x-real-ip` and `cf-connecting-ip`, which are only credible because an
+   * edge normally overwrites them. Trusting those under `TRUSTED_PROXIES=0`
+   * let a caller send a different one on every request, take a fresh bucket
+   * each time, and reduce the limiter to decoration while it looked like it
+   * was working.
+   *
+   * The honest answer here is that the caller cannot be identified from
+   * headers, which falls through to the shared bucket below. That is
+   * deliberately harsh and it is the right harshness: it lands on exactly the
+   * deployment that has no way to tell callers apart.
+   */
+  if (trusted === 0) return null;
+
   const forwarded = headers.get(FORWARDED_FOR);
   if (forwarded) {
     const hops = forwarded
@@ -37,14 +59,15 @@ export function clientAddress(
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0);
 
-    // Count in from the right, past the proxies we actually have.
+    // Count in from the right, past the proxies we actually have. Anything
+    // further left is whatever the caller chose to claim.
     const index = hops.length - 1 - (trusted - 1);
     const address = index >= 0 ? hops[index] : hops[0];
     if (address) return normalize(address);
   }
 
-  // Some platforms set exactly one of these and they are not forgeable in the
-  // same way, because they are written by the edge rather than forwarded.
+  // Written by the edge rather than forwarded by it, which is why they are
+  // credible at all — and only once there is an edge. See the guard above.
   for (const header of ['cf-connecting-ip', 'x-real-ip', 'x-vercel-forwarded-for']) {
     const value = headers.get(header);
     if (value) return normalize(value);

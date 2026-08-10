@@ -81,3 +81,48 @@ describe('the key a caller is limited on', () => {
     expect(callerKey(null, null)).toBe('unknown');
   });
 });
+
+describe('a deployment with no proxy in front of it', () => {
+  const headers = (entries: Record<string, string>) => new Headers(entries);
+
+  it('believes no forwarded header at all', () => {
+    // Every header here is written by a proxy. With none in front, they arrive
+    // exactly as the caller typed them.
+    expect(clientAddress(headers({ 'x-forwarded-for': '1.2.3.4' }), { trustedProxies: 0 })).toBeNull();
+    expect(clientAddress(headers({ 'x-real-ip': '9.9.9.9' }), { trustedProxies: 0 })).toBeNull();
+    expect(
+      clientAddress(headers({ 'cf-connecting-ip': '8.8.8.8' }), { trustedProxies: 0 }),
+    ).toBeNull();
+    expect(
+      clientAddress(headers({ 'x-vercel-forwarded-for': '7.7.7.7' }), { trustedProxies: 0 }),
+    ).toBeNull();
+  });
+
+  it('does not let a caller take a fresh bucket per request', () => {
+    // The bug this replaced: `x-forwarded-for` was correctly ignored at zero
+    // hops, but the vendor headers were not — so a caller sent a different
+    // `x-real-ip` each time, got a new bucket each time, and the limiter
+    // enforced nothing while appearing to work.
+    const keys = new Set(
+      ['1.1.1.1', '2.2.2.2', '3.3.3.3', '4.4.4.4'].map((ip) =>
+        callerKey(null, clientAddress(headers({ 'x-real-ip': ip }), { trustedProxies: 0 })),
+      ),
+    );
+    expect(keys.size).toBe(1);
+  });
+
+  it('still tells two signed-in wallets apart', () => {
+    // Losing the address must not lose the wallet. A signed-in caller is
+    // limited as themselves however they reached the server.
+    const one = callerKey('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', null);
+    const two = callerKey('9oNfewPW6KSxbKbTUCQ3g7tc2gViCEYijc6TbDaumwg1', null);
+    expect(one).not.toBe(two);
+  });
+
+  it('leaves a real proxy deployment exactly as it was', () => {
+    expect(
+      clientAddress(headers({ 'x-forwarded-for': 'evil, 203.0.113.9' }), { trustedProxies: 1 }),
+    ).toBe('203.0.113.9');
+    expect(clientAddress(headers({ 'x-real-ip': '9.9.9.9' }), { trustedProxies: 1 })).toBe('9.9.9.9');
+  });
+});

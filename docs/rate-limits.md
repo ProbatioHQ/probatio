@@ -32,6 +32,15 @@ examples do — would let a caller set the header themselves and get a fresh
 bucket on every request, so the limiter would enforce nothing while appearing
 to work.
 
+Zero is its own case, and was a hole until it was not. It means no proxy, so
+every forwarding header — `x-forwarded-for` and the vendor ones alike — is
+written by the caller. `x-forwarded-for` was already ignored at zero hops, but
+`x-real-ip` and `cf-connecting-ip` were not, so a caller could send a different
+one on each request, take a fresh bucket every time, and reduce the limiter to
+decoration while it looked like it was working. At zero hops none of them are
+believed now: callers who cannot be identified share a single bucket, and a
+signed-in wallet is still limited as itself.
+
 Set `TRUSTED_PROXIES` to match the deployment. Too high limits a shared proxy as
 one caller; too low lets a caller choose their own key. Too high is the safe
 error.

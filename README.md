@@ -75,7 +75,7 @@ hard.
 ```bash
 npm install
 cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
-npm test                                # 1151 tests, no network
+npm test                                # 1163 tests, no network
 npm --prefix app run dev
 ```
 
