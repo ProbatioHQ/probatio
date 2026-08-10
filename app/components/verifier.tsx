@@ -171,7 +171,12 @@ export function Verifier() {
           passed: health.result === 'ok',
           detail:
             health.result === 'ok'
-              ? 'reachable, the trader record account is read from here'
+              ? // Says what this step did, not what a later one will. It asked
+                // the endpoint whether it was healthy; it did not read an
+                // account, because there is not one to read until the program
+                // is deployed. Claiming otherwise would be the site telling a
+                // reader a check happened that did not.
+                'reachable from your browser, and answering'
               : 'reachable but not healthy',
         });
       } catch {

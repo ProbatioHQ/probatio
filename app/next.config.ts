@@ -18,9 +18,9 @@ import type { NextConfig } from 'next';
  *   by this server, and never trusted for anything.
  * - `frame-src` names DEX Screener alone. That is the embedded TradingView
  *   chart, and nothing else may be framed.
- * - `connect-src 'self'` is enough: every third party this app talks to — the
- *   RPC, the price quote, the pair check — is called from the server. The
- *   browser only ever talks to this origin.
+ * - `connect-src 'self'` almost everywhere: the RPC, the price quote and the
+ *   pair check are all called from the server, so the browser only needs this
+ *   origin. `/verify` is the deliberate exception — see below.
  * - `object-src 'none'`, `base-uri 'self'` and `form-action 'self'` are the
  *   cheap ones that close whole classes of injection.
  *
@@ -31,6 +31,26 @@ import type { NextConfig } from 'next';
  */
 
 const isProduction = process.env.NODE_ENV === 'production';
+
+/**
+ * The one page that has to reach outside.
+ *
+ * `/verify` rebuilds a trading record in the reader's browser and compares it
+ * against Solana — reading from an endpoint *they* choose, precisely so the
+ * answer does not come through this server. A server that vouches for its own
+ * records is the thing the whole design exists to avoid needing.
+ *
+ * Locking `connect-src` to `'self'` broke exactly that. The page still loaded
+ * and still ran its local checks, so nothing looked wrong; the RPC step simply
+ * reported that the reader's endpoint could not be reached, blaming them for a
+ * refusal this site had issued. The central claim of the product was
+ * unfulfilled in the one place a stranger would go to test it.
+ *
+ * So `https:` is allowed here, and only here. It cannot be an allowlist of
+ * hosts: "an endpoint you choose" means any endpoint, and a list of approved
+ * ones would put this server back in the middle of the answer.
+ */
+const VERIFY_CONNECT_SRC = "connect-src 'self' https:";
 
 const csp = [
   "default-src 'self'",
@@ -70,6 +90,14 @@ const securityHeaders = [
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
 ];
 
+/** The same policy, with the verifier's outbound fetch permitted. */
+const verifyCsp = csp
+  .split('; ')
+  .map((directive) =>
+    directive.startsWith('connect-src') ? VERIFY_CONNECT_SRC : directive,
+  )
+  .join('; ');
+
 const nextConfig: NextConfig = {
   // @probatio/sim ships raw TypeScript rather than a build artifact, so the
   // fill engine has exactly one compiled form and the tests, the replay
@@ -88,6 +116,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 
   async headers() {
+    const hsts = {
+      key: 'Strict-Transport-Security',
+      value: 'max-age=63072000; includeSubDomains; preload',
+    };
+
     return [
       {
         source: '/:path*',
@@ -96,12 +129,32 @@ const nextConfig: NextConfig = {
               ...securityHeaders,
               // Only over TLS, and only in production — sending this from a
               // local dev server would pin localhost to https in the browser.
-              {
-                key: 'Strict-Transport-Security',
-                value: 'max-age=63072000; includeSubDomains; preload',
-              },
+              hsts,
             ]
           : securityHeaders,
+      },
+      {
+        /*
+         * Listed after the catch-all, and that order is the whole trick.
+         *
+         * Next applies every matching entry in turn, so for a repeated header
+         * key the last match is the one that survives. Putting this first read
+         * more naturally and did nothing at all: `/verify` kept serving the
+         * site-wide `connect-src 'self'` and the page stayed broken while the
+         * config looked correct. Checked by reading the header off the running
+         * server rather than by reasoning about it.
+         */
+        source: '/verify',
+        headers: isProduction
+          ? [
+              { key: 'Content-Security-Policy', value: verifyCsp },
+              ...securityHeaders.filter((h) => h.key !== 'Content-Security-Policy'),
+              hsts,
+            ]
+          : [
+              { key: 'Content-Security-Policy', value: verifyCsp },
+              ...securityHeaders.filter((h) => h.key !== 'Content-Security-Policy'),
+            ],
       },
     ];
   },
