@@ -119,6 +119,7 @@ describe('migrations', () => {
       '016_curve_state.sql',
       '017_curve_virtual_reserves.sql',
       '018_session_epoch.sql',
+      '019_practice_purchases.sql',
     ]);
   });
 

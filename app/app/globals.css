@@ -3339,3 +3339,68 @@ body:has(main.wide) .site-footer .shell {
 .skip-link:focus {
   top: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Store
+   ---------------------------------------------------------------------------
+   Practice balance, sold in sizes. Laid out as a grid of tiles rather than a
+   list of prices because the thing being compared is size against cost, and a
+   grid puts those side by side. */
+
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.store-tier {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  background: rgba(63, 224, 138, 0.04);
+  border: 1px solid rgba(63, 224, 138, 0.18);
+  border-radius: 10px;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.store-tier:hover:not(:disabled) {
+  background: rgba(63, 224, 138, 0.09);
+  border-color: rgba(63, 224, 138, 0.45);
+  transform: translateY(-1px);
+}
+
+.store-tier:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.store-size {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 21px;
+  color: var(--accent);
+}
+
+.store-price {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 15px;
+}
+
+.store-rate,
+.store-busy {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.store-busy {
+  color: var(--accent);
+}

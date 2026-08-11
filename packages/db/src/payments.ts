@@ -1,4 +1,5 @@
 import type { Client } from '@libsql/client';
+import { FREE_PLAY_ORDINAL } from './constants';
 
 /**
  * Payments, and the intents that precede them.
@@ -9,7 +10,7 @@ import type { Client } from '@libsql/client';
  * having asked with having been paid.
  */
 
-export type PaymentPurpose = 'season_entry' | 'coach_upgrade';
+export type PaymentPurpose = 'season_entry' | 'coach_upgrade' | 'practice_sol';
 export type PaymentStatus = 'pending' | 'verified' | 'failed';
 
 export interface PaymentIntentRow {
@@ -158,6 +159,8 @@ export async function settlePayment(
     readonly seasonId: number | null;
     readonly purpose: PaymentPurpose;
     readonly amount: string;
+    /** Lamports of practice balance to credit. Only for `practice_sol`. */
+    readonly amountCredited?: string;
     readonly now: number;
   },
 ): Promise<Settlement> {
@@ -212,6 +215,37 @@ export async function settlePayment(
         args: [input.seasonId, input.userPubkey, payment.id, input.now, input.reference],
       });
       entryId = entry.rows[0] ? Number(entry.rows[0]['id']) : null;
+    }
+
+    /*
+     * Practice balance is credited inside the same transaction that records
+     * the payment it was bought with. Either both exist or neither does; a
+     * credit without a payment is money given away, and a payment without a
+     * credit is money taken for nothing.
+     *
+     * The free-play account only, found by the season's ordinal rather than by
+     * whatever season happens to be running. A ranked season's starting balance
+     * is fixed and hashed into its published ruleset, and topping one up would
+     * turn a percentage-ranked leaderboard into a measure of who spent most —
+     * a trader down fifty percent could buy their loss away.
+     */
+    if (input.purpose === 'practice_sol') {
+      const credited = await tx.execute({
+        sql: `UPDATE accounts
+                 SET sol_balance = CAST(CAST(sol_balance AS INTEGER) + ? AS TEXT),
+                     updated_at = ?
+               WHERE user_pubkey = ?
+                 AND season_id = (SELECT id FROM seasons WHERE ordinal = ?)`,
+        args: [input.amountCredited ?? '0', input.now, input.userPubkey, FREE_PLAY_ORDINAL],
+      });
+
+      // No free-play account yet means nowhere to put it. Refusing the whole
+      // settlement is right: the payment is on chain either way, and leaving it
+      // unrecorded lets the buyer try again once the account exists rather than
+      // paying for a credit that silently went nowhere.
+      if (Number(credited.rowsAffected) !== 1) {
+        throw new Error('no free play account to credit');
+      }
     }
 
     await tx.commit();

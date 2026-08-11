@@ -25,7 +25,7 @@ import {
  * reaches us has still paid, and must not be asked to pay again.
  */
 
-export type Purpose = 'season_entry' | 'coach_upgrade';
+export type Purpose = 'season_entry' | 'coach_upgrade' | 'practice_sol';
 
 export interface PaymentIntent {
   readonly reference: string;

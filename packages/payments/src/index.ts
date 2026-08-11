@@ -36,3 +36,6 @@ export type { CreateIntentInput, PaymentIntent, Purpose } from './intent';
 
 export { explainFailure, verifyPayment } from './verify';
 export type { Expectation, Verification, VerificationFailure } from './verify';
+
+export { LAMPORTS_PER_SOL, PRACTICE_TIERS, creditFor, pricePerSol, tierFor } from './store';
+export type { PracticeTier } from './store';

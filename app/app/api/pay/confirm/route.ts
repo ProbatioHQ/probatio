@@ -1,5 +1,5 @@
 import { RpcClient } from '@probatio/pools';
-import { explainFailure, verifyPayment } from '@probatio/payments';
+import { PRACTICE_TIERS, creditFor, explainFailure, verifyPayment } from '@probatio/payments';
 import { getPaymentIntent, settlePayment } from '@probatio/db';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
@@ -79,6 +79,30 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  /*
+   * How much practice balance this buys, recomputed from the price rather than
+   * taken from the request.
+   *
+   * The client never says what it is owed. It asks for a size, the price is
+   * looked up here, and the credit is derived from the tier the buyer actually
+   * paid for — so a rewritten request buys whatever was paid for and nothing
+   * more.
+   */
+  const tier =
+    intent.purpose === 'practice_sol'
+      ? PRACTICE_TIERS.find((entry) => entry.priceLamports === BigInt(intent.amount))
+      : undefined;
+
+  if (intent.purpose === 'practice_sol' && !tier) {
+    // A price with no tier means the catalogue changed under an intent that was
+    // already in flight. Refusing is right: the money is on chain and can be
+    // handled deliberately, whereas guessing a credit invents a number.
+    return Response.json(
+      { error: 'that purchase is no longer available at the price it was quoted.' },
+      { status: 409 },
+    );
+  }
+
   const settlement = await settlePayment(client, {
     reference: intent.reference,
     txSignature: signature,
@@ -86,11 +110,13 @@ export async function POST(request: Request): Promise<Response> {
     seasonId: intent.seasonId,
     purpose: intent.purpose,
     amount: intent.amount,
+    ...(tier ? { amountCredited: creditFor(tier).toString() } : {}),
     now: Date.now(),
   });
 
   return Response.json({
     settled: true,
+    ...(tier ? { credited: creditFor(tier).toString(), sol: tier.sol } : {}),
     // False means it was already credited, which is a success, not an error.
     fresh: settlement.fresh,
     entered: settlement.entryId !== null,
