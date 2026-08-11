@@ -32,12 +32,42 @@ export interface WalletEvidence {
    * are one person however carefully they trade.
    */
   readonly funder: string | null;
+  /**
+   * True when that funder pays for so many wallets that the link says nothing
+   * about who owns this one.
+   *
+   * The sentence above — twenty wallets funded from one place are one person —
+   * is true of a farmer's funding wallet and false of an exchange. Somebody
+   * buying SOL for the first time and withdrawing it to a fresh wallet has an
+   * exchange as the fee payer of their first transaction, which was checked
+   * against mainnet rather than assumed: a wallet paid by Coinbase's hot wallet
+   * resolves its funder to that hot wallet, alongside millions of strangers.
+   *
+   * Left unhandled, the rule refused the newcomers it was never aimed at. The
+   * first three exchange withdrawals in a season took the whole quota and every
+   * arrival after them was told they had hit a limit somebody else reached. The
+   * bias also ran exactly backwards: an established wallet was funded long ago
+   * by some address of its own and passes, while a fresh one — the person the
+   * free simulator exists for — is the one that resolves to an exchange.
+   *
+   * Fan-out separates them without a list of approved addresses to maintain: a
+   * farmer funding fifty wallets leaves fifty transactions, an exchange leaves
+   * thousands an hour.
+   */
+  readonly funderIsShared: boolean;
   readonly gatheredAt: number;
 }
 
 /** How far back to look. Enough to date a wallet without paging forever. */
 const MAX_PAGES = 5;
 const PAGE = 1_000;
+
+/**
+ * Signatures on a funder before its link to any one wallet stops meaning
+ * anything. One page: nobody hand-funding wallets gets near it, and every
+ * exchange passes it in minutes.
+ */
+export const SHARED_FUNDER_SIGNATURES = 1_000;
 
 export async function gatherEvidence(
   rpc: RpcClient,
@@ -66,6 +96,7 @@ export async function gatherEvidence(
       signatureCount: 0,
       truncated: false,
       funder: null,
+      funderIsShared: false,
       gatheredAt: now,
     };
   }
@@ -73,13 +104,15 @@ export async function gatherEvidence(
   // Returned newest first, so the oldest is last.
   const oldest = signatures[signatures.length - 1]!;
   const firstSeenAt = oldest.blockTime === null ? null : oldest.blockTime * 1_000;
+  const funder = await findFunder(rpc, pubkey, oldest.signature);
 
   return {
     pubkey,
     firstSeenAt,
     signatureCount: signatures.length,
     truncated,
-    funder: await findFunder(rpc, pubkey, oldest.signature),
+    funder,
+    funderIsShared: funder === null ? false : await funderIsShared(rpc, funder),
     gatheredAt: now,
   };
 }
@@ -104,5 +137,28 @@ async function findFunder(
   } catch {
     // A funder that cannot be read is unknown, never assumed.
     return null;
+  }
+}
+
+/**
+ * Whether this funder is somebody's wallet or a piece of shared plumbing.
+ *
+ * One page of signatures answers it. An exchange, a bridge or an on-ramp fills
+ * the page; a person funding wallets by hand does not come close, so the
+ * question needs no list of known addresses and nothing to keep up to date.
+ *
+ * A busy personal wallet can clear the line too, and that is the harmless
+ * direction: being called shared only means the funder stops being grounds for
+ * refusal. Everything is still recorded, and the refusal was never the point —
+ * the evidence kept against a farmed record was.
+ */
+async function funderIsShared(rpc: RpcClient, funder: string): Promise<boolean> {
+  try {
+    const signatures = await rpc.getSignatures(funder, { limit: SHARED_FUNDER_SIGNATURES });
+    return signatures.length >= SHARED_FUNDER_SIGNATURES;
+  } catch {
+    // Unreadable means unknown, and unknown must not become a refusal: the
+    // failure would fall on the entrant as a limit they never hit.
+    return true;
   }
 }

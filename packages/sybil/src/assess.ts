@@ -91,13 +91,21 @@ export function assess(input: AssessInput): Assessment {
     flags.push('quiet_wallet');
   }
 
-  if (evidence.funder !== null && input.siblingEntries > 0) {
+  // A funder that pays for thousands of wallets is not evidence about this one.
+  // See evidence.ts: an exchange withdrawal makes the exchange the fee payer of
+  // a new wallet's first transaction, so counting it refused the newcomers this
+  // exists to welcome and flagged the rest for using an exchange. Neither the
+  // refusal nor the flag applies to shared plumbing; the funder is still
+  // recorded, because dropping it would lose the fact that it was an exchange.
+  const funderIdentifies = evidence.funder !== null && !evidence.funderIsShared;
+
+  if (funderIdentifies && input.siblingEntries > 0) {
     flags.push('shared_funder');
   }
 
   // The one refusal. Counting entries already funded from here, so the limit is
   // the number of entries that source may have in the season in total.
-  if (evidence.funder !== null && input.siblingEntries >= rules.maxEntriesPerFunder) {
+  if (funderIdentifies && input.siblingEntries >= rules.maxEntriesPerFunder) {
     return { allowed: false, refusal: 'funder_limit', flags, funder: evidence.funder };
   }
 

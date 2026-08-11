@@ -13,6 +13,7 @@ function evidence(overrides: Partial<WalletEvidence> = {}): WalletEvidence {
     signatureCount: 400,
     truncated: false,
     funder: FUNDER,
+    funderIsShared: false,
     gatheredAt: NOW,
     ...overrides,
   };
@@ -112,6 +113,52 @@ describe('the one refusal', () => {
     const result = check({ funder: null }, 99);
     expect(result.allowed).toBe(true);
     expect(result.refusal).toBeNull();
+  });
+});
+
+describe('a funder that is shared plumbing rather than a person', () => {
+  // Somebody buying SOL for the first time and withdrawing it to a fresh wallet
+  // has an exchange as the fee payer of their first transaction — checked
+  // against mainnet, not assumed. Counting that as one person meant the first
+  // three exchange withdrawals took the whole season's quota and everybody
+  // after them was refused for a limit a stranger had reached.
+  it('never refuses on an exchange, however many share it', () => {
+    const result = check({ funderIsShared: true }, 5_000);
+    expect(result.allowed).toBe(true);
+    expect(result.refusal).toBeNull();
+  });
+
+  it('does not hold it against them either', () => {
+    // A flag that fires on nearly every real entrant is noise, and this one is
+    // kept forever as evidence about them. Using an exchange is not evidence.
+    const result = check({ funderIsShared: true }, 5_000);
+    expect(result.flags).not.toContain('shared_funder');
+  });
+
+  it('still records which exchange it was', () => {
+    // Not counted is not the same as not known. Dropping the funder would lose
+    // the fact that the wallet came off an exchange at all.
+    expect(check({ funderIsShared: true }, 5_000).funder).toBe(FUNDER);
+  });
+
+  it('leaves the age and history flags alone', () => {
+    // The refusal is the only thing a shared funder changes. A brand new wallet
+    // is still recorded as brand new.
+    const result = check({
+      funderIsShared: true,
+      firstSeenAt: NOW - DAY,
+      signatureCount: 2,
+    }, 5_000);
+    expect(result.flags).toContain('young_wallet');
+    expect(result.flags).toContain('quiet_wallet');
+    expect(result.allowed).toBe(true);
+  });
+
+  it('still refuses a farmer, whose funding wallet is not shared', () => {
+    // The rule has to keep working on what it was aimed at.
+    const result = check({ funderIsShared: false }, DEFAULT_RULES.maxEntriesPerFunder);
+    expect(result.allowed).toBe(false);
+    expect(result.refusal).toBe('funder_limit');
   });
 
   it('does not flag a shared funder when there is no funder', () => {

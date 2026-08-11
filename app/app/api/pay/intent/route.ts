@@ -73,8 +73,10 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'could not reach the network. Try again.' }, { status: 502 });
   }
 
+  // Not counted for a shared funder: assess ignores the number, and on an
+  // exchange it is the one count in the request that grows with the season.
   const siblings =
-    evidence.funder === null
+    evidence.funder === null || evidence.funderIsShared
       ? 0
       : await entriesFromFunder(client, season.id, evidence.funder, now);
 
