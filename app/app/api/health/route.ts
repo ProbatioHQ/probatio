@@ -4,6 +4,7 @@ import { downNow } from '@/lib/health';
 import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
 import { pendingTradeMints } from '@/lib/trade-candles';
 import { driftStatus } from '@/lib/drift-watch';
+import { priceStreamStatus } from '@/lib/price-stream';
 
 /**
  * What the site can currently do.
@@ -49,6 +50,8 @@ export async function GET(request: Request): Promise<Response> {
        * weeks ago and left everything looking fine.
        */
       drift: driftStatus(),
+      // The push feed behind live prices.
+      prices: priceStreamStatus(),
       // Stated whatever the status, because the promise matters most when
       // something is broken.
       promise:

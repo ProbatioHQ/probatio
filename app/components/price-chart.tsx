@@ -204,6 +204,69 @@ export function PriceChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mint, timeframe]);
 
+  /*
+   * The live price, pushed rather than polled.
+   *
+   * Candles are still fetched on a timer because history is a bounded thing
+   * worth asking for. The current price is not: it changes when somebody
+   * trades, so asking on a timer means being wrong for the length of the timer.
+   * The chain pushes it instead, and the bar being drawn is updated in place.
+   *
+   * Held in refs so a new price does not tear down the connection that
+   * delivered it — the socket depends on the mint and nothing else.
+   */
+  const lastBar = useRef<CandlestickData | null>(null);
+  const liveRef = useRef({ unit, solUsd, decimals: 0, supply: '0' });
+  useEffect(() => {
+    liveRef.current = {
+      unit,
+      solUsd,
+      decimals: data?.tokenDecimals ?? 0,
+      supply: data?.totalSupply ?? '0',
+    };
+  }, [unit, solUsd, data]);
+
+  useEffect(() => {
+    if (typeof EventSource === 'undefined') return;
+    const source = new EventSource(`/api/price-stream?mint=${encodeURIComponent(mint)}`);
+
+    source.addEventListener('price', (event) => {
+      const bar = series.current;
+      const latest = lastBar.current;
+      if (!bar || !latest) return;
+
+      let payload: { price?: string };
+      try {
+        payload = JSON.parse((event as MessageEvent).data) as { price?: string };
+      } catch {
+        return;
+      }
+      if (!payload.price) return;
+
+      const { unit: u, solUsd: rate, decimals, supply } = liveRef.current;
+      if (supply === '0') return;
+      const value = toDisplay(payload.price, u, decimals, supply, rate);
+      if (!Number.isFinite(value) || value <= 0) return;
+
+      // The bar in progress moves; the ones behind it are history and do not.
+      const updated: CandlestickData = {
+        ...latest,
+        close: value,
+        high: Math.max(latest.high, value),
+        low: Math.min(latest.low, value),
+      };
+      lastBar.current = updated;
+      try {
+        bar.update(updated);
+      } catch {
+        // A bar older than the series' last one is refused by the library;
+        // the next candle poll will resynchronise it.
+      }
+    });
+
+    return () => source.close();
+  }, [mint]);
+
   const points = useMemo<CandlestickData[]>(() => {
     if (!data) return [];
     return data.candles.map((candle) => ({
@@ -348,6 +411,7 @@ export function PriceChart({
     });
 
     series.current.setData(points);
+    lastBar.current = points[points.length - 1] ?? null;
     volume.current?.setData(showVolume ? volumes : []);
 
     for (const period of MA_PERIODS) {

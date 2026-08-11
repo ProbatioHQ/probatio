@@ -26,3 +26,6 @@ export type { LogNotification, ObservedLaunch } from './launches';
 
 export { PoolPoller } from './poller';
 export type { PollerOptions, TickResult } from './poller';
+
+export { AccountSubscription } from './accounts';
+export type { AccountSubscriptionOptions, AccountUpdate } from './accounts';

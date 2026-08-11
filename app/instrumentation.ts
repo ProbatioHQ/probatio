@@ -27,6 +27,14 @@ export async function register(): Promise<void> {
     startCurveWatch();
   }
 
+  // Pushes a price the moment a watched token's market moves. Independent of
+  // the launch feed: somebody can be looking at a chart on a server that is not
+  // watching for launches at all.
+  if (process.env['PROBATIO_DISABLE_PRICE_STREAM'] !== '1') {
+    const { startPriceStream } = await import('./lib/price-stream');
+    startPriceStream();
+  }
+
   // Probing runs even when the feed is disabled: knowing the chain is
   // unreachable matters more than the feed does.
   const { startProbing } = await import('./lib/health');
