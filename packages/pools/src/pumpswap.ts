@@ -25,6 +25,24 @@ export const WSOL_MINT = 'So11111111111111111111111111111111111111112';
  * two vaults, and the balances live in those ordinary SPL token accounts. That
  * is the structural difference from a bonding curve, which carries its reserves
  * inline, and it is why reading an AMM always takes two hops.
+ *
+ * There is more account past `coin_creator` than this decodes — 58 bytes of it
+ * — and pools come in at least two lengths, 300 and 301 bytes, both common: ten
+ * and three among the thirteen pools quoting one mint. Only the fields above
+ * are read, and they are read at fixed offsets from the start, so the trailing
+ * variance does not disturb them. Every decoded field is checked against the
+ * chain besides: the vaults must be owned by the pool and hold the mints it
+ * names, which would not survive a shifted layout.
+ *
+ * That region is not idle, and it is the open question about this venue. On a
+ * pool where those bytes are zero the fill engine reproduces real swaps exactly,
+ * to the smallest unit. On one where they are set it prices consistently 2.8
+ * times away from the market — 2.8 on buys and its reciprocal on sells, a fixed
+ * factor rather than a drift, which is the signature of a reserve being wrong
+ * rather than the arithmetic. The likeliest reading is that a pool carrying
+ * accrued state prices against its own accounting rather than against what
+ * happens to be sitting in its vaults. That is a lead and not a conclusion, and
+ * decoding it needs measurement rather than a plausible guess at offsets.
  */
 export const POOL_OFFSETS = {
   poolBump: 0x08,
@@ -91,6 +109,9 @@ export function decodePumpSwapPool(data: Uint8Array): PumpSwapPool {
   }
 
   return pool;
+  // Deliberately no upper bound on length. Pools are 300 and 301 bytes today
+  // and a version that appends another field must keep working here, because
+  // refusing to decode it would take a token off the board rather than read it.
 }
 
 /**

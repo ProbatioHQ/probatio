@@ -105,12 +105,19 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        It is not yet a claim about every graduated coin. On a thin, heavily botted pool the same
-        harness disagrees with reality by a wide margin, and the cause is not settled: the pool
-        account carries fields we do not read, and the balances sitting in its vaults may not all
-        be liquidity that trades. Until that is understood, the honest statement is that the
-        engine is measured exact on the graduated coins where it can be checked, and unverified
-        on thin ones. Both harnesses are in the repository and run against mainnet.
+        It is not yet a claim about every graduated coin, and the exception is specific rather
+        than vague. Some pools carry accrued state in a part of their account we do not decode,
+        and on one of those the engine prices consistently 2.8 times away from the market — 2.8
+        on buys and its reciprocal on sells. A fixed factor, not a drift, which is what a wrong
+        reserve looks like rather than wrong arithmetic. Where those bytes are zero the engine is
+        exact; where they are set it is not, and the likeliest reading is that such a pool prices
+        against its own accounting rather than against whatever is sitting in its vaults.
+      </p>
+
+      <p>
+        So: measured exact on the graduated coins that can be checked, and knowingly unverified
+        on the ones that carry that state. Saying which is which is the point of having the
+        harness at all. Both of them are in the repository and run against mainnet.
       </p>
 
       <p>

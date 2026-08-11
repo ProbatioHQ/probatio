@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   POOL_DISCRIMINATOR,
+  POOL_MIN_BYTES,
   POOL_OFFSETS,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
@@ -97,5 +98,38 @@ describe('decodePumpSwapPool rejects bad input', () => {
 describe('discriminator', () => {
   it('matches the captured pool', () => {
     expect(bytes(PUMPSWAP_POOL.base64).subarray(0, 8)).toEqual(POOL_DISCRIMINATOR);
+  });
+});
+
+describe('pool accounts of different lengths', () => {
+  /**
+   * Pools are 300 and 301 bytes on mainnet, both common. The fields this reads
+   * sit at fixed offsets from the start, so a longer account must decode
+   * identically rather than being refused — refusing one would take a token off
+   * the board instead of reading it.
+   */
+  const canonical = bytes(PUMPSWAP_POOL.base64);
+
+  function padded(extra: number): Uint8Array {
+    const grown = new Uint8Array(canonical.length + extra);
+    grown.set(canonical);
+    return grown;
+  }
+
+  it('decodes an account with trailing bytes it does not interpret', () => {
+    const longer = decodePumpSwapPool(padded(1));
+    expect(longer).toEqual(decodePumpSwapPool(canonical));
+  });
+
+  it('decodes one with a good deal more of them', () => {
+    expect(decodePumpSwapPool(padded(58)).baseVault).toBe(
+      decodePumpSwapPool(canonical).baseVault,
+    );
+  });
+
+  it('still refuses an account too short to hold the fields', () => {
+    expect(() => decodePumpSwapPool(canonical.subarray(0, POOL_MIN_BYTES - 1))).toThrow(
+      LayoutError,
+    );
   });
 });
