@@ -29,8 +29,13 @@ import { rpcEndpoint } from './env';
  *
  * Enough to draw a chart with a shape, far short of a token's full history. The
  * result records that it was truncated rather than pretending otherwise.
+ *
+ * Raised from 120, which drew a chart thin enough to look broken next to the
+ * same token on pump.fun. Configurable because the right number depends
+ * entirely on what the RPC endpoint will tolerate: a public one refuses this
+ * load, a paid one will not notice it.
  */
-const MAX_TRANSACTIONS = 120;
+const MAX_TRANSACTIONS = Number(process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? '400');
 /** Never more than one of these at a time, whatever the traffic. */
 const MAX_CONCURRENT = 2;
 

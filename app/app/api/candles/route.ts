@@ -43,10 +43,21 @@ export async function GET(request: Request): Promise<Response> {
 
   const candles = await readCandles(await db(), mint, timeframe, limit);
 
-  // A chart with almost nothing on it means nobody has read this token's
-  // history yet, not that it has never traded. Kicked off in the background:
-  // the walk takes seconds and the caller is not made to wait for it.
-  if (candles.length < 5) backfillChart(mint);
+  /*
+   * Ask for this token's history. Kicked off in the background: the walk takes
+   * seconds and the caller is not made to wait for it.
+   *
+   * Unconditional, because `backfillChart` already decides whether there is
+   * anything to do — it is recorded per mint, capped, and limited to two at a
+   * time. This used to be guarded by `candles.length < 5`, and that guard was
+   * the reason charts looked empty. A token the feed had watched for a few
+   * minutes had ten candles, which is more than five, so it never qualified for
+   * a backfill and stayed at ten candles for the life of the database. Ten
+   * points is enough to pass a "has data" test and nowhere near enough to draw
+   * a chart, so the tokens that looked worst were the exact ones the check
+   * decided were fine.
+   */
+  backfillChart(mint);
 
   return Response.json({
     mint,
