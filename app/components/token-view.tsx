@@ -81,6 +81,20 @@ export function TokenView({
    */
   const [timeframe, setTimeframe] = useState<string>('s15');
   const [timeframeChosen, setTimeframeChosen] = useState(false);
+
+  /*
+   * A different token is a different question.
+   *
+   * Both of these are answers about the token on screen, and neither survives
+   * moving to another one. Left alone, opening a busy coin and then a quiet one
+   * carried the busy coin's answer across: the quiet token never got fitted,
+   * and drew as the scattered dashes this was supposed to have fixed. The
+   * reader's own choice is theirs for that token, not for every token after it.
+   */
+  useEffect(() => {
+    setTimeframeChosen(false);
+    setTimeframe('s15');
+  }, [mint]);
   /**
    * Whichever chart has data.
    *

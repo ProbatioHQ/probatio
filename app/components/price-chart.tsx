@@ -132,6 +132,35 @@ export function PriceChart({
     drawingRef.current = drawing;
   }, [drawing]);
 
+  /**
+   * SOL in dollars, for the market-cap axis.
+   *
+   * Null until it is known, and null forever if the rate cannot be read — in
+   * which case the axis stays in SOL and the header says so. Printing a dollar
+   * sign over a SOL figure is how a coin worth eight thousand dollars came to
+   * read as "102".
+   */
+  const [solUsd, setSolUsd] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const read = (): void => {
+      void fetch('/api/sol-price')
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body: { solUsd?: number } | null) => {
+          if (!cancelled && typeof body?.solUsd === 'number') setSolUsd(body.solUsd);
+        })
+        .catch(() => undefined);
+    };
+    read();
+    // The rate moves slowly; the chart does not need to know quickly.
+    const timer = setInterval(read, 120_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -179,12 +208,14 @@ export function PriceChart({
     if (!data) return [];
     return data.candles.map((candle) => ({
       time: candle.time as UTCTimestamp,
-      open: toDisplay(candle.open, unit, data.tokenDecimals, data.totalSupply),
-      high: toDisplay(candle.high, unit, data.tokenDecimals, data.totalSupply),
-      low: toDisplay(candle.low, unit, data.tokenDecimals, data.totalSupply),
-      close: toDisplay(candle.close, unit, data.tokenDecimals, data.totalSupply),
+      open: toDisplay(candle.open, unit, data.tokenDecimals, data.totalSupply, solUsd),
+      high: toDisplay(candle.high, unit, data.tokenDecimals, data.totalSupply, solUsd),
+      low: toDisplay(candle.low, unit, data.tokenDecimals, data.totalSupply, solUsd),
+      close: toDisplay(candle.close, unit, data.tokenDecimals, data.totalSupply, solUsd),
     }));
-  }, [data, unit]);
+    // solUsd matters: the axis is in dollars once it arrives, and without it
+    // here the chart keeps drawing the SOL figures it first computed.
+  }, [data, unit, solUsd]);
 
   const volumes = useMemo<HistogramData[]>(() => {
     if (!data) return [];
@@ -368,7 +399,11 @@ export function PriceChart({
     <div className="chart">
       <div className="chart-head">
         <span className="cmd">
-          {unit === 'market-cap' ? 'market cap' : 'price'}
+          {unit === 'market-cap'
+            ? solUsd
+              ? 'market cap usd'
+              : 'market cap sol'
+            : 'price'}
           <span className="caret" />
         </span>
 

@@ -41,6 +41,20 @@ const MAX_CONCURRENT = 2;
 
 const running = new Set<string>();
 
+/**
+ * Mints already known to have been walked.
+ *
+ * The route asks for a backfill on every chart poll, which is every three
+ * seconds per viewer, and the answer for a token that has one is always no. The
+ * database knows that, but asking it three times a second per open chart is a
+ * query per poll to learn something that cannot change back. Remembered here so
+ * the question is asked once per process instead.
+ *
+ * Only ever records "done". A mint absent from this set falls through to the
+ * database, so a fresh process is correct rather than merely fast.
+ */
+const settled = new Set<string>();
+
 export function backfillInFlight(mint: string): boolean {
   return running.has(mint);
 }
@@ -53,7 +67,7 @@ export function backfillInFlight(mint: string): boolean {
  * dead RPC is not a reason to fail the page.
  */
 export function backfillChart(mint: string): void {
-  if (running.has(mint) || running.size >= MAX_CONCURRENT) return;
+  if (settled.has(mint) || running.has(mint) || running.size >= MAX_CONCURRENT) return;
   running.add(mint);
 
   void (async () => {
@@ -62,7 +76,10 @@ export function backfillChart(mint: string): void {
 
       // Recorded, so this is once per token for the life of the database
       // rather than once per visitor.
-      if (await getBackfill(client, mint)) return;
+      if (await getBackfill(client, mint)) {
+        settled.add(mint);
+        return;
+      }
 
       const rpc = new RpcClient({
         endpoint: rpcEndpoint(),
@@ -93,6 +110,7 @@ export function backfillChart(mint: string): void {
         Date.now(),
       );
 
+      settled.add(mint);
       if (result.observations.length === 0) return;
 
       for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {

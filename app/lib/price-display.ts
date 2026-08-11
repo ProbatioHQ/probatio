@@ -46,10 +46,20 @@ export function toDisplay(
   unit: PriceUnit,
   tokenDecimals: number,
   totalSupply: string,
+  /**
+   * SOL in dollars, when it is known.
+   *
+   * A market cap in SOL is not the number anybody quotes. Everywhere a trader
+   * looks — pump.fun, a screenshot, a chat — it is dollars, so a chart reading
+   * "102" for a coin worth eight thousand dollars is not a smaller unit, it is
+   * an unreadable one. Null leaves the figure in SOL, and the caller has to say
+   * so rather than print a dollar sign over it.
+   */
+  solUsd?: number | null,
 ): number {
-  return unit === 'market-cap'
-    ? marketCapSol(scaledPrice, tokenDecimals, totalSupply)
-    : solPerToken(scaledPrice, tokenDecimals);
+  if (unit !== 'market-cap') return solPerToken(scaledPrice, tokenDecimals);
+  const sol = marketCapSol(scaledPrice, tokenDecimals, totalSupply);
+  return solUsd && solUsd > 0 ? sol * solUsd : sol;
 }
 
 /**
