@@ -88,14 +88,24 @@ export function Season() {
         <div className="season-head">
           <h2>{season.name}</h2>
           <span className={`pill ${closed ? 'closed' : 'live'}`}>
-            {closed ? 'closed' : season.status === 'pending' ? 'opens soon' : 'open'}
+            {season.status === 'finalized'
+              ? 'final'
+              : season.status === 'closed'
+                ? 'closed'
+                : season.status === 'pending'
+                  ? 'opens soon'
+                  : 'open'}
           </span>
         </div>
 
         {season.status === 'pending' && (
           <p className="dim">Opens {new Date(season.startsAt).toLocaleString()}.</p>
         )}
-        {closed && <p className="dim">This season is over.</p>}
+        {season.status === 'finalized' ? (
+          <p className="dim">This season is over and its results are on chain.</p>
+        ) : (
+          closed && <p className="dim">This season is over. Results are not published yet.</p>
+        )}
 
         {/* The three numbers somebody actually came for, at a size that says so. */}
         <div className="stat-row">

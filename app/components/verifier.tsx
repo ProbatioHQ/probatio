@@ -251,11 +251,10 @@ export function Verifier() {
           passed: health.result === 'ok',
           detail:
             health.result === 'ok'
-              ? // Says what this step did, not what a later one will. It asked
-                // the endpoint whether it was healthy; it did not read an
-                // account, because there is not one to read until the program
-                // is deployed. Claiming otherwise would be the site telling a
-                // reader a check happened that did not.
+              ? // Says what this step did, not what the next one does. This
+                // asked the endpoint whether it was healthy; reading the record
+                // and comparing it is the step below, and reporting that here
+                // would claim a check had happened before it had.
                 'reachable from your browser, and answering'
               : 'reachable but not healthy',
         });

@@ -189,8 +189,18 @@ export function SeasonBoard() {
         <div className="term-body">
           <div className="season-head">
             <h1 style={{ fontSize: 28 }}>{season.name}</h1>
+            {/* Finalized is not the same as closed, and the difference is the
+                one that matters to somebody owed money: closed means trading
+                stopped, finalized means the results are on chain and a prize
+                can be claimed against them. Both used to read "closed". */}
             <span className={`pill ${closed ? 'closed' : 'live'}`}>
-              {closed ? 'closed' : entryOpen ? 'entry open' : season.status.replace('_', ' ')}
+              {season.status === 'finalized'
+                ? 'final'
+                : season.status === 'closed'
+                  ? 'closed'
+                  : entryOpen
+                    ? 'entry open'
+                    : season.status.replace('_', ' ')}
             </span>
           </div>
 
@@ -209,10 +219,21 @@ export function SeasonBoard() {
                 {BigInt(season.entryCost) === 0n ? 'free' : `${sol(season.entryCost, 3)} SOL`}
               </span>
             </div>
+            {/* Three questions, not one with a broken answer. A finished season
+                read "Season ends in: closed", which is a label its own value
+                does not answer — the countdown returns "closed" at zero and the
+                label never changed with it. */}
             <div className="stat">
-              <span className="k">{entryClosesIn > 0 ? 'Entry closes in' : 'Season ends in'}</span>
+              <span className="k">
+                {closed ? 'Ended' : entryClosesIn > 0 ? 'Entry closes in' : 'Season ends in'}
+              </span>
               <span className="v">
-                {countdown(entryClosesIn > 0 ? entryClosesIn : endsIn)}
+                {closed
+                  ? new Date(season.endsAt).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                    })
+                  : countdown(entryClosesIn > 0 ? entryClosesIn : endsIn)}
               </span>
             </div>
           </div>
