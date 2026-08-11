@@ -190,7 +190,7 @@ function Row({
           {token.marketCap ? (
             marketCapLabel(token.marketCap, solUsd)
           ) : (
-            <span className="dim">—</span>
+            <span className="dim">n/a</span>
           )}
         </span>
 
@@ -652,7 +652,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             </label>
 
             <p className="dim filter-note">
-              Every token here launched on pump.fun — that is the only feed this indexes, so
+              Every token here launched on pump.fun. That is the only feed this indexes, so
               there is no launchpad to choose between. A creator&apos;s launch count is a floor,
               counted from what this feed has seen rather than their whole history.
             </p>

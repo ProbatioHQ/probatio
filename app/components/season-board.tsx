@@ -159,7 +159,7 @@ export function SeasonBoard() {
         <div className="term-body">
           <p className="dim">
             No ranked season is running. Free play is always open, and trades made in it are
-            committed the same way — they just are not ranked for a prize.
+            committed the same way. They just are not ranked for a prize.
           </p>
         </div>
       </section>
@@ -223,7 +223,7 @@ export function SeasonBoard() {
             </div>
             {/* Three questions, not one with a broken answer. A finished season
                 read "Season ends in: closed", which is a label its own value
-                does not answer — the countdown returns "closed" at zero and the
+                does not answer: the countdown returns "closed" at zero and the
                 label never changed with it. */}
             <div className="stat">
               <span className="k">
@@ -284,7 +284,7 @@ export function SeasonBoard() {
 
           {/* Offered only when the server can actually take it. A paid
                 season needs a treasury address, which is configuration
-                rather than code — without it the button drew, the reader
+                rather than code. Without it the button drew, the reader
                 pressed it, and only then met a refusal. */}
           {season.entered ? (
             <p className="accent mono">You are entered. Every ranked trade counts.</p>

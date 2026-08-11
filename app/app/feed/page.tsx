@@ -24,7 +24,7 @@ export default function FeedPage() {
       <div className="page-head">
         <h1>Terminal</h1>
         <p className="dim">
-          Every pump.fun launch as it happens. Pick anything and trade it with practice money —
+          Every pump.fun launch as it happens. Pick anything and trade it with practice money against
           the prices, the liquidity and the fees are the real ones.
         </p>
       </div>
@@ -33,7 +33,7 @@ export default function FeedPage() {
 
       <p className="dim" style={{ fontSize: 13 }}>
         Market caps are shown in dollars for readability and are display only. Everything this
-        site decides — a fill, a balance, a ranking, a payout — is counted in lamports and never
+        site decides, whether a fill, a balance, a ranking or a payout, is counted in lamports and never
         touches an exchange rate. <a href="/docs/fills">How the fills work</a>.
       </p>
     </main>

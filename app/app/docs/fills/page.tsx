@@ -99,14 +99,14 @@ export default function FillsDoc() {
         <strong>After graduation.</strong> Every sample above is a curve fill, because that
         harness walks a token&rsquo;s bonding curve and stops where the curve does. There is now
         a second one for PumpSwap, where a token trades once it graduates. On a liquid graduated
-        coin it reproduces real swaps at 0 bps — median, 95th percentile and worst case — across
+        coin it reproduces real swaps at 0 bps for the median, 95th percentile and worst case, across
         buys and sells, most of them identical to the smallest unit and the rest within one of
         it.
       </p>
 
       <p>
-        Most graduated pools price against more SOL than they actually hold — three of five
-        sampled — and the surplus is recorded in the pool&rsquo;s own account. Quoting the vault
+        Most graduated pools price against more SOL than they actually hold. Three of five were
+        sampled that way, and the surplus is recorded in the pool&rsquo;s own account. Quoting the vault
         balance alone made the engine wrong on those by thousands of basis points: 8,937 on one,
         7,501 and 26,589 on two others. Counting it brings all three to 28. The figure was solved
         from real fills on one pool and then confirmed on the other two, which is what separates
@@ -116,11 +116,11 @@ export default function FillsDoc() {
       <p>
         Twenty-eight is where it stops, and the reason is worth stating plainly. Those pools quote
         against roughly 19 SOL while holding 1.5, so an ordinary trade barely moves the price and
-        the quote is very nearly a straight line — and on a straight line a fee and a reserve are
+        the quote is very nearly a straight line, and on a straight line a fee and a reserve are
         indistinguishable. The same fills come out exact either from this reserve with a 0.02%
         fee, or from a reserve 0.3% larger with the real 0.30% one. Nothing measurable here tells
         those apart, so the published fee stays and the difference is left where it falls against
-        you rather than for you. Pools with nothing recorded — the liquid ones — remain exact.
+        you rather than for you. Pools with nothing recorded, the liquid ones, remain exact.
       </p>
 
       <p>
@@ -132,7 +132,7 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        Until recently the engine charged 1.25% here — the bonding curve&rsquo;s rate, copied
+        Until recently the engine charged 1.25% here, the bonding curve&rsquo;s rate, copied
         across and never checked, because the harness that checks fees only ever walked the curve.
         Every migrated coin was four times too expensive to trade, and since a season ranks curve
         traders and migrated-coin traders against each other for the same prize, that was a

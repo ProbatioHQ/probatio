@@ -46,7 +46,7 @@ export default async function ProfileCard({
   const rankText = card.rank === null ? '' : `Rank ${card.rank} of ${card.entrants}`;
   const committedText =
     card.committed > 0
-      ? `${card.committed} trades committed on Solana — this record cannot be edited`
+      ? `${card.committed} trades committed on Solana. This record cannot be edited`
       : 'Not yet committed on chain';
   // Not the address again, and never a truncated one. The full key is already
   // on the card above; a shortened one in a URL is an instruction nobody can

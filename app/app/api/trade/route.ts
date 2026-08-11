@@ -125,7 +125,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   if (!atClickResolution.pool) {
     return Response.json(
-      { error: 'this token has no live market — it may have graduated with no pool' },
+      { error: 'this token has no live market. It may have graduated with no pool.' },
       { status: 409 },
     );
   }

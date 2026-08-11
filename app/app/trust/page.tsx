@@ -28,7 +28,7 @@ export default function TrustPage() {
       <p>
         Trades are still recorded and still hashed the moment they fill. What is not happening
         yet is the part that makes them checkable by a stranger, and the interface says which
-        trades have reached the chain rather than assuming they all have — your record and your
+        trades have reached the chain rather than assuming they all have. Your record and your
         trade log both report it per trade, and the honest answer today is none of them.
       </p>
 
@@ -36,7 +36,7 @@ export default function TrustPage() {
       <p>
         The on-chain program treats records as append-only: nothing can rewrite a trade once it
         is committed, not the server, not the key that signs the commitments, not us. That is
-        enforced by the program itself — once it is running, and subject to the section above.
+        enforced by the program itself, once it is running, and subject to the section above.
       </p>
       <p>
         But a Solana program has an upgrade authority, and while one exists that key can replace
@@ -66,7 +66,7 @@ export default function TrustPage() {
       <p>
         There was also a specific thing missing, and it is worth saying that it is no longer
         missing. The published void policy promises every entrant a full refund if a season does
-        not count, and for a long time the program had no instruction that could pay one —
+        not count, and for a long time the program had no instruction that could pay one, so
         burning the authority then would have made that promise impossible to keep for good.
         <code>void_season</code> and <code>refund_entry</code> now exist, so that blocker is
         gone and what remains is deployment itself.

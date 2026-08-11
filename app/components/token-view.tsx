@@ -147,7 +147,7 @@ export function TokenView({
                 title={
                   indexed
                     ? undefined
-                    : 'DEX Screener has not indexed this token yet — it usually takes a few minutes after launch'
+                    : 'DEX Screener has not indexed this token yet. It usually takes a few minutes after launch'
                 }
                 onClick={() => {
                   setChosen(true);
@@ -223,7 +223,7 @@ export function TokenView({
               <DexChart mint={mint} height={620} />
               <p className="dim chart-note">
                 TradingView charts, with pump.fun and PumpSwap trades, served by DEX Screener.
-                Your fills are quoted against the reserves this site reads directly —{' '}
+                Your fills are quoted against the reserves this site reads directly, and you can{' '}
                 <button type="button" className="linklike" onClick={() => setSource('native')}>
                   see that chart
                 </button>
@@ -250,7 +250,7 @@ export function TokenView({
               <p className="dim chart-note">
                 {indexed ? (
                   <>
-                    Built from the reserves this site reads directly — the same ones your fills
+                    Built from the reserves this site reads directly, the same ones your fills
                     are quoted against.{' '}
                     <button
                       type="button"
@@ -282,7 +282,7 @@ export function TokenView({
 
       {/* Only once there is something to show. A bare line of text reading
           "sign in to see your positions" under a chart is furniture, not
-          information — the trade panel beside it already says how to sign in. */}
+          information, and the trade panel beside it already says how to sign in. */}
       {signedIn && (
         <div className="positions-slot">
           <Positions refreshKey={tradeCount} />

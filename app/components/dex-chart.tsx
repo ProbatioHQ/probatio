@@ -50,7 +50,7 @@ export function DexChart({ mint, height = 620 }: { mint: string; height?: number
       {failed && !loaded && (
         <p className="chart-empty dim">
           The chart could not be reached. It is served by DEX Screener, so this is their side
-          rather than yours — the native chart below still works, and so does trading.
+          rather than yours. The native chart below still works, and so does trading.
         </p>
       )}
 

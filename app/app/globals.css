@@ -2675,7 +2675,7 @@ button:hover:not(:disabled),
 }
 
 /* Three dots that fill in turn while a trade is in flight. The delay is real
-   — six hundred milliseconds of it — so the wait is shown rather than hidden. */
+   of six hundred milliseconds, so the wait is shown rather than hidden. */
 .inflight {
   display: flex;
   align-items: center;

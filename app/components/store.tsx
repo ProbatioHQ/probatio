@@ -166,7 +166,7 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
 
         {!available && (
           <p className="dim">
-            The store is closed on this server — no payment address is configured, so nothing can
+            The store is closed on this server. No payment address is configured, so nothing can
             be taken.
           </p>
         )}
@@ -184,7 +184,7 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
         <p className="dim" style={{ fontSize: 13.5 }}>
           <strong>This is free play only.</strong> A ranked season starts every entrant on the same
           balance, fixed in the ruleset published with that season, and purchased balance cannot
-          go into one. Seasons are ranked by percentage return — if buying were allowed there, a
+          go into one. Seasons are ranked by percentage return, so if buying were allowed there a
           trader who was down could buy the loss away, and the board would measure spending rather
           than trading.
         </p>

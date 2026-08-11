@@ -219,7 +219,7 @@ export async function runDriftCycle(): Promise<void> {
     current.blindCycles += 1;
     current.lastSummary =
       current.blindCycles >= BLIND_CYCLES
-        ? `measured nothing for ${current.blindCycles} cycles — the engine is going unchecked, ` +
+        ? `measured nothing for ${current.blindCycles} cycles, so the engine is going unchecked, ` +
           'which usually means the RPC endpoint is refusing the load'
         : `no samples from ${mints.length} token(s)`;
     return;

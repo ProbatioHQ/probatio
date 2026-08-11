@@ -71,7 +71,7 @@ export default function Home() {
           {/*
             Says what the system does without asserting what it has done.
             "Every trade is written to Solana as you make it" was present tense
-            on a program that is not deployed and a keeper with no key — so it
+            on a program that is not deployed and a keeper with no key, so it
             was, right now, false, in the first paragraph on the site. The
             design claim is real and stays; the state claim moved to the two
             places that actually know it, the trust page and the trade log.
@@ -79,7 +79,7 @@ export default function Home() {
           <p className="lede">
             Practice money, live prices, and fills that model real slippage and real delay. Every
             trade is hashed the moment it fills and committed to Solana in batches, so a record
-            can be checked by anyone and edited by nobody —{' '}
+            can be checked by anyone and edited by nobody.{' '}
             <a href="/trust">including what that does not cover yet</a>.
           </p>
 

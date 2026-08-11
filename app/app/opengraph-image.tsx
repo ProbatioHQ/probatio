@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'Probatio — trade fake money on real tokens, prove you are good';
+export const alt = 'Probatio: trade fake money on real tokens, prove you are good';
 
 /**
  * The card the site itself turns into when a link is pasted.
@@ -33,7 +33,7 @@ export default function SiteCard() {
         </div>
         {/*
           Sized so each sentence holds its own line. At a larger size they wrap
-          mid-phrase — "on real / tokens." — which reads as a mistake on the
+          mid-phrase, on "on real / tokens.", which reads as a mistake on the
           one image most people will ever see of this.
         */}
         <div style={{ fontSize: 60, fontWeight: 700, lineHeight: 1.25, display: 'flex' }}>

@@ -303,7 +303,7 @@ export function Verifier() {
             label: 'On-chain comparison',
             passed: false,
             detail:
-              `no account at ${account.slice(0, 8)}… on this endpoint — either nothing has been ` +
+              `no account at ${account.slice(0, 8)}… on this endpoint. Either nothing has been ` +
               'committed for this trader yet, or the program is not deployed on the cluster you chose',
           });
         } else if (value.owner !== PROGRAM_ID) {

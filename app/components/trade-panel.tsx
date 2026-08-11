@@ -77,7 +77,7 @@ const REJECTION_TEXT: Record<string, string> = {
   venue_changed: 'The token graduated while your trade was in flight.',
   insufficient_sol: 'Not enough SOL.',
   insufficient_tokens: 'You do not hold that many tokens.',
-  raced: 'Another of your trades landed first. Nothing changed — try again.',
+  raced: 'Another of your trades landed first. Nothing changed, so try again.',
 };
 
 export function TradePanel({
@@ -249,7 +249,7 @@ export function TradePanel({
         </div>
         <div className="term-body">
           <p className="dim">
-            Connect a wallet to trade. It signs a message to prove the record is yours — nothing
+            Connect a wallet to trade. It signs a message to prove the record is yours. Nothing
             is ever asked to move real funds.
           </p>
           <button type="button" className="button-link" onClick={() => void signIn()}>
@@ -297,11 +297,11 @@ export function TradePanel({
         <div className="holdings">
           <span>
             <span className="k">Cash</span>
-            <span className="mono">{balance === null ? '—' : `${solFromLamports(balance, 3)} SOL`}</span>
+            <span className="mono">{balance === null ? '…' : `${solFromLamports(balance, 3)} SOL`}</span>
           </span>
           <span>
             <span className="k">Holding</span>
-            <span className="mono">{holding === 0n ? '—' : tokens(held)}</span>
+            <span className="mono">{holding === 0n ? 'none' : tokens(held)}</span>
           </span>
         </div>
 

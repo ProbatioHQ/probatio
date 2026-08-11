@@ -160,7 +160,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td>{sol(position.costBasis)}</td>
                 <td>
                   {/* A price that could not be read is said so, not shown as
-                      zero — a failed RPC call must never look like a wipeout. */}
+                      zero, because a failed RPC call must never look like a wipeout. */}
                   {position.value === null ? 'price unavailable' : `${sol(position.value)} SOL`}
                 </td>
                 <td>{position.unrealized === null ? '·' : `${signedSol(position.unrealized)} SOL`}</td>

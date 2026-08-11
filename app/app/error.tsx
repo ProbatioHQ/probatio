@@ -42,7 +42,7 @@ export default function Error({
           <h1>That did not work</h1>
           <p className="dim" style={{ maxWidth: '56ch' }}>
             Something failed while building this page. Nothing you were doing was saved, and no
-            trade was placed — writes here either complete or roll back, never half.
+            trade was placed. Writes here either complete or roll back, never half.
           </p>
           <div className="cta-row">
             <button type="button" className="button-link" onClick={reset}>

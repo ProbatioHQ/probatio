@@ -31,11 +31,11 @@ export function guardTheProcess(): void {
   store.__probatioGuarded = true;
 
   process.on('unhandledRejection', (reason) => {
-    console.error('[process] unhandled rejection — surviving it', reason);
+    console.error('[process] unhandled rejection, surviving it', reason);
   });
 
   process.on('uncaughtException', (error) => {
-    console.error('[process] uncaught exception — exiting for a clean restart', error);
+    console.error('[process] uncaught exception, exiting for a clean restart', error);
     /*
      * Not unref'd, deliberately.
      *

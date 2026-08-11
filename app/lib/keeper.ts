@@ -41,7 +41,7 @@ export function startKeeper(): void {
 
   const secret = keeperSecret();
   if (!secret) {
-    console.log('[keeper] no key configured — trades will be recorded but not committed');
+    console.log('[keeper] no key configured: trades will be recorded but not committed');
     return;
   }
 
@@ -99,7 +99,7 @@ export function startKeeper(): void {
       const line =
         `[keeper] committed ${result.committed} batch(es), ${result.tradesCommitted} trade(s), ` +
         `reconciled ${result.reconciled}, discarded ${result.discarded}, failed ${result.failed}` +
-        (result.halted ? ` — HALTED: ${result.halted}` : '');
+        (result.halted ? ` HALTED: ${result.halted}` : '');
 
       if (result.failed > 0 || result.halted) console.error(line);
       else console.log(line);

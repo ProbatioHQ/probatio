@@ -27,7 +27,7 @@ export default function NotFound() {
           <h1>Nothing here</h1>
           <p className="dim" style={{ maxWidth: '54ch' }}>
             That address does not match a page on this site. If you followed a link to a token,
-            the mint may never have launched on pump.fun — this only indexes tokens it watched
+            the mint may never have launched on pump.fun. This only indexes tokens it watched
             being created.
           </p>
           <div className="cta-row">

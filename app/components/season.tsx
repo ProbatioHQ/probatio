@@ -162,7 +162,7 @@ export function Season() {
 
         {/* Offered only when the server can actually take it. A paid
                 season needs a treasury address, which is configuration
-                rather than code — without it the button drew, the reader
+                rather than code. Without it the button drew, the reader
                 pressed it, and only then met a refusal. */}
         {season.entered ? (
           <p className="accent mono">You are entered.</p>
@@ -178,8 +178,8 @@ export function Season() {
           !closed && <p className="dim">Entries are closed for this season. Free play is always open.</p>
         )}
 
-        {/* The front page is the summary. Everything else about the season —
-            the full board, every trader's numbers — is one click away rather
+        {/* The front page is the summary. Everything else about the season,
+            the full board and every trader's numbers, is one click away rather
             than duplicated here. */}
         <p>
           <a href="/season" className="ghost-link">
