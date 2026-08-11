@@ -2,6 +2,7 @@ import { readCandles } from '@probatio/db';
 import { TIMEFRAMES, type Timeframe } from '@probatio/candles';
 import { PUMPFUN_TOKEN_DECIMALS, PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { backfillChart, backfillInFlight } from '@/lib/chart-backfill';
+import { noteViewed } from '@/lib/watched';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -58,6 +59,12 @@ export async function GET(request: Request): Promise<Response> {
    * decided were fine.
    */
   backfillChart(mint);
+
+  // Asking for this chart is what makes the token worth pricing often. The
+  // watcher rotates a fixed budget across the whole feed, which leaves a
+  // graduated token minutes between reads — fine for a lane of dashes, useless
+  // for the chart somebody is actually watching.
+  noteViewed(mint);
 
   return Response.json({
     mint,

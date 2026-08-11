@@ -15,6 +15,7 @@ import {
   type Timeframe,
 } from '@probatio/candles';
 import { PoolReader, RpcClient, decodeBondingCurve } from '@probatio/pools';
+import { recentlyViewed } from './watched';
 import { db } from './db';
 import { publishCurves } from './launch-stream';
 import { rpcEndpoint } from './env';
@@ -179,13 +180,36 @@ async function recordPrices(observations: Map<string, Observation>): Promise<voi
  * that worked.
  */
 const GRADS_PER_PASS = 4;
+/**
+ * Extra graduated tokens priced each pass because somebody has one on screen.
+ *
+ * On top of the rotation rather than instead of it, so watching a chart cannot
+ * starve the rest of the feed of its turn.
+ */
+const WATCHED_PER_PASS = 3;
 const GRAD_REFRESH_MS = 4 * 60 * 1_000;
 
 async function gradPass(reader: PoolReader): Promise<void> {
   const client = await db();
   const now = Date.now();
 
-  const wanted = await gradsToRefresh(client, GRADS_PER_PASS, now - GRAD_REFRESH_MS);
+  const rotation = await gradsToRefresh(client, GRADS_PER_PASS, now - GRAD_REFRESH_MS);
+
+  /*
+   * Whoever is being looked at goes first, and skips the four-minute floor.
+   *
+   * The floor exists so a feed of thousands does not cost thousands of calls a
+   * minute. It was also being applied to the one token filling somebody's
+   * screen, so a chart that polls every three seconds was reading a price that
+   * moved every four minutes: fast poll, slow truth, and it looked frozen
+   * because it was.
+   */
+  const watched = recentlyViewed(now)
+    .slice(0, WATCHED_PER_PASS)
+    .filter((mint) => !rotation.some((entry) => entry.mint === mint))
+    .map((mint) => ({ mint }));
+
+  const wanted = [...watched, ...rotation];
   if (wanted.length === 0) return;
 
   const states: CurveWrite[] = [];
