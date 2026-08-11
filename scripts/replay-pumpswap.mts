@@ -42,7 +42,11 @@ const [poolAccount] = await rpc.getAccounts([pool.address]);
 const override = process.env['RESERVE_OFFSET'];
 const offset = override ? BigInt(override) : poolAccount ? pumpSwapReserveOffset(poolAccount.data) : 0n;
 console.log(`quote reserve offset: ${offset}`);
-const report = replayPool(mint, swaps, 6, 1, fees, offset);
+const feeOverride = process.env['FEE_BPS'];
+const usedFees = feeOverride
+  ? { protocolBps: Number(feeOverride), creatorBps: 0, lpBps: 0 }
+  : fees;
+const report = replayPool(mint, swaps, 6, 1, usedFees, offset);
 console.log(`events seen   ${report.eventsSeen}`);
 console.log(`samples       ${report.samples}  (${report.buys} buys, ${report.sells} sells)`);
 console.log(`skipped       ${report.skipped.not_consecutive} not consecutive, ${report.skipped.unquotable} unquotable, ${report.skipped.first_event} first`);

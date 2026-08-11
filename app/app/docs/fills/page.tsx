@@ -105,20 +105,22 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        Some pools price against more SOL than they actually hold, and the surplus is recorded in
-        the pool&rsquo;s own account. Quoting the vault balance alone put the engine a constant
-        2.8 times away from the market on such a pool — a fixed factor rather than a drift, which
-        is what a wrong reserve looks like rather than wrong arithmetic. That figure was solved
-        from real fills and then found in the account, and counting it takes the same replay from
-        8,937 basis points of error down to 28.
+        Most graduated pools price against more SOL than they actually hold — three of five
+        sampled — and the surplus is recorded in the pool&rsquo;s own account. Quoting the vault
+        balance alone made the engine wrong on those by thousands of basis points: 8,937 on one,
+        7,501 and 26,589 on two others. Counting it brings all three to 28. The figure was solved
+        from real fills on one pool and then confirmed on the other two, which is what separates
+        a model from a curve fit.
       </p>
 
       <p>
-        Twenty-eight is not zero, and the remaining gap is not yet explained. It runs one way:
-        the engine pays out slightly less than the market did, so where it is still wrong it is
-        wrong against you rather than for you. Pools with nothing recorded there — the ordinary
-        case — are unaffected and remain exact. Both harnesses are in the repository and run
-        against mainnet.
+        Twenty-eight is where it stops, and the reason is worth stating plainly. Those pools quote
+        against roughly 19 SOL while holding 1.5, so an ordinary trade barely moves the price and
+        the quote is very nearly a straight line — and on a straight line a fee and a reserve are
+        indistinguishable. The same fills come out exact either from this reserve with a 0.02%
+        fee, or from a reserve 0.3% larger with the real 0.30% one. Nothing measurable here tells
+        those apart, so the published fee stays and the difference is left where it falls against
+        you rather than for you. Pools with nothing recorded — the liquid ones — remain exact.
       </p>
 
       <p>

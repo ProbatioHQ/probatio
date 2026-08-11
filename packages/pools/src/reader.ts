@@ -334,8 +334,23 @@ export class PoolReader {
        * buys and its reciprocal on sells, which is what a wrong reserve looks
        * like rather than wrong arithmetic. The offset was solved from real
        * fills before it was found in the account, and it is trusted because
-       * adding it takes the replay of that pool to nothing rather than because
-       * of where it sits.
+       * counting it reproduces real swaps on pools it was never derived from:
+       * two further ones replayed at 7,501 and 26,589 basis points of error
+       * without it and at 28 with it.
+       *
+       * Three of five graduated pools sampled carry one, so this is the usual
+       * case for a migrated coin and not a corner of it.
+       *
+       * The 28 basis points that remain are a degeneracy rather than a mystery.
+       * These pools price against roughly 19 SOL while holding 1.5, so an
+       * ordinary trade is tiny against the reserve and the quote is very nearly
+       * linear — and in that regime a fee and a reserve are not separable. The
+       * same fills are reproduced exactly by this offset with a 2 bps fee, or
+       * by a 0.3% larger offset with the venue's real 30. Nothing here can tell
+       * those apart, so the venue's published fee stays and the residual is
+       * left where it errs harsh: the engine pays out slightly less than the
+       * market did. Fitting a 2 bps fee to make the number pretty would be
+       * inventing a rate the venue does not charge.
        */
       solReserve: quote.amount + quoteReserveOffset,
       tokenReserve: base.amount,

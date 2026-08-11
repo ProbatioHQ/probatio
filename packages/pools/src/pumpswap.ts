@@ -65,8 +65,21 @@ export const POOL_OFFSETS = {
    * vault, and the difference was the same to four significant figures across
    * trades taken minutes apart. That difference is stored here.
    *
-   * Only trusted when adding it reproduces real swaps, which is checked rather
-   * than assumed — see `pumpSwapReserveOffset`.
+   * Confirmed on pools it was not derived from, which is the part that makes it
+   * a model rather than a curve fit. Two further pools, picked only for having
+   * a non-zero value here, replayed at 7,501 and 26,589 basis points of error
+   * against their vault balances alone and at 28 with this counted — the same
+   * residual, to the basis point, as the pool it was solved on.
+   *
+   * It is not rare. Three of five graduated pools sampled carry one, so this is
+   * the ordinary case for a migrated coin rather than an oddity, and quoting
+   * without it was wrong for most of them by thousands of basis points.
+   *
+   * The value is nearly identical across unrelated pools — 17,584,505,389 and
+   * …404 and …288 — which rules out its being fees this pool happened to
+   * accrue. It is read per pool anyway rather than pinned as a constant, so a
+   * pool that differs, or a value that moves, is followed rather than
+   * contradicted.
    */
   quoteReserveOffset: 0xf5,
 } as const;
