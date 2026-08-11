@@ -93,7 +93,7 @@ export class PoolReader {
     // Graduated. Quoting the curve's final reserves would price a market that
     // has stopped trading, so the successor pool has to be found instead.
     const pools = await this.findPumpSwapPools(mint);
-    const pool = pools[0];
+    const pool = await this.deepestPool(pools);
     if (!pool) {
       return { mint, venue: { kind: 'unlisted' }, pool: null, slot: curveAccount.slot };
     }
@@ -132,6 +132,74 @@ export class PoolReader {
         }
       })
       .filter((entry): entry is { address: string; pool: PumpSwapPool } => entry !== null);
+  }
+
+  /**
+   * Which of a mint's pools is the market.
+   *
+   * Anybody may create a PumpSwap pool for any mint against WSOL, and popular
+   * graduations collect a dozen. This used to take `pools[0]` — whichever the
+   * RPC happened to list first, an order no node promises and which differs
+   * between providers and over time.
+   *
+   * Measured against mainnet rather than argued about: one graduated token had
+   * thirteen pools, and the one `pools[0]` selected held 0.0044 SOL while the
+   * real market held 46.1 SOL. Ten thousand times shallower. Spot prices sit
+   * close because arbitrage keeps them there, so the error is invisible in the
+   * price and total in the fill: depth is what sets price impact, and impact is
+   * most of what this engine exists to reproduce honestly. Against a pool that
+   * shallow an ordinary buy either moves the price absurdly or is refused for
+   * breaching the impact cap, and a graduated token is effectively untradeable.
+   *
+   * It is also the cheapest attack on the leaderboard there is. Creating a pool
+   * costs very little, and a trader who controls the pool the simulator quotes
+   * from controls the price of their own fills — which is the whole season.
+   * Depth is not something an attacker can fake cheaply: to be quoted they have
+   * to be the deepest market in the token, which means putting up real SOL that
+   * real arbitrage will take off them.
+   *
+   * One batched read prices every candidate, so this costs a single extra round
+   * trip rather than one per pool. Ties break on address so that two servers,
+   * or the same server replaying a season, choose identically.
+   */
+  async deepestPool(
+    pools: readonly { address: string; pool: PumpSwapPool }[],
+  ): Promise<{ address: string; pool: PumpSwapPool } | null> {
+    if (pools.length === 0) return null;
+    if (pools.length === 1) return pools[0]!;
+
+    // The quote vault holds the SOL side, which is the depth that matters.
+    const vaults = pools.map((entry) => entry.pool.quoteVault);
+    const accounts = await this.#rpc.getAccounts(vaults);
+
+    let best: { address: string; pool: PumpSwapPool } | null = null;
+    let bestReserve = -1n;
+
+    for (const [index, entry] of pools.entries()) {
+      const account = accounts[index];
+      if (!account) continue;
+
+      let reserve: bigint;
+      try {
+        const vault = decodeTokenAccount(account.data);
+        // A vault that does not belong to this pool, or holds the wrong mint,
+        // is not evidence of anything. Skipping is right: a forged pointer
+        // must not be able to win the comparison.
+        if (vault.owner !== entry.address || vault.mint !== entry.pool.quoteMint) continue;
+        reserve = vault.amount;
+      } catch {
+        continue;
+      }
+
+      if (reserve > bestReserve || (reserve === bestReserve && best && entry.address < best.address)) {
+        best = entry;
+        bestReserve = reserve;
+      }
+    }
+
+    // Every candidate unreadable. Falling back to an arbitrary one would be
+    // the bug this function exists to remove, so the token reads as unlisted.
+    return best;
   }
 
   /**

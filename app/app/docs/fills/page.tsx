@@ -1,7 +1,7 @@
 export const metadata = {
   title: 'Fills, Probatio',
   description:
-    'How a simulated fill is computed against live pool reserves, with real slippage and real delay. And the measured error against real trades: 0 bps.',
+    'How a simulated fill is computed against live pool reserves, with real slippage and real delay. And the measured error against real bonding-curve trades: 0 bps.',
 };
 
 export default function FillsDoc() {
@@ -61,8 +61,10 @@ export default function FillsDoc() {
 
       <div className="panel" role="group" aria-label="Measured accuracy">
         <dl>
+          <dt>Measured</dt>
+          <dd className="mono">11 August 2026</dd>
           <dt>Samples</dt>
-          <dd className="mono">128 real fills</dd>
+          <dd className="mono">129 real fills</dd>
           <dt>Median error</dt>
           <dd className="mono gain">0 bps</dd>
           <dt>95th percentile</dt>
@@ -70,7 +72,7 @@ export default function FillsDoc() {
           <dt>Worst case</dt>
           <dd className="mono gain">0 bps</dd>
           <dt>Exact matches</dt>
-          <dd className="mono gain">128 of 128</dd>
+          <dd className="mono gain">129 of 129</dd>
         </dl>
       </div>
 
@@ -80,10 +82,26 @@ export default function FillsDoc() {
 
       <p>
         A pair is only scored when the reserves prove the two trades were consecutive, that
-        nothing happened in between that we did not see. In the run above, 91 of 221 events were
+        nothing happened in between that we did not see. In that run, 91 of 222 events were
         skipped for that reason. Throwing away most of the data is what makes the number mean
         anything: a sample that quietly included gaps would be measuring our bookkeeping rather
         than the engine.
+      </p>
+
+      <p>
+        The date matters because the harness reads live history, so the sample grows as those
+        tokens keep trading. Rerunning it will not reproduce these counts exactly, and a page
+        that stated them as though it would was inviting the reader to think the number had been
+        rounded in our favour. The counts move; the errors have not.
+      </p>
+
+      <p>
+        <strong>What this does not cover.</strong> The harness follows a token&rsquo;s bonding
+        curve, so every sample above is a curve fill. Once a token graduates it trades on
+        PumpSwap, and those fills are not measured here — the engine prices them from the pool
+        reserves the same way, but &ldquo;the same way&rdquo; is an argument and this page is
+        supposed to contain the opposite of one. Treat the number as what it is: the curve,
+        measured.
       </p>
 
       <h2>Check it yourself</h2>
