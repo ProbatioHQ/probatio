@@ -104,6 +104,22 @@ export default function FillsDoc() {
         measured.
       </p>
 
+      <p>
+        <strong>And a graduated token costs you more here than it would on the market.</strong>{' '}
+        PumpSwap&rsquo;s fee slides down as a coin grows, from about 1.25% on a fresh graduate
+        toward 0.30% once it is established. This engine charges every graduated token the top of
+        that range. Measured against real buys on a large graduated coin, the market took about
+        0.3% and we take 1.25% — four times too much.
+      </p>
+
+      <p>
+        It is left that way on purpose, because the alternative is charging some traders less than
+        the market really would, and a simulator that flatters you is worth nothing. But it is a
+        real cost and you should know it: if you trade migrated coins you are being handicapped
+        against someone trading the curve, where the fee is exact to the lamport. Fixing it
+        properly means reading the live fee schedule rather than picking a better constant.
+      </p>
+
       <h2>Check it yourself</h2>
 
       <p>The harness is in the repository and runs against mainnet:</p>
