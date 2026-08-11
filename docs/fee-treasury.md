@@ -85,5 +85,14 @@ It cannot touch the pot.
 
 No automatic top-up and no alert on a failing check — the script exists and
 running it on a schedule is a deployment concern. The keeper does not yet refuse
-to start on an insufficient balance, because the concrete chain gateway arrives
-with deployment; the check it would call is written and tested.
+to start on an insufficient balance: `checkTreasury` and `coversItsCosts` are
+written and tested, and `scripts/treasury.mts` is the only caller. The reason
+given here used to be that the concrete chain gateway arrived with deployment.
+It has arrived, so that is no longer a reason and the gap is now simply open.
+
+**Entry fees are not the pot.** This page describes a treasury wallet that
+receives entry payments; the program pays prizes and refunds only out of the
+season vault, against an on-chain `Entry` that only `record_entry` creates.
+Money in the treasury wallet cannot be paid out or refunded by any instruction.
+That is why entry is free — see the Status section of the README — and why
+`chargeRefusal` in `@probatio/seasons` refuses a paid season outright.

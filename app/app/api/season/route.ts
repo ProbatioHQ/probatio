@@ -6,7 +6,9 @@ import {
 } from '@probatio/db';
 import {
   bandFor,
+  chargeRefusal,
   distribute,
+  explainChargeRefusal,
   nextBand,
   rulesetFor,
   rulesetHashHex,
@@ -60,6 +62,10 @@ export async function GET(request: Request): Promise<Response> {
   const status = statusAt(timing, now);
   const totals = await seasonTotals(client, season.id);
   const rules = rulesetFor(season.ordinal);
+  const entryRefusal = chargeRefusal({
+    entryCost: BigInt(season.entryCost),
+    treasury: treasuryAddress(),
+  });
 
   // The cut applies to what entrants paid, not to a sponsored prize — taking
   // a tenth of money somebody put up as the prize would advertise more than
@@ -146,17 +152,21 @@ export async function GET(request: Request): Promise<Response> {
       /*
        * Whether an entry can actually be taken right now.
        *
-       * A paid season needs somewhere for the money to go, and that address is
-       * configuration rather than code — unset, `/api/pay/intent` answers 503.
-       * Without saying so here the interface had no way to know: it read
-       * `entry_open` and a cost of 0.05 SOL, drew the button, and the refusal
-       * only arrived after somebody had committed to pressing it.
+       * A paid season needs somewhere for the money to go, and it needs a way
+       * to give it back — see @probatio/seasons/charging, which owns both
+       * questions. Without answering here the interface had no way to know: it
+       * read `entry_open` and a cost of 0.05 SOL, drew the button, and the
+       * refusal only arrived after somebody had committed to pressing it.
        *
-       * A free season needs no treasury, so it is available whenever its window
-       * is open.
+       * The reason travels with the answer. There is more than one way to be
+       * unavailable now, and a page that gives the wrong one is worse than a
+       * page that gives none.
+       *
+       * A free season is always available: there is nothing to give back.
        */
-      entryAvailable:
-        BigInt(season.entryCost) === 0n || treasuryAddress() !== null,
+      entryAvailable: entryRefusal === null,
+      entryUnavailableReason:
+        entryRefusal === null ? null : explainChargeRefusal(entryRefusal),
 
       rulesetHash: season.rulesetHash,
       // What today's code produces for this ordinal. Equal to the above unless

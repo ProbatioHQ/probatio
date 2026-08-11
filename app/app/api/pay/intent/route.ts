@@ -11,6 +11,7 @@ import {
   openRankedSeason,
   recordIntentEvidence,
 } from '@probatio/db';
+import { chargeRefusal, explainChargeRefusal } from '@probatio/seasons';
 import { DEFAULT_RULES, assess, explainRefusal, gatherEvidence } from '@probatio/sybil';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
@@ -37,11 +38,6 @@ export async function POST(request: Request): Promise<Response> {
   const user = await currentUser();
   if (!user) return Response.json({ error: 'sign in to enter' }, { status: 401 });
 
-  const treasury = treasuryAddress();
-  if (!treasury) {
-    return Response.json({ error: 'entry is not open on this server' }, { status: 503 });
-  }
-
   const client = await db();
   const now = Date.now();
 
@@ -51,6 +47,31 @@ export async function POST(request: Request): Promise<Response> {
       { error: 'no season is accepting entries right now.' },
       { status: 409 },
     );
+  }
+
+  /*
+   * Whether this season may charge at all, asked where the money is taken.
+   *
+   * /api/season answers the same question so the interface can avoid drawing a
+   * button that cannot work, but that is a courtesy and this is the guard. A
+   * check that only runs in the page it decorates is not a check.
+   *
+   * Asked after the season is loaded rather than before, because the answer
+   * depends on what the season costs: a free season has nothing to give back
+   * and is never refused.
+   */
+  const treasury = treasuryAddress();
+  const refusal = chargeRefusal({ entryCost: BigInt(season.entryCost), treasury });
+  if (refusal) {
+    return Response.json(
+      { error: explainChargeRefusal(refusal), refusal },
+      { status: 503 },
+    );
+  }
+  if (!treasury) {
+    // Unreachable while a refusal covers it, and kept so the narrowing below is
+    // the type system's rather than an assumption about another function.
+    return Response.json({ error: 'entry is not open on this server' }, { status: 503 });
   }
 
   if (await hasEntered(client, season.id, user.pubkey)) {

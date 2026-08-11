@@ -46,6 +46,9 @@ export {
 } from './lifecycle';
 export type { Schedule, SeasonStatus, SeasonTiming } from './lifecycle';
 
+export { PAYOUT_PATH, chargeRefusal, explainChargeRefusal } from './charging';
+export type { ChargeInput, ChargeRefusal } from './charging';
+
 export {
   DEFAULT_VOID_POLICY,
   VoidError,

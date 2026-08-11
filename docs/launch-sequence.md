@@ -102,6 +102,28 @@ the sequence stops here.
 17. Requires the refund instruction (shipped: `void_season` + `refund_entry`) **and** the upgrade authority
     burned. If either is missing, season 1 runs free like season 0.
 18. Never charge for entry and then discover a refund cannot be paid.
+19. **Also requires a payout path, which does not exist yet.** Step 18 was
+    written here and broken anyway, because a document cannot refuse anything.
+    The rule now lives in `chargeRefusal` (`@probatio/seasons/charging`), which
+    both `/api/season` and `/api/pay/intent` consult, and it refuses every paid
+    season until `PAYOUT_PATH.wired` is true. What has to be built before it can
+    be, in order:
+    - **Entry on chain.** The app takes entry as a plain transfer to a treasury
+      wallet. `claim_prize` and `refund_entry` pay out of the season vault
+      against an `Entry` PDA that only `record_entry` creates, so entry has to
+      become that instruction — built and signed in the browser the way the
+      transfer already is. Note the trader also pays the `Entry` rent
+      (1,572,960 lamports) on top of the entry cost, which changes what the
+      season advertises.
+    - **Finalization.** Nothing calls `finalize_season` and nothing sets a
+      season's status to `finalized`. Freeze the standings, compute the root
+      with `resultsRoot` from `@probatio/scoring` — which today is called by its
+      own test and nowhere else — and record it. Authority-signed, so a script
+      rather than a route.
+    - **Proofs.** A route that gives a trader their result leaf and merkle path.
+      Without it a winner holds a claim they cannot construct.
+    - **Claiming.** `claim_prize` built client-side. Anyone may submit it on a
+      winner's behalf, so a lost key does not strand a prize.
 
 ---
 

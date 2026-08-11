@@ -163,6 +163,23 @@ Both of the gaps that used to be listed here are closed:
   give every entrant back exactly what they paid, which is what the void policy
   always promised. Until they existed no season could honestly charge for entry.
 
+One is open, and it is the reason entry is free:
+
+- **Nothing can pay a winner yet.** The program is complete — `record_entry`
+  funds the vault, `finalize_season` publishes a results root, `claim_prize`
+  pays against it — but no code off chain calls any of them. Entry payments go
+  to a treasury wallet by plain transfer, so no on-chain `Entry` exists and the
+  vault is never funded; nothing computes a results root for a real season or
+  sets a season finalized; and no route serves the proof a claim needs. A season
+  that ended today would pay nobody.
+
+  So a paid season is refused rather than opened: `chargeRefusal` in
+  `@probatio/seasons` is consulted both where the entry button is drawn and
+  where the money would be taken. Refusing there rather than in a document is
+  the point — the rule against charging before a refund can be paid already
+  existed in `docs/launch-sequence.md`, and a paid season was opened anyway,
+  because nothing consulted it.
+
 What remains is deployment itself, and the upgrade authority: while it is held,
 the program can be replaced, so read [what you still have to
 trust](docs/upgrade-authority.md) before believing anything above.

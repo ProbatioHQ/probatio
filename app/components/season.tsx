@@ -33,6 +33,8 @@ interface Ranked {
   entered: boolean;
   /** False when this server cannot take an entry — see /api/season. */
   entryAvailable?: boolean;
+  /** Why, in the server's words. Null when entry is available. */
+  entryUnavailableReason?: string | null;
 }
 
 function sol(lamports: string): string {
@@ -167,9 +169,10 @@ export function Season() {
         ) : season.status === 'entry_open' && season.entryAvailable !== false ? (
           <EnterSeason free={BigInt(season.entryCost) === 0n} />
         ) : season.status === 'entry_open' ? (
+          /* The server's reason, not one guessed here — see season-board. */
           <p className="dim">
-            Entry is not open on this server yet. Free play is, and trades made in it are
-            committed the same way.
+            {season.entryUnavailableReason ??
+              'Entry is not open on this server yet. Free play is, and trades made in it are committed the same way.'}
           </p>
         ) : (
           !closed && <p className="dim">Entries are closed for this season. Free play is always open.</p>
