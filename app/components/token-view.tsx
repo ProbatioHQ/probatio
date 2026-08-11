@@ -19,6 +19,41 @@ import type { PriceUnit } from '@/lib/price-display';
 
 const TIMEFRAMES = ['s15', 'm1', 'm5', 'm15', 'h1'] as const;
 
+/** Bucket sizes, in seconds, matching TIMEFRAMES. */
+const BUCKET_SECONDS: Record<string, number> = {
+  s15: 15,
+  m1: 60,
+  m5: 300,
+  m15: 900,
+  h1: 3_600,
+};
+
+/**
+ * The bucket size that suits a token's actual trading.
+ *
+ * A chart reads well when its candles are mostly adjacent. Too fine and the
+ * trades scatter into isolated slivers with hours of empty grid between them;
+ * too coarse and a whole session collapses into three candles. Aiming for
+ * roughly one bucket per candle of real activity puts a token's history across
+ * a sensible number of buckets whether it has traded for four minutes or four
+ * days.
+ */
+function fitTimeframe(candles: number, spanSeconds: number): string | null {
+  if (candles < 2 || spanSeconds <= 0) return null;
+  const wanted = spanSeconds / Math.min(120, Math.max(20, candles));
+
+  let best: string | null = null;
+  let closest = Number.POSITIVE_INFINITY;
+  for (const frame of TIMEFRAMES) {
+    const distance = Math.abs(Math.log(BUCKET_SECONDS[frame]! / wanted));
+    if (distance < closest) {
+      closest = distance;
+      best = frame;
+    }
+  }
+  return best;
+}
+
 export function TokenView({
   mint,
   dexIndexed,
@@ -30,10 +65,22 @@ export function TokenView({
   const { status } = useWallet();
   const signedIn = status === 'signed-in';
   const [tradeCount, setTradeCount] = useState(0);
-  // Fifteen seconds, not a minute. These tokens do their whole life in
-  // minutes — a fast one puts sixty trades inside a single 1m bucket, which
-  // draws as one candle and looks like a chart that is not working.
+  /*
+   * Fifteen seconds to begin with, because a token doing its whole life in
+   * minutes puts sixty trades inside one 1m bucket and draws as a single
+   * candle. That is right for the token this site is most about and wrong for
+   * every token older than an afternoon, which is what the reader actually
+   * complained about: a day-old coin at fifteen-second candles filled 49 of
+   * 7,262 slots — under one percent — and drew as scattered dashes across an
+   * empty grid. The same token at hourly candles filled 61% and looked like a
+   * chart.
+   *
+   * So this is only the opening guess. Once the first load says how much
+   * history there is, `fitTimeframe` picks a bucket that suits this token, and
+   * stops as soon as the reader picks one themselves.
+   */
   const [timeframe, setTimeframe] = useState<string>('s15');
+  const [timeframeChosen, setTimeframeChosen] = useState(false);
   /**
    * Whichever chart has data.
    *
@@ -120,7 +167,10 @@ export function TokenView({
                   type="button"
                   className={frame === timeframe ? 'on' : undefined}
                   aria-pressed={frame === timeframe}
-                  onClick={() => setTimeframe(frame)}
+                  onClick={() => {
+                    setTimeframeChosen(true);
+                    setTimeframe(frame);
+                  }}
                 >
                   {TIMEFRAME_LABELS[frame] ?? frame}
                 </button>
@@ -168,7 +218,21 @@ export function TokenView({
             </>
           ) : (
             <>
-              <PriceChart mint={mint} timeframe={timeframe} unit={unit} height={560} />
+              <PriceChart
+                mint={mint}
+                timeframe={timeframe}
+                unit={unit}
+                height={560}
+                onHistory={({ candles, spanSeconds }) => {
+                  if (timeframeChosen) return;
+                  const fitted = fitTimeframe(candles, spanSeconds);
+                  // Only ever moved once, and never over a choice the reader made.
+                  if (fitted && fitted !== timeframe) {
+                    setTimeframeChosen(true);
+                    setTimeframe(fitted);
+                  }
+                }}
+              />
               <p className="dim chart-note">
                 {indexed ? (
                   <>

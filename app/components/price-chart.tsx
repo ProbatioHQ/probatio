@@ -90,11 +90,20 @@ function movingAverage(points: readonly CandlestickData[], period: number): Line
 export function PriceChart({
   mint,
   timeframe = 'm1',
+  onHistory,
   unit = 'market-cap',
   height = 560,
 }: {
   mint: string;
   timeframe?: string;
+  /**
+   * What the loaded history looks like: how many candles, over what span.
+   *
+   * Reported so the page can choose a bucket size that suits this token rather
+   * than a fixed one. See token-view: a quiet token at fifteen-second candles
+   * fills well under one percent of its slots and draws as scattered dashes.
+   */
+  onHistory?: (info: { candles: number; spanSeconds: number }) => void;
   unit?: PriceUnit;
   height?: number;
 }) {
@@ -138,6 +147,13 @@ export function PriceChart({
           }
           setError(null);
           setData(body);
+
+          const first = body.candles[0];
+          const last = body.candles[body.candles.length - 1];
+          onHistory?.({
+            candles: body.candles.length,
+            spanSeconds: first && last ? last.time - first.time : 0,
+          });
         })
         .catch(() => {
           // Only the first failure is worth reporting. A dropped poll on a
