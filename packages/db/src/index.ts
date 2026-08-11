@@ -60,6 +60,7 @@ export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';
 export {
   driftHistory,
   isSuspended,
+  mostTradedMints,
   liftSuspension,
   recordDrift,
   suspendToken,

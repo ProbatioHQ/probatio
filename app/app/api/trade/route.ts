@@ -4,6 +4,7 @@ import { applyFill, emptyPosition, TradingError, type AccountState } from '@prob
 import { hashLeaf, toHex } from '@probatio/commit';
 import {
   ConcurrentTradeError,
+  isSuspended,
   openPosition,
   recordTrade,
 } from '@probatio/db';
@@ -73,6 +74,33 @@ export async function POST(request: Request): Promise<Response> {
 
   const client = await db();
   const now = Date.now();
+
+  /*
+   * A token the monitor found farmable is off the board.
+   *
+   * The suspension machinery was written, tested, and never consulted by
+   * anything — a token could be marked exploitable in the database and traded
+   * all day. Checked here, before the chain is read, because a refusal should
+   * not cost an RPC round trip and because this is the one place a suspension
+   * has to bite.
+   *
+   * Free play is refused too, not only ranked. A trade made in free play is
+   * committed the same way and shows on the same public record, so a fill the
+   * engine got wrong is worth the same to somebody building a track record.
+   */
+  if (await isSuspended(client, mint)) {
+    return Response.json(
+      {
+        error:
+          'This token is suspended. The simulator was filling it differently from ' +
+          'the market, so trading it is off until that is resolved. Nothing was ' +
+          'charged and no position changed.',
+        suspended: true,
+      },
+      { status: 409 },
+    );
+  }
+
   const { account, seasonId } = await activeSeason(client, user.pubkey, now);
 
   const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 15_000 });

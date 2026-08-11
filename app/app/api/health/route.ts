@@ -3,6 +3,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { downNow } from '@/lib/health';
 import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
 import { pendingTradeMints } from '@/lib/trade-candles';
+import { driftStatus } from '@/lib/drift-watch';
 
 /**
  * What the site can currently do.
@@ -40,6 +41,14 @@ export async function GET(request: Request): Promise<Response> {
         streamSubscribers: launchListenerCount(),
         bufferedTradeMints: pendingTradeMints(),
       },
+      /*
+       * The engine-against-reality check.
+       *
+       * Reported whether or not it has found anything, because the useful
+       * failure is not "drift detected" — it is a monitor that stopped running
+       * weeks ago and left everything looking fine.
+       */
+      drift: driftStatus(),
       // Stated whatever the status, because the promise matters most when
       // something is broken.
       promise:

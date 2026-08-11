@@ -6,6 +6,7 @@ import {
   driftHistory,
   isSuspended,
   liftSuspension,
+  mostTradedMints,
   recordDrift,
   suspendToken,
   suspendedTokens,
@@ -166,5 +167,64 @@ describe('suspension', () => {
       args: [MINT],
     });
     expect(String(result.rows[0]!['lifted_note'])).toBe('first');
+  });
+});
+
+describe('choosing what to check', () => {
+  const OTHER = '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump';
+  const QUIET = 'G6kpwWRSuWtVTbutTSZUvg5QVP7o6Bfs9edE6edTpump';
+
+  async function trade(mint: string, sequence: number, at: number): Promise<void> {
+    await db.execute({
+      sql: `INSERT INTO trades (account_id, sequence, season_id, user_pubkey, mint, side,
+              sol_amount, token_amount, fee, price_impact_bps, partial, pool_source,
+              clicked_at_slot, filled_at_slot, latency_ms, engine_version, pool_snapshot_id,
+              leaf_hash, created_at)
+            VALUES (1, ?, 1, 'u', ?, 'buy', '1000000', '1000', '3000', 5, 0, 'pumpswap',
+                    1, 1, 600, 1, 1, ?, ?)`,
+      args: [sequence, mint, 'b'.repeat(64), at],
+    });
+  }
+
+  beforeEach(async () => {
+    await db.execute('PRAGMA foreign_keys = OFF');
+  });
+
+  it('puts the most traded token first', async () => {
+    // Being wrong matters in proportion to how many people it is wrong for.
+    await trade(QUIET, 1, NOW);
+    await trade(OTHER, 2, NOW);
+    await trade(OTHER, 3, NOW);
+
+    expect(await mostTradedMints(db, NOW - 1_000, 10)).toEqual([OTHER, QUIET]);
+  });
+
+  it('ignores trades older than the window', async () => {
+    await trade(OTHER, 1, NOW - 100_000);
+    expect(await mostTradedMints(db, NOW - 1_000, 10)).toEqual([]);
+  });
+
+  it('skips a token that is already suspended', async () => {
+    // It is refused at the trade route, so re-measuring it every cycle spends
+    // the whole budget on the one answer that cannot change anything.
+    await trade(OTHER, 1, NOW);
+    await trade(QUIET, 2, NOW);
+    await suspendToken(db, OTHER, 'farmable', 'exploitable', NOW);
+
+    expect(await mostTradedMints(db, NOW - 1_000, 10)).toEqual([QUIET]);
+  });
+
+  it('checks a token again once its suspension is lifted', async () => {
+    await trade(OTHER, 1, NOW);
+    await suspendToken(db, OTHER, 'farmable', 'exploitable', NOW);
+    await liftSuspension(db, OTHER, 'engine corrected', NOW + 1);
+
+    expect(await mostTradedMints(db, NOW - 1_000, 10)).toEqual([OTHER]);
+  });
+
+  it('honours the limit, because the budget is RPC calls', async () => {
+    await trade(OTHER, 1, NOW);
+    await trade(QUIET, 2, NOW);
+    expect(await mostTradedMints(db, NOW - 1_000, 1)).toHaveLength(1);
   });
 });

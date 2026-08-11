@@ -137,3 +137,36 @@ export async function driftHistory(
     };
   });
 }
+
+/**
+ * The mints worth checking the engine against.
+ *
+ * Ordered by how much they are being traded here, not by how much they trade on
+ * the chain. The engine being wrong matters exactly in proportion to how many
+ * people it is wrong for, and a farmable token nobody has found is a smaller
+ * problem than a mispriced one everybody is holding.
+ *
+ * Trades already suspended are excluded: they are refused at the trade route,
+ * so re-measuring them every cycle spends the RPC budget on the one set of
+ * tokens whose answer cannot change anything.
+ */
+export async function mostTradedMints(
+  db: Client,
+  since: number,
+  limit: number,
+): Promise<string[]> {
+  const result = await db.execute({
+    sql: `SELECT t.mint AS mint, COUNT(*) AS n
+            FROM trades t
+           WHERE t.created_at >= ?
+             AND NOT EXISTS (
+                   SELECT 1 FROM suspended_tokens s
+                    WHERE s.mint = t.mint AND s.lifted_at IS NULL
+                 )
+        GROUP BY t.mint
+        ORDER BY n DESC, t.mint
+           LIMIT ?`,
+    args: [since, limit],
+  });
+  return result.rows.map((row) => String(row['mint']));
+}

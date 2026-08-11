@@ -35,4 +35,12 @@ export async function register(): Promise<void> {
   // Commits records to the chain. Does nothing without a key, and says so.
   const { startKeeper } = await import('./lib/keeper');
   startKeeper();
+
+  // Measures the engine against real fills and takes farmable tokens off the
+  // board. Tied to the feed switch only in the sense that both need the chain;
+  // it is the one check that runs without anybody deciding to look.
+  if (process.env['PROBATIO_DISABLE_DRIFT'] !== '1') {
+    const { startDriftWatch } = await import('./lib/drift-watch');
+    startDriftWatch();
+  }
 }
