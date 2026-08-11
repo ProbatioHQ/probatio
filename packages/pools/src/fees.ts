@@ -30,8 +30,17 @@ export const PUMPFUN_CURVE_FEES: FeeSchedule = Object.freeze({
 });
 
 /**
- * PumpSwap. A copy of the curve's schedule above, and measurably not what
- * PumpSwap charges.
+ * PumpSwap, when its published schedule cannot be read. A fallback now, not the
+ * rate: `PoolReader` reads the real one from PumpSwap's global config account
+ * and quotes 30 bps — 20 to liquidity providers, 5 protocol, 5 creator.
+ *
+ * Kept deliberately at 125 rather than corrected to 30. This value is only
+ * reached when the config is unreadable, and a fallback should fail toward
+ * quoting a trader worse than the market rather than better. Everything below
+ * is the record of how the number was found to be wrong.
+ *
+ * A copy of the curve's schedule above, and measurably not what PumpSwap
+ * charges.
  *
  * `scripts/measure-pumpswap-fees.mts` reads real buys off mainnet and recovers
  * both the total cost and the part the pool keeps. On an established graduated
@@ -45,22 +54,16 @@ export const PUMPFUN_CURVE_FEES: FeeSchedule = Object.freeze({
  * own documentation contradicts, and which a constant product growing across
  * every swap disproves.
  *
- * The total is left alone deliberately, and that is a judgement rather than an
- * oversight. PumpSwap's rate really does slide from about 1.25% on a fresh
- * graduate toward 0.30% as market cap climbs, so a single number is wrong
- * somewhere whatever it is, and 125 is wrong in the safe direction: a trader
- * quoted worse than reality has been treated more harshly than the market
- * would, which is the smaller sin. Replacing it with 29 on the evidence of one
- * liquid token would make every freshly graduated token generous, which is the
- * larger one. Thin pools could not be measured — their trades arrive in bundles
- * of several swaps per transaction, which this method cannot separate — so the
- * other end of the range is genuinely unknown rather than merely unmeasured.
+ * The total was left at 125 for one pass, on the reasoning that PumpSwap's rate
+ * slides from about 1.25% on a fresh graduate toward 0.30% as market cap
+ * climbs, so no single number could be right and the high end was at least
+ * wrong in the safe direction. That premise was false. There is one global
+ * config account holding three flat rates, and the ~0.30% end of the supposed
+ * range is simply the rate. Nothing slides.
  *
- * What it costs to leave: a trader on a migrated token pays four times the real
- * cost while a trader on a curve pays exactly the real cost, and both are
- * ranked against each other for the same prize. That is a fairness question
- * about the season, not only an accuracy one about the engine, and closing it
- * needs the actual sliding schedule rather than a better guess.
+ * The lesson is the reason this comment survives the fix: the argument for
+ * keeping a wrong number was good enough to hold for a pass, and what settled
+ * it was reading the account rather than reasoning about the constant.
  */
 export const PUMPSWAP_DEFAULT_FEES: FeeSchedule = Object.freeze({
   protocolBps: 95,

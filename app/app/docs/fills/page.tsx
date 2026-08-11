@@ -105,19 +105,21 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        <strong>And a graduated token costs you more here than it would on the market.</strong>{' '}
-        PumpSwap&rsquo;s fee slides down as a coin grows, from about 1.25% on a fresh graduate
-        toward 0.30% once it is established. This engine charges every graduated token the top of
-        that range. Measured against real buys on a large graduated coin, the market took about
-        0.3% and we take 1.25% — four times too much.
+        <strong>What a graduated token costs.</strong> PumpSwap publishes its fee schedule in an
+        account on chain, and that is where these numbers come from rather than from anything
+        written in this repository: 0.20% to the pool&rsquo;s liquidity providers, 0.05% protocol,
+        0.05% to the coin&rsquo;s creator. Thirty basis points, read live and re-read if it
+        changes.
       </p>
 
       <p>
-        It is left that way on purpose, because the alternative is charging some traders less than
-        the market really would, and a simulator that flatters you is worth nothing. But it is a
-        real cost and you should know it: if you trade migrated coins you are being handicapped
-        against someone trading the curve, where the fee is exact to the lamport. Fixing it
-        properly means reading the live fee schedule rather than picking a better constant.
+        Until recently the engine charged 1.25% here — the bonding curve&rsquo;s rate, copied
+        across and never checked, because the harness that checks fees only ever walked the curve.
+        Every migrated coin was four times too expensive to trade, and since a season ranks curve
+        traders and migrated-coin traders against each other for the same prize, that was a
+        handicap on one of them rather than only an inaccuracy. It is measured now, two
+        independent ways: the published schedule sums to 30 bps, and replaying real buys off the
+        chain recovers 29.
       </p>
 
       <h2>Check it yourself</h2>

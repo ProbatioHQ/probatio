@@ -1,12 +1,15 @@
-import type { PoolState } from '@probatio/sim';
+import type { FeeSchedule, PoolState } from '@probatio/sim';
 import { LayoutError } from './layout';
 import { PUMP_PROGRAM_ID, bondingCurveAddress, decodeBondingCurve } from './pumpfun';
 import { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 import {
   POOL_OFFSETS,
+  PUMPSWAP_GLOBAL_CONFIG,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
+  decodePumpSwapGlobalConfig,
   decodePumpSwapPool,
+  type PumpSwapGlobalConfig,
   type PumpSwapPool,
 } from './pumpswap';
 import { RpcClient } from './rpc';
@@ -37,9 +40,66 @@ export interface Resolution {
 
 export class PoolReader {
   readonly #rpc: RpcClient;
+  /** PumpSwap's published fee schedule. Read once, then reused. */
+  #globalConfig: PumpSwapGlobalConfig | null = null;
 
   constructor(rpc: RpcClient) {
     this.#rpc = rpc;
+  }
+
+  /**
+   * What PumpSwap charges, from PumpSwap.
+   *
+   * The rates used to be a constant in this repository, copied from the bonding
+   * curve's schedule: 125 bps against a real cost of about 30. Every graduated
+   * token was quoted at four times its true cost, which in a ranked season is
+   * not only an accuracy problem — a trader on a migrated coin was handicapped
+   * against one trading the curve, where the fee is exact, and the two are
+   * ranked together for the same prize.
+   *
+   * The config is cached for the life of the reader. It is an administered
+   * account that changes very rarely, and paying an extra round trip on every
+   * quote to re-read a number that has not moved would cost latency the fill
+   * model actually cares about.
+   *
+   * All three rates are charged, including the creator fee on a pool with no
+   * creator, and that is a measurement rather than a guess. The obvious reading
+   * is that a pool whose `coinCreator` is the zero address should not pay a
+   * creator fee, and it was written that way first. The measurement refused it:
+   * on exactly such a pool, real buys cost 29 bps, which is 20 + 5 + 5 rounded
+   * down and not 20 + 5. The fee comes out of the trade whether or not anybody
+   * is there to collect it, so quoting 25 would have handed traders a fill
+   * nobody could have got — a small error, in the direction that matters most.
+   */
+  async pumpSwapFees(_pool: PumpSwapPool): Promise<FeeSchedule> {
+    const config = await this.globalConfig();
+    if (!config) return PUMPSWAP_DEFAULT_FEES;
+
+    return {
+      protocolBps: config.protocolFeeBps,
+      creatorBps: config.coinCreatorFeeBps,
+      lpBps: config.lpFeeBps,
+    };
+  }
+
+  /**
+   * The config account, or null if it cannot be read or understood.
+   *
+   * Null falls back to the old constant, and that is the safe direction on
+   * purpose: 125 bps quotes a trader worse than the market, which is the
+   * smaller sin. Guessing lower on a failed read would hand out fills nobody
+   * could have got.
+   */
+  async globalConfig(): Promise<PumpSwapGlobalConfig | null> {
+    if (this.#globalConfig) return this.#globalConfig;
+    try {
+      const [account] = await this.#rpc.getAccounts([PUMPSWAP_GLOBAL_CONFIG]);
+      if (!account || account.owner !== PUMPSWAP_PROGRAM_ID) return null;
+      this.#globalConfig = decodePumpSwapGlobalConfig(account.data);
+      return this.#globalConfig;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -255,7 +315,7 @@ export class PoolReader {
       // deliverable. Only a bonding curve splits the two.
       deliverableTokens: base.amount,
       tokenDecimals: decimals,
-      fees: PUMPSWAP_DEFAULT_FEES,
+      fees: await this.pumpSwapFees(pool),
       source: 'pumpswap',
       slot: baseAccount.slot,
     };

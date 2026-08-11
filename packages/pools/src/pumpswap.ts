@@ -92,3 +92,90 @@ export function decodePumpSwapPool(data: Uint8Array): PumpSwapPool {
 
   return pool;
 }
+
+/**
+ * PumpSwap's fee schedule, which lives on chain rather than in this repository.
+ *
+ * The rates were a constant here, copied from the bonding curve's schedule, and
+ * measurably wrong: 125 bps against a real cost of about 30. The comment
+ * defending the copy said PumpSwap's rate slides with market cap so no single
+ * number could be right, and used the high end deliberately. The premise was
+ * wrong. There is one global config account and it holds three flat numbers.
+ *
+ * Read from mainnet, and cross-checked: `scripts/measure-pumpswap-fees.mts`
+ * recovers 29 bps of total cost from real swaps by arithmetic that knows
+ * nothing about this account, and this account says 30. Two independent methods
+ * on the same number is the standard the curve schedule was already held to.
+ *
+ *   0x000  discriminator                     8 bytes
+ *   0x008  admin                             Pubkey
+ *   0x028  lp_fee_basis_points               u64   (20)
+ *   0x030  protocol_fee_basis_points         u64   (5)
+ *   0x038  protocol_fee_recipients           Pubkey[8]
+ *   0x138  disable_flags                     u8
+ *   0x139  coin_creator_fee_basis_points     u64   (5)
+ *
+ * The recipient array is what pushes the creator fee off an eight-byte
+ * boundary, which is why it is at 0x139 and not 0x138.
+ */
+export const PUMPSWAP_GLOBAL_CONFIG = 'ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw';
+
+export const GLOBAL_CONFIG_OFFSETS = {
+  admin: 0x008,
+  lpFeeBasisPoints: 0x028,
+  protocolFeeBasisPoints: 0x030,
+  disableFlags: 0x138,
+  coinCreatorFeeBasisPoints: 0x139,
+} as const;
+
+export const GLOBAL_CONFIG_MIN_BYTES = GLOBAL_CONFIG_OFFSETS.coinCreatorFeeBasisPoints + 8;
+
+/** Anchor discriminator for GlobalConfig, taken from the live account. */
+export const GLOBAL_CONFIG_DISCRIMINATOR = Uint8Array.from([
+  0x95, 0x08, 0x9c, 0xca, 0xa0, 0xfc, 0xb0, 0xd9,
+]);
+
+export interface PumpSwapGlobalConfig {
+  readonly admin: string;
+  readonly lpFeeBps: number;
+  readonly protocolFeeBps: number;
+  readonly coinCreatorFeeBps: number;
+}
+
+export function decodePumpSwapGlobalConfig(data: Uint8Array): PumpSwapGlobalConfig {
+  if (data.length < GLOBAL_CONFIG_MIN_BYTES) {
+    throw new LayoutError(
+      `pumpswap global config is ${data.length} bytes, expected at least ${GLOBAL_CONFIG_MIN_BYTES}`,
+    );
+  }
+  if (!discriminatorMatches(data, GLOBAL_CONFIG_DISCRIMINATOR)) {
+    throw new LayoutError(
+      'account discriminator is not GlobalConfig — this is a different account type',
+    );
+  }
+
+  const o = GLOBAL_CONFIG_OFFSETS;
+  const config: PumpSwapGlobalConfig = {
+    admin: readPubkey(data, o.admin),
+    lpFeeBps: Number(readU64(data, o.lpFeeBasisPoints)),
+    protocolFeeBps: Number(readU64(data, o.protocolFeeBasisPoints)),
+    coinCreatorFeeBps: Number(readU64(data, o.coinCreatorFeeBasisPoints)),
+  };
+
+  // A misread offset produces enormous numbers rather than plausible ones, so
+  // this is the check that a layout change is noticed instead of quoted. A fee
+  // above 10% is not a fee PumpSwap charges; it is a field that moved.
+  for (const [name, value] of [
+    ['lp', config.lpFeeBps],
+    ['protocol', config.protocolFeeBps],
+    ['coin creator', config.coinCreatorFeeBps],
+  ] as const) {
+    if (!Number.isSafeInteger(value) || value < 0 || value > 1_000) {
+      throw new LayoutError(
+        `pumpswap ${name} fee reads ${value} bps, which is not a fee — the layout has moved`,
+      );
+    }
+  }
+
+  return config;
+}

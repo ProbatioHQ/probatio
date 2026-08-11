@@ -43,14 +43,19 @@ export {
 export type { TokenAccount, TokenAccountState } from './token';
 
 export {
+  GLOBAL_CONFIG_DISCRIMINATOR,
+  GLOBAL_CONFIG_MIN_BYTES,
+  GLOBAL_CONFIG_OFFSETS,
   POOL_DISCRIMINATOR,
   POOL_MIN_BYTES,
   POOL_OFFSETS,
+  PUMPSWAP_GLOBAL_CONFIG,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
+  decodePumpSwapGlobalConfig,
   decodePumpSwapPool,
 } from './pumpswap';
-export type { PumpSwapPool } from './pumpswap';
+export type { PumpSwapGlobalConfig, PumpSwapPool } from './pumpswap';
 
 export {
   BPF_UPGRADEABLE_LOADER,
