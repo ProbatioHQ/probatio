@@ -14,5 +14,8 @@ export type { OrderedEvent, Sample, SkipReason, ValidationReport } from './repla
 
 export { formatReport } from './format';
 
+export { asPoolSwap, collectPoolSwaps, joins, replayPool, swapCount } from './pumpswap';
+export type { CollectPoolOptions, PoolSwap } from './pumpswap';
+
 export { DEFAULT_THRESHOLDS, assessDrift, assessToken } from './drift';
 export type { DriftAssessment, DriftSeverity, DriftThresholds, TokenDrift } from './drift';

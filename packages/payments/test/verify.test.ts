@@ -23,6 +23,8 @@ function landed(overrides: Partial<ConfirmedTransaction> = {}): ConfirmedTransac
     accountKeys: [PAYER, TREASURY, REFERENCE, '11111111111111111111111111111111'],
     preBalances: [1_000_000_000n, 0n, 0n, 1n],
     postBalances: [949_995_000n, 50_000_000n, 0n, 1n],
+    preTokenBalances: [],
+    postTokenBalances: [],
     logMessages: [],
     ...overrides,
   };

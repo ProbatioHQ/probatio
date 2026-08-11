@@ -25,6 +25,9 @@ import { decodeMintDecimals, decodeTokenAccount } from './token';
  * reader has to say plainly which venue a quote came from.
  */
 
+/** A pool with no creator to pay. Anchor writes an unset Pubkey as all zeros. */
+const UNSET_CREATOR = '11111111111111111111111111111111';
+
 export type Venue =
   | { readonly kind: 'pumpfun-curve'; readonly curveAddress: string }
   | { readonly kind: 'pumpswap'; readonly poolAddress: string; readonly graduated: true }
@@ -62,22 +65,27 @@ export class PoolReader {
    * quote to re-read a number that has not moved would cost latency the fill
    * model actually cares about.
    *
-   * All three rates are charged, including the creator fee on a pool with no
-   * creator, and that is a measurement rather than a guess. The obvious reading
-   * is that a pool whose `coinCreator` is the zero address should not pay a
-   * creator fee, and it was written that way first. The measurement refused it:
-   * on exactly such a pool, real buys cost 29 bps, which is 20 + 5 + 5 rounded
-   * down and not 20 + 5. The fee comes out of the trade whether or not anybody
-   * is there to collect it, so quoting 25 would have handed traders a fill
-   * nobody could have got — a small error, in the direction that matters most.
+   * The creator fee is charged only where there is a creator to pay it to. A
+   * pool whose `coinCreator` is unset has none.
+   *
+   * This was written that way, then changed to charge it always, then changed
+   * back — and the round trip is worth recording because of what settled it.
+   * The evidence for charging always was a crude measurement putting a
+   * creatorless pool's cost at 29 bps, which is 20 + 5 + 5 and not 20 + 5. That
+   * measurement was counting the front end's own cut as the venue's, so the
+   * number was several basis points too high and pointed the wrong way.
+   *
+   * The replay harness settled it, which is what a harness is for: quoting the
+   * creator fee on a creatorless pool leaves every single sample short by
+   * exactly five basis points, and dropping it leaves them exact.
    */
-  async pumpSwapFees(_pool: PumpSwapPool): Promise<FeeSchedule> {
+  async pumpSwapFees(pool: PumpSwapPool): Promise<FeeSchedule> {
     const config = await this.globalConfig();
     if (!config) return PUMPSWAP_DEFAULT_FEES;
 
     return {
       protocolBps: config.protocolFeeBps,
-      creatorBps: config.coinCreatorFeeBps,
+      creatorBps: pool.coinCreator === UNSET_CREATOR ? 0 : config.coinCreatorFeeBps,
       lpBps: config.lpFeeBps,
     };
   }

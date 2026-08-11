@@ -118,15 +118,22 @@ export function decodePumpSwapPool(data: Uint8Array): PumpSwapPool {
  * The recipient array is what pushes the creator fee off an eight-byte
  * boundary, which is why it is at 0x139 and not 0x138.
  */
+/** Anchor writes an empty Pubkey slot as thirty-two zero bytes. */
+const UNSET_PUBKEY = '11111111111111111111111111111111';
+
 export const PUMPSWAP_GLOBAL_CONFIG = 'ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw';
 
 export const GLOBAL_CONFIG_OFFSETS = {
   admin: 0x008,
   lpFeeBasisPoints: 0x028,
   protocolFeeBasisPoints: 0x030,
+  protocolFeeRecipients: 0x038,
   disableFlags: 0x138,
   coinCreatorFeeBasisPoints: 0x139,
 } as const;
+
+/** The recipient array is eight slots wide whether or not all are in use. */
+export const PROTOCOL_FEE_RECIPIENT_SLOTS = 8;
 
 export const GLOBAL_CONFIG_MIN_BYTES = GLOBAL_CONFIG_OFFSETS.coinCreatorFeeBasisPoints + 8;
 
@@ -140,6 +147,16 @@ export interface PumpSwapGlobalConfig {
   readonly lpFeeBps: number;
   readonly protocolFeeBps: number;
   readonly coinCreatorFeeBps: number;
+  /**
+   * Where the protocol fee goes. Unset slots are dropped.
+   *
+   * Worth having because it is the only way to tell PumpSwap's own fee apart
+   * from somebody else's. Most swaps arrive through a front end or a bot that
+   * takes a cut of its own in the same transaction, and a reader that treats
+   * every wrapped-SOL account which gained as a venue fee will attribute that
+   * cut to PumpSwap.
+   */
+  readonly protocolFeeRecipients: readonly string[];
 }
 
 export function decodePumpSwapGlobalConfig(data: Uint8Array): PumpSwapGlobalConfig {
@@ -155,11 +172,18 @@ export function decodePumpSwapGlobalConfig(data: Uint8Array): PumpSwapGlobalConf
   }
 
   const o = GLOBAL_CONFIG_OFFSETS;
+  const recipients: string[] = [];
+  for (let slot = 0; slot < PROTOCOL_FEE_RECIPIENT_SLOTS; slot += 1) {
+    const recipient = readPubkey(data, o.protocolFeeRecipients + slot * 32);
+    if (recipient !== UNSET_PUBKEY) recipients.push(recipient);
+  }
+
   const config: PumpSwapGlobalConfig = {
     admin: readPubkey(data, o.admin),
     lpFeeBps: Number(readU64(data, o.lpFeeBasisPoints)),
     protocolFeeBps: Number(readU64(data, o.protocolFeeBasisPoints)),
     coinCreatorFeeBps: Number(readU64(data, o.coinCreatorFeeBasisPoints)),
+    protocolFeeRecipients: recipients,
   };
 
   // A misread offset produces enormous numbers rather than plausible ones, so

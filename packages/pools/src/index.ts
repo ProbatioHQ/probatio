@@ -46,6 +46,7 @@ export {
   GLOBAL_CONFIG_DISCRIMINATOR,
   GLOBAL_CONFIG_MIN_BYTES,
   GLOBAL_CONFIG_OFFSETS,
+  PROTOCOL_FEE_RECIPIENT_SLOTS,
   POOL_DISCRIMINATOR,
   POOL_MIN_BYTES,
   POOL_OFFSETS,
@@ -72,6 +73,7 @@ export type {
   ProgramAccountFilter,
   RpcOptions,
   SignatureInfo,
+  TokenBalanceChange,
   TransactionLogs,
 } from './rpc';
 

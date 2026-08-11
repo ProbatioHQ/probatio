@@ -96,12 +96,21 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        <strong>What this does not cover.</strong> The harness follows a token&rsquo;s bonding
-        curve, so every sample above is a curve fill. Once a token graduates it trades on
-        PumpSwap, and those fills are not measured here — the engine prices them from the pool
-        reserves the same way, but &ldquo;the same way&rdquo; is an argument and this page is
-        supposed to contain the opposite of one. Treat the number as what it is: the curve,
-        measured.
+        <strong>After graduation.</strong> Every sample above is a curve fill, because that
+        harness walks a token&rsquo;s bonding curve and stops where the curve does. There is now
+        a second one for PumpSwap, where a token trades once it graduates. On a liquid graduated
+        coin it reproduces real swaps at 0 bps — median, 95th percentile and worst case — across
+        buys and sells, most of them identical to the smallest unit and the rest within one of
+        it.
+      </p>
+
+      <p>
+        It is not yet a claim about every graduated coin. On a thin, heavily botted pool the same
+        harness disagrees with reality by a wide margin, and the cause is not settled: the pool
+        account carries fields we do not read, and the balances sitting in its vaults may not all
+        be liquidity that trades. Until that is understood, the honest statement is that the
+        engine is measured exact on the graduated coins where it can be checked, and unverified
+        on thin ones. Both harnesses are in the repository and run against mainnet.
       </p>
 
       <p>
@@ -127,7 +136,7 @@ export default function FillsDoc() {
       <p>The harness is in the repository and runs against mainnet:</p>
 
       <pre>
-        <code>RPC_VALIDATION=1 npx vitest run packages/validation/test/mainnet.test.ts</code>
+        <code>RPC_VALIDATION=1 npx vitest run packages/validation/test/mainnet.test.ts{'\n'}npx tsx scripts/replay-pumpswap.mts &lt;mint&gt;</code>
       </pre>
 
       <p>

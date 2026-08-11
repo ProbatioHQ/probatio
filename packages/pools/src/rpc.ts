@@ -421,12 +421,65 @@ export class RpcClient {
       slot: result.slot,
       blockTime: result.blockTime ?? null,
       err: result.meta?.err ?? null,
-      accountKeys: result.transaction?.message?.accountKeys ?? [],
+      accountKeys: allAccountKeys(result),
       preBalances: (result.meta?.preBalances ?? []).map((value) => BigInt(value)),
       postBalances: (result.meta?.postBalances ?? []).map((value) => BigInt(value)),
+      preTokenBalances: tokenBalances(result.meta?.preTokenBalances),
+      postTokenBalances: tokenBalances(result.meta?.postTokenBalances),
       logMessages: result.meta?.logMessages ?? [],
     };
   }
+}
+
+/**
+ * Every account a transaction touched, in the order its balance arrays index.
+ *
+ * A versioned transaction can load most of its accounts from an address lookup
+ * table, and those do not appear in the message — they arrive separately in
+ * `loadedAddresses`. The balance arrays are indexed over the whole set, so
+ * reading `accountKeys[i]` without them silently resolves the wrong account or
+ * none at all.
+ *
+ * The order is fixed by the runtime and is not a choice: static keys first,
+ * then the writable loaded addresses, then the readonly ones. Getting it wrong
+ * would be worse than omitting them, because every index would still resolve to
+ * something.
+ *
+ * Found when a replay of a PumpSwap pool recognised one swap in a hundred and
+ * fifty transactions: on that venue the pool's own vaults are routinely in the
+ * lookup table, so almost every real trade looked like it never touched the
+ * pool. The same gap could refuse a genuine entry payment, since a wallet is
+ * free to send a versioned transaction and the treasury it paid would not be
+ * found among the keys.
+ */
+function allAccountKeys(result: RawFullTransaction): string[] {
+  const statics = result.transaction?.message?.accountKeys ?? [];
+  const loaded = result.meta?.loadedAddresses;
+  if (!loaded) return [...statics];
+  return [...statics, ...(loaded.writable ?? []), ...(loaded.readonly ?? [])];
+}
+
+function tokenBalances(raw: RawTokenBalance[] | undefined): TokenBalanceChange[] {
+  return (raw ?? []).map((entry) => ({
+    accountIndex: entry.accountIndex,
+    mint: entry.mint,
+    amount: BigInt(entry.uiTokenAmount?.amount ?? '0'),
+  }));
+}
+
+/**
+ * An SPL token balance, as it stood before or after a transaction.
+ *
+ * Separate from the lamport arrays because an AMM's reserves are not lamports:
+ * a pool's SOL side is wrapped SOL sitting in an ordinary token account, so the
+ * only way to see a swap move it is here. `accountIndex` points into
+ * `accountKeys`, and the RPC omits accounts that hold no token at all, so this
+ * array is shorter than that one and must never be indexed in parallel with it.
+ */
+export interface TokenBalanceChange {
+  readonly accountIndex: number;
+  readonly mint: string;
+  readonly amount: bigint;
 }
 
 export interface ConfirmedTransaction {
@@ -438,7 +491,15 @@ export interface ConfirmedTransaction {
   readonly accountKeys: readonly string[];
   readonly preBalances: readonly bigint[];
   readonly postBalances: readonly bigint[];
+  readonly preTokenBalances: readonly TokenBalanceChange[];
+  readonly postTokenBalances: readonly TokenBalanceChange[];
   readonly logMessages: readonly string[];
+}
+
+interface RawTokenBalance {
+  accountIndex: number;
+  mint: string;
+  uiTokenAmount?: { amount?: string };
 }
 
 interface RawFullTransaction {
@@ -449,6 +510,9 @@ interface RawFullTransaction {
     err?: unknown;
     preBalances?: number[];
     postBalances?: number[];
+    preTokenBalances?: RawTokenBalance[];
+    postTokenBalances?: RawTokenBalance[];
+    loadedAddresses?: { writable?: string[]; readonly?: string[] } | null;
     logMessages?: string[];
   } | null;
 }
