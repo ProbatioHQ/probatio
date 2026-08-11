@@ -4,6 +4,7 @@ import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import { subscribeToCurves, subscribeToLaunches, takeStreamSlot } from '@/lib/launch-stream';
 import { knownImages } from '@/lib/token-images';
 import { rateLimit } from '@/lib/rate-limit';
+import { feedIsLive } from '@/lib/health';
 
 /**
  * The launch feed as it happens.
@@ -57,7 +58,9 @@ export async function GET(request: Request): Promise<Response> {
       // Tells the client to stop showing a reconnecting state, and gives the
       // browser its retry interval.
       controller.enqueue(encoder.encode('retry: 4000\n\n'));
-      send('ready', { ok: true });
+      // Whether this connection is open is not the same question as whether
+      // anything will come down it. Both are reported.
+      send('ready', { ok: true, feedLive: feedIsLive() });
 
       const unsubscribe = subscribeToLaunches((launches: readonly Launch[]) => {
         // A brand-new token has no picture yet — the document is published
@@ -107,6 +110,9 @@ export async function GET(request: Request): Promise<Response> {
         if (!open) return;
         try {
           controller.enqueue(encoder.encode(': ping\n\n'));
+          // The upstream feed can drop while this connection stays perfectly
+          // healthy, so its state is re-sent rather than only announced once.
+          send('status', { feedLive: feedIsLive() });
         } catch {
           open = false;
         }

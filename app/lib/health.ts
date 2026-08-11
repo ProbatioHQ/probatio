@@ -27,21 +27,66 @@ let started = false;
  * healthy feed on a server where the feed was never started — which is a lie
  * that looks like good news, the worst kind for a status page to tell.
  */
-const feedState = { running: false, connected: false, startedAt: 0 };
+interface FeedState {
+  running: boolean;
+  connected: boolean;
+  startedAt: number;
+}
+
+/**
+ * On `globalThis`, and this is the third time.
+ *
+ * `instrumentation.ts` and a route handler compile into separate bundles, so a
+ * module-level object here exists once per bundle. The feed reports its state
+ * from the instrumentation side; anything reading it from a route sees a copy
+ * that is never written to and therefore permanently reports a dead feed.
+ *
+ * The health endpoint never noticed because it answers from outage rows in the
+ * database, which both bundles share. The moment something read this object
+ * directly — a "streaming" indicator that wanted to know whether launches were
+ * actually arriving — it read false forever, on a perfectly healthy feed.
+ *
+ * The launch stream registry and the open-stream counter are on `globalThis`
+ * for exactly this reason. Anything in `app/lib` that holds state written by a
+ * background worker and read by a request belongs there too.
+ */
+const FEED_KEY = Symbol.for('probatio.feed-state');
+
+function feedStateStore(): FeedState {
+  const store = globalThis as typeof globalThis & { [FEED_KEY]?: FeedState };
+  store[FEED_KEY] ??= { running: false, connected: false, startedAt: 0 };
+  return store[FEED_KEY];
+}
 
 /** A socket needs a moment to connect. Below this, silence is not an outage. */
 const CONNECT_GRACE_MS = 20_000;
 
 export function reportFeedRunning(): void {
+  const feedState = feedStateStore();
   feedState.running = true;
   feedState.startedAt = Date.now();
 }
 
 export function reportFeedState(connected: boolean): void {
-  feedState.connected = connected;
+  feedStateStore().connected = connected;
+}
+
+/**
+ * Whether launches can actually arrive right now.
+ *
+ * The feed page showed "streaming" whenever its own connection to this server
+ * was open, which says nothing about whether this server is hearing anything
+ * from Solana. With the upstream feed down the page claimed to be streaming
+ * while the banner directly above it said new launches were not arriving —
+ * two true-ish statements that contradict each other, on the same screen.
+ */
+export function feedIsLive(): boolean {
+  const feedState = feedStateStore();
+  return feedState.running && feedState.connected;
 }
 
 function feedFailure(): string | null {
+  const feedState = feedStateStore();
   if (!feedState.running) return 'feed not running on this instance';
   if (feedState.connected) return null;
 

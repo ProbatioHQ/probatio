@@ -71,7 +71,11 @@ const REQUIREMENTS: {
     capability: 'launches',
     needs: ['feed'],
     stops: false,
-    degradedNote: 'New launches are not arriving. The list shows what was seen before the feed dropped.',
+    // Says nothing about what is already listed, because on a fresh install
+    // there is nothing — "the list shows what was seen before the feed
+    // dropped" described a list that had never existed.
+    degradedNote:
+      'New launches are not arriving. Nothing new will appear until the feed reconnects.',
     stoppedNote: '',
   },
   {

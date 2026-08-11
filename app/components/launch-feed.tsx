@@ -217,7 +217,10 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   const [lanes, setLanes] = useState<Lanes | null>(null);
   const [results, setResults] = useState<Token[] | null>(null);
   const [query, setQuery] = useState('');
+  /** This connection is open. */
   const [live, setLive] = useState(false);
+  /** Launches can actually arrive — the upstream feed is up. Null until told. */
+  const [feedLive, setFeedLive] = useState<boolean | null>(null);
   const [arrived, setArrived] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
   const [solUsd, setSolUsd] = useState<number | null>(null);
@@ -335,7 +338,24 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   useEffect(() => {
     const source = new EventSource('/api/launches/stream');
 
-    source.addEventListener('ready', () => setLive(true));
+    source.addEventListener('ready', (event) => {
+      setLive(true);
+      try {
+        const body = JSON.parse((event as MessageEvent<string>).data) as { feedLive?: boolean };
+        if (typeof body.feedLive === 'boolean') setFeedLive(body.feedLive);
+      } catch {
+        // A malformed ready payload is not a reason to fail the connection.
+      }
+    });
+
+    source.addEventListener('status', (event) => {
+      try {
+        const body = JSON.parse((event as MessageEvent<string>).data) as { feedLive?: boolean };
+        if (typeof body.feedLive === 'boolean') setFeedLive(body.feedLive);
+      } catch {
+        // Same.
+      }
+    });
 
     source.addEventListener('launches', (event) => {
       // While somebody is searching, arrivals would shove their results
@@ -515,8 +535,18 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
       <div className="term-bar">
         <span className="prompt">~/feed</span>
         <span>pump.fun</span>
-        <span className={live && !filters.paused ? 'pill live' : 'pill'}>
-          {filters.paused ? 'paused' : live ? 'streaming' : 'reconnecting'}
+        {/* Three states, because there are three. Connected and hearing
+            launches is streaming; connected to a server that is hearing
+            nothing is stalled, which used to read as streaming while the
+            banner above said the opposite. */}
+        <span className={live && feedLive !== false && !filters.paused ? 'pill live' : 'pill'}>
+          {filters.paused
+            ? 'paused'
+            : !live
+              ? 'reconnecting'
+              : feedLive === false
+                ? 'stalled'
+                : 'streaming'}
         </span>
         <span className="lights">
           <i />
