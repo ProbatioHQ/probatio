@@ -15,6 +15,29 @@ import { rateLimit } from '@/lib/rate-limit';
  * records are correct is the thing the whole design exists to avoid needing.
  */
 
+/**
+ * The trader's most recent season that actually has commitments, if any.
+ *
+ * Read straight from the commits table rather than guessed from the season
+ * list: a trader may have traded in three seasons and be committed in one.
+ */
+async function seasonWithCommitsFor(
+  client: Awaited<ReturnType<typeof db>>,
+  trader: string,
+): Promise<{ id: number; ordinal: number } | null> {
+  const result = await client.execute({
+    sql: `SELECT c.season_id AS id, s.ordinal AS ordinal
+          FROM commits c
+          JOIN seasons s ON s.id = c.season_id
+          WHERE c.user_pubkey = ? AND c.confirmed_at IS NOT NULL
+          ORDER BY s.ordinal DESC, c.id DESC
+          LIMIT 1`,
+    args: [trader],
+  });
+  const row = result.rows[0];
+  return row ? { id: Number(row['id']), ordinal: Number(row['ordinal']) } : null;
+}
+
 export async function GET(request: Request): Promise<Response> {
   const throttled = await rateLimit(request, 'chainRead');
   if (throttled.response) return throttled.response;
@@ -30,18 +53,51 @@ export async function GET(request: Request): Promise<Response> {
   const client = await db();
   const now = Date.now();
 
-  const season =
-    ordinal === null
-      ? null
-      : await seasonByOrdinal(client, Number(ordinal));
-  const seasonId = season?.id ?? (await ensureFreePlaySeason(client, now));
+  /*
+   * Which season to prove.
+   *
+   * Asked for explicitly when a season is named. Otherwise the one this trader
+   * actually has commitments in, most recent first — because defaulting to
+   * free play meant the verify page could only ever check unranked records.
+   * Every ranked season is the one that pays money, and there was no way to
+   * reach one from the interface at all: the form has a wallet and an endpoint
+   * and nowhere to say which season.
+   *
+   * A parsed ordinal is required to be a number. `Number('abc')` is NaN, which
+   * matched nothing and fell through to free play, quietly answering a
+   * different question than the one asked.
+   */
+  const parsed = ordinal === null ? null : Number(ordinal);
+  if (parsed !== null && !Number.isInteger(parsed)) {
+    return Response.json({ error: 'season must be an integer ordinal' }, { status: 400 });
+  }
+
+  const season = parsed === null ? null : await seasonByOrdinal(client, parsed);
+  if (parsed !== null && !season) {
+    return Response.json({ error: `no season with ordinal ${parsed}` }, { status: 404 });
+  }
+
+  const withCommits = season ? null : await seasonWithCommitsFor(client, trader);
+  const seasonId = season?.id ?? withCommits?.id ?? (await ensureFreePlaySeason(client, now));
+
+  /*
+   * The ordinal of the season actually used, not of the one that was asked for.
+   *
+   * These are two different things whenever the season is chosen rather than
+   * named, and reporting the wrong one is not cosmetic: the verifier derives
+   * the on-chain record address from this number. Sending -1 while proving
+   * season 0 pointed the reader's browser at an account that does not exist
+   * and reported the record as missing — a failed verification for a record
+   * that was committed correctly.
+   */
+  const usedOrdinal = season?.ordinal ?? withCommits?.ordinal ?? -1;
 
   const commits = await commitHistory(client, seasonId, trader);
   if (commits.length === 0) {
     return Response.json({
       trader,
       seasonId,
-      seasonOrdinal: season?.ordinal ?? -1,
+      seasonOrdinal: usedOrdinal,
       batches: [],
       note: 'Nothing has been committed on chain for this trader in this season yet.',
     });
@@ -84,7 +140,7 @@ export async function GET(request: Request): Promise<Response> {
   return Response.json({
     trader,
     seasonId,
-    seasonOrdinal: season?.ordinal ?? -1,
+    seasonOrdinal: usedOrdinal,
     batches,
     // Read this from the chain yourself. Ours is not the copy that counts.
     howToVerify:

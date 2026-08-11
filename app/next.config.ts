@@ -50,7 +50,13 @@ const isProduction = process.env.NODE_ENV === 'production';
  * hosts: "an endpoint you choose" means any endpoint, and a list of approved
  * ones would put this server back in the middle of the answer.
  */
-const VERIFY_CONNECT_SRC = "connect-src 'self' https:";
+const VERIFY_CONNECT_SRC = isProduction
+  ? "connect-src 'self' https:"
+  : // A local validator is plain http on 127.0.0.1, so an https-only policy
+    // made the verify page unusable against one — which is exactly the setup
+    // anybody developing or self-hosting checks against first. Development
+    // only; a deployed site still refuses everything but https.
+    "connect-src 'self' https: http://127.0.0.1:* http://localhost:*";
 
 const csp = [
   "default-src 'self'",
