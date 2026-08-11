@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   EMPTY_ACCUMULATOR,
   buildProof,
@@ -118,17 +118,53 @@ const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
 export function Verifier() {
   const [trader, setTrader] = useState('');
   const [rpc, setRpc] = useState(DEFAULT_RPC);
+  /** So a link that says "check this record" only ever checks it once. */
+  const autoRan = useRef(false);
   const [checks, setChecks] = useState<Check[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function run(): Promise<void> {
+  /*
+   * A wallet in the link fills the form and runs the check.
+   *
+   * Every profile page links here as "Check this record yourself" with the
+   * trader in the query string, and nothing read it — so the one path built for
+   * a sceptic dropped them on an empty form and asked them to copy the address
+   * back out of the page they had just left. The link looked like it worked.
+   *
+   * Read from `window.location` rather than `useSearchParams`, which would make
+   * this page dynamic and require a Suspense boundary for a value that only
+   * matters in the browser.
+   */
+  useEffect(() => {
+    if (autoRan.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const linked = params.get('trader');
+    if (!linked) return;
+
+    autoRan.current = true;
+    setTrader(linked);
+    const endpoint = params.get('rpc');
+    if (endpoint) setRpc(endpoint);
+    void run(linked, endpoint ?? undefined);
+    // Once, on arrival. `run` is stable enough for this and re-running on every
+    // keystroke is the opposite of what a prefilled link should do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function run(overrideTrader?: string, overrideRpc?: string): Promise<void> {
     setBusy(true);
     setChecks(null);
     setNote(null);
 
     try {
-      const response = await fetch(`/api/proof?trader=${encodeURIComponent(trader.trim())}`);
+      // The overrides matter: when a link triggers this, the state set a line
+      // earlier has not been committed yet, so reading `trader` here would send
+      // an empty address.
+      const who = (overrideTrader ?? trader).trim();
+      const endpoint = (overrideRpc ?? rpc).trim();
+
+      const response = await fetch(`/api/proof?trader=${encodeURIComponent(who)}`);
       const bundle = (await response.json()) as Bundle & { error?: string };
 
       if (!response.ok) {
@@ -204,7 +240,7 @@ export function Verifier() {
       // 4. The chain itself. Read from the reader's own endpoint, because a
       //    verification that trusts our copy of the answer verifies nothing.
       try {
-        const chainResponse = await fetch(rpc.trim(), {
+        const chainResponse = await fetch(endpoint, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth', params: [] }),
@@ -248,7 +284,7 @@ export function Verifier() {
        */
       try {
         const account = recordPda(seasonPda(bundle.seasonOrdinal), bundle.trader);
-        const response = await fetch(rpc.trim(), {
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({

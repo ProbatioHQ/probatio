@@ -11,28 +11,54 @@
  *
  *   DATABASE_URL=file:./app/probatio.db npx tsx scripts/keeper-audit.mts
  */
-import { migrate, openDatabase, seasonByOrdinal } from '@probatio/db';
-import { auditRecords, type ChainGateway } from '@probatio/keeper';
+import { readFileSync } from 'node:fs';
+import { migrate, openDatabase } from '@probatio/db';
+import { RpcClient } from '@probatio/pools';
+import { auditRecords, SolanaGateway, type ChainGateway } from '@probatio/keeper';
 
 const url = process.env['DATABASE_URL'] ?? 'file:./app/probatio.db';
+const endpoint = process.env['RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+const keypairPath = process.env['KEEPER_KEYPAIR'] ?? process.argv[2];
 
 const db = openDatabase({ url });
 await migrate(db);
 
-/**
- * The concrete gateway arrives with deployment. Until the program is on a
- * cluster there is nothing to read, and a stub that returned "fine" would be
- * worse than an honest refusal — an audit that always passes is not an audit.
+/*
+ * The gateway, actually built.
+ *
+ * This was `const gateway: ChainGateway | null = null` with a comment saying
+ * the concrete one "arrives with deployment". It arrived. `SolanaGateway` has
+ * existed for a long time, is exercised by the drill, and commits real batches
+ * — but this script kept its placeholder, so it printed "the program is not
+ * deployed" no matter what was deployed, and exited zero.
+ *
+ * That matters more here than in most places. This is the standing check for
+ * whether somebody else has used the keeper key, and a check that cannot run
+ * is indistinguishable from one that always passes. It was reporting nothing
+ * while claiming to report nothing, which is the only reason it was not worse.
+ *
+ * Reading a record needs an address, not a signature, but the gateway takes
+ * the key it signs with — so the audit is run with the same key the keeper
+ * uses, which is what an operator has to hand anyway.
  */
-const gateway: ChainGateway | null = null;
-
-if (gateway === null) {
-  const seasons = await db.execute('SELECT ordinal FROM seasons WHERE ranked = 1');
-  console.log('The program is not deployed, so there is no chain to audit against.');
-  console.log(`${seasons.rows.length} ranked season(s) recorded locally.`);
-  console.log('\nThis check cannot pass or fail yet, and is reporting neither.');
-  process.exit(0);
+if (!keypairPath) {
+  console.error('set KEEPER_KEYPAIR, or pass a keypair path, so the audit can read the chain');
+  process.exit(1);
 }
+
+let gateway: ChainGateway;
+try {
+  const secret = Uint8Array.from(JSON.parse(readFileSync(keypairPath, 'utf8')) as number[]);
+  gateway = new SolanaGateway({
+    rpc: new RpcClient({ endpoint, timeoutMs: 30_000, minIntervalMs: 120 }),
+    keeperSecret: secret,
+  });
+} catch (error) {
+  console.error(`could not build a gateway from ${keypairPath}:`, error);
+  process.exit(1);
+}
+
+console.log(`auditing against ${endpoint}\n`);
 
 const ordinals = new Map<number, number>();
 for (const row of (await db.execute('SELECT id, ordinal FROM seasons')).rows) {
