@@ -43,11 +43,35 @@ const MAX_MINTS = 400;
  */
 const MAX_PER_MINT = 500;
 
-const pending = new Map<string, Observation[]>();
-let timer: ReturnType<typeof setInterval> | null = null;
-let flushing = false;
+/**
+ * On `globalThis`, for the reason written out in lib/health.ts.
+ *
+ * This buffer is filled by the websocket in the instrumentation bundle and was
+ * read by the health route in another, so `bufferedTradeMints` reported zero
+ * always. Measured: two hundred and thirty-four candles written in twelve
+ * seconds while health insisted nothing was buffered.
+ *
+ * That is worse than having no metric. It was added so a silent failure in the
+ * trade pipeline would be visible, and instead it was an instrument reading
+ * empty while thousands of observations flowed past it — the exact shape of
+ * reassuring lie it existed to prevent.
+ */
+interface TradeBuffer {
+  pending: Map<string, Observation[]>;
+  timer: ReturnType<typeof setInterval> | null;
+  flushing: boolean;
+}
+
+const BUFFER_KEY = Symbol.for('probatio.trade-candles');
+
+function buffer(): TradeBuffer {
+  const store = globalThis as typeof globalThis & { [BUFFER_KEY]?: TradeBuffer };
+  store[BUFFER_KEY] ??= { pending: new Map(), timer: null, flushing: false };
+  return store[BUFFER_KEY];
+}
 
 export function ingestTradeEvents(events: readonly TradeEvent[]): void {
+  const { pending } = buffer();
   for (const event of events) {
     let observations = pending.get(event.mint);
     if (!observations) {
@@ -63,11 +87,12 @@ export function ingestTradeEvents(events: readonly TradeEvent[]): void {
 }
 
 async function flush(): Promise<void> {
-  if (flushing || pending.size === 0) return;
-  flushing = true;
+  const state = buffer();
+  if (state.flushing || state.pending.size === 0) return;
+  state.flushing = true;
 
-  const batch = [...pending.entries()];
-  pending.clear();
+  const batch = [...state.pending.entries()];
+  state.pending.clear();
 
   try {
     const client = await db();
@@ -82,24 +107,26 @@ async function flush(): Promise<void> {
       }
     }
   } finally {
-    flushing = false;
+    state.flushing = false;
   }
 }
 
 export function startTradeCandles(): void {
-  if (timer) return;
-  timer = setInterval(() => void flush().catch(() => undefined), FLUSH_INTERVAL_MS);
+  const state = buffer();
+  if (state.timer) return;
+  state.timer = setInterval(() => void flush().catch(() => undefined), FLUSH_INTERVAL_MS);
   // Never the reason the process stays alive.
-  timer.unref?.();
+  state.timer.unref?.();
 }
 
 export function stopTradeCandles(): void {
-  if (timer) clearInterval(timer);
-  timer = null;
-  pending.clear();
+  const state = buffer();
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+  state.pending.clear();
 }
 
 /** How many mints are waiting to be written. Reported rather than guessed at. */
 export function pendingTradeMints(): number {
-  return pending.size;
+  return buffer().pending.size;
 }

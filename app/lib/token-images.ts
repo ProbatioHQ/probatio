@@ -31,10 +31,26 @@ const CONCURRENCY = 4;
 /** Refresh an image at most this often. Metadata is mutable but rarely moves. */
 const STALE_MS = 24 * 60 * 60 * 1_000;
 
-/** Mints being resolved right now, so two callers do not fetch the same one. */
-const inFlight = new Set<string>();
+/**
+ * Mints being resolved right now, so two callers do not fetch the same one.
+ *
+ * Shared across bundles for the reason written out in lib/health.ts: this is
+ * called both by the launch feed in the instrumentation bundle and by the
+ * routes, and a per-bundle copy means each side happily fetches a document the
+ * other is already fetching. Not a correctness bug — the write is idempotent —
+ * but it is a stranger's IPFS gateway being asked twice for the same file, and
+ * the whole point of the set is to not do that.
+ */
+const IN_FLIGHT_KEY = Symbol.for('probatio.token-images-inflight');
+
+function inFlightSet(): Set<string> {
+  const store = globalThis as typeof globalThis & { [IN_FLIGHT_KEY]?: Set<string> };
+  store[IN_FLIGHT_KEY] ??= new Set();
+  return store[IN_FLIGHT_KEY];
+}
 
 async function resolveOne(mint: string, now: number): Promise<void> {
+  const inFlight = inFlightSet();
   if (inFlight.has(mint)) return;
   inFlight.add(mint);
   try {
@@ -84,7 +100,7 @@ async function resolveOne(mint: string, now: number): Promise<void> {
     // A picture is never worth failing a request over.
     console.error('[images] could not resolve', mint, error);
   } finally {
-    inFlight.delete(mint);
+    inFlightSet().delete(mint);
   }
 }
 
