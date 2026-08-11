@@ -14,7 +14,7 @@
  * deposit as a swap, and solving an arbitrage that buys and sells in one
  * transaction as a single badly priced trade.
  */
-import { PoolReader, RpcClient } from '@probatio/pools';
+import { PoolReader, RpcClient, pumpSwapReserveOffset } from '@probatio/pools';
 import { collectPoolSwaps, replayPool } from '@probatio/validation';
 import { totalFeeBps } from '@probatio/sim';
 
@@ -38,7 +38,11 @@ const swaps = await collectPoolSwaps(rpc, pool.address, pool.pool, {
 }, config?.protocolFeeRecipients ?? []);
 console.log(`\n${swaps.length} swaps\n`);
 
-const report = replayPool(mint, swaps, 6, 1, fees);
+const [poolAccount] = await rpc.getAccounts([pool.address]);
+const override = process.env['RESERVE_OFFSET'];
+const offset = override ? BigInt(override) : poolAccount ? pumpSwapReserveOffset(poolAccount.data) : 0n;
+console.log(`quote reserve offset: ${offset}`);
+const report = replayPool(mint, swaps, 6, 1, fees, offset);
 console.log(`events seen   ${report.eventsSeen}`);
 console.log(`samples       ${report.samples}  (${report.buys} buys, ${report.sells} sells)`);
 console.log(`skipped       ${report.skipped.not_consecutive} not consecutive, ${report.skipped.unquotable} unquotable, ${report.skipped.first_event} first`);

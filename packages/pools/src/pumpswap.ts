@@ -55,9 +55,41 @@ export const POOL_OFFSETS = {
   quoteVault: 0xab,
   lpSupply: 0xcb,
   coinCreator: 0xd3,
+  /**
+   * SOL the pool counts as reserve that is not sitting in its quote vault.
+   *
+   * Found by solving rather than by reading a specification. The engine priced
+   * some graduated pools a constant 2.8 times away from the market, which is
+   * the signature of a wrong reserve; solving what the SOL reserve must have
+   * been to produce two real fills gave a number consistently larger than the
+   * vault, and the difference was the same to four significant figures across
+   * trades taken minutes apart. That difference is stored here.
+   *
+   * Only trusted when adding it reproduces real swaps, which is checked rather
+   * than assumed — see `pumpSwapReserveOffset`.
+   */
+  quoteReserveOffset: 0xf5,
 } as const;
 
 export const POOL_MIN_BYTES = POOL_OFFSETS.coinCreator + 32;
+
+/** Enough of the account to also carry the reserve offset above. */
+export const POOL_WITH_OFFSET_BYTES = POOL_OFFSETS.quoteReserveOffset + 8;
+
+/**
+ * The SOL a pool counts beyond its quote vault, or zero when the account is too
+ * short to say.
+ *
+ * Kept out of `decodePumpSwapPool` and its return type on purpose. Every other
+ * field there is confirmed against the chain — a vault must be owned by the
+ * pool and hold the mint it names — and this one is confirmed only by
+ * reproducing fills. Keeping it separate means a caller has to reach for it
+ * knowingly.
+ */
+export function pumpSwapReserveOffset(data: Uint8Array): bigint {
+  if (data.length < POOL_WITH_OFFSET_BYTES) return 0n;
+  return readU64(data, POOL_OFFSETS.quoteReserveOffset);
+}
 
 /** Anchor discriminator for the Pool account, taken from live mainnet pools. */
 export const POOL_DISCRIMINATOR = Uint8Array.from([

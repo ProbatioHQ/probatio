@@ -9,6 +9,7 @@ import {
   WSOL_MINT,
   decodePumpSwapGlobalConfig,
   decodePumpSwapPool,
+  pumpSwapReserveOffset,
   type PumpSwapGlobalConfig,
   type PumpSwapPool,
 } from './pumpswap';
@@ -166,7 +167,13 @@ export class PoolReader {
       return { mint, venue: { kind: 'unlisted' }, pool: null, slot: curveAccount.slot };
     }
 
-    const state = await this.readPumpSwapReserves(pool.address, pool.pool, tokenDecimals);
+    const [poolAccount] = await this.#rpc.getAccounts([pool.address]);
+    const state = await this.readPumpSwapReserves(
+      pool.address,
+      pool.pool,
+      tokenDecimals,
+      poolAccount ? pumpSwapReserveOffset(poolAccount.data) : 0n,
+    );
     return {
       mint,
       venue: { kind: 'pumpswap', poolAddress: pool.address, graduated: true },
@@ -282,6 +289,7 @@ export class PoolReader {
     poolAddress: string,
     pool: PumpSwapPool,
     tokenDecimals?: number,
+    quoteReserveOffset = 0n,
   ): Promise<PoolState> {
     const addresses = [pool.baseVault, pool.quoteVault];
     if (tokenDecimals === undefined) addresses.push(pool.baseMint);
@@ -317,7 +325,19 @@ export class PoolReader {
 
     return {
       mint: pool.baseMint,
-      solReserve: quote.amount,
+      /*
+       * Not simply the vault balance.
+       *
+       * Some pools price against more SOL than they hold, and the surplus is
+       * recorded in the pool account. Quoting the raw vault balance on one of
+       * those put the engine a constant 2.8 times away from the market — 2.8 on
+       * buys and its reciprocal on sells, which is what a wrong reserve looks
+       * like rather than wrong arithmetic. The offset was solved from real
+       * fills before it was found in the account, and it is trusted because
+       * adding it takes the replay of that pool to nothing rather than because
+       * of where it sits.
+       */
+      solReserve: quote.amount + quoteReserveOffset,
       tokenReserve: base.amount,
       // An AMM holds its reserves outright, so everything in the vault is
       // deliverable. Only a bonding curve splits the two.

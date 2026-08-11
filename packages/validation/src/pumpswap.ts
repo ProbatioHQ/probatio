@@ -298,6 +298,8 @@ export function replayPool(
   tokenDecimals: number,
   engineVersion: number,
   fees = PUMPSWAP_DEFAULT_FEES,
+  /** SOL the pool counts beyond its quote vault. See pumpSwapReserveOffset. */
+  quoteReserveOffset = 0n,
 ): ValidationReport {
   const samples: Sample[] = [];
   const skipped: Record<SkipReason, number> = {
@@ -317,7 +319,7 @@ export function replayPool(
 
     const before: PoolState = {
       mint,
-      solReserve: current.solBefore,
+      solReserve: current.solBefore + quoteReserveOffset,
       tokenReserve: current.tokenBefore,
       // An AMM holds its reserves outright, so all of them are deliverable.
       deliverableTokens: current.tokenBefore,

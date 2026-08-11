@@ -105,19 +105,20 @@ export default function FillsDoc() {
       </p>
 
       <p>
-        It is not yet a claim about every graduated coin, and the exception is specific rather
-        than vague. Some pools carry accrued state in a part of their account we do not decode,
-        and on one of those the engine prices consistently 2.8 times away from the market — 2.8
-        on buys and its reciprocal on sells. A fixed factor, not a drift, which is what a wrong
-        reserve looks like rather than wrong arithmetic. Where those bytes are zero the engine is
-        exact; where they are set it is not, and the likeliest reading is that such a pool prices
-        against its own accounting rather than against whatever is sitting in its vaults.
+        Some pools price against more SOL than they actually hold, and the surplus is recorded in
+        the pool&rsquo;s own account. Quoting the vault balance alone put the engine a constant
+        2.8 times away from the market on such a pool — a fixed factor rather than a drift, which
+        is what a wrong reserve looks like rather than wrong arithmetic. That figure was solved
+        from real fills and then found in the account, and counting it takes the same replay from
+        8,937 basis points of error down to 28.
       </p>
 
       <p>
-        So: measured exact on the graduated coins that can be checked, and knowingly unverified
-        on the ones that carry that state. Saying which is which is the point of having the
-        harness at all. Both of them are in the repository and run against mainnet.
+        Twenty-eight is not zero, and the remaining gap is not yet explained. It runs one way:
+        the engine pays out slightly less than the market did, so where it is still wrong it is
+        wrong against you rather than for you. Pools with nothing recorded there — the ordinary
+        case — are unaffected and remain exact. Both harnesses are in the repository and run
+        against mainnet.
       </p>
 
       <p>

@@ -49,12 +49,14 @@ export {
   PROTOCOL_FEE_RECIPIENT_SLOTS,
   POOL_DISCRIMINATOR,
   POOL_MIN_BYTES,
+  POOL_WITH_OFFSET_BYTES,
   POOL_OFFSETS,
   PUMPSWAP_GLOBAL_CONFIG,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
   decodePumpSwapGlobalConfig,
   decodePumpSwapPool,
+  pumpSwapReserveOffset,
 } from './pumpswap';
 export type { PumpSwapGlobalConfig, PumpSwapPool } from './pumpswap';
 

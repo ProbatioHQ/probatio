@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   POOL_DISCRIMINATOR,
   POOL_MIN_BYTES,
+  POOL_WITH_OFFSET_BYTES,
   POOL_OFFSETS,
   PUMPSWAP_PROGRAM_ID,
   WSOL_MINT,
   decodePumpSwapPool,
+  pumpSwapReserveOffset,
 } from '../src/pumpswap';
 import { LayoutError } from '../src/layout';
 import { decodeTokenAccount } from '../src/token';
@@ -131,5 +133,34 @@ describe('pool accounts of different lengths', () => {
     expect(() => decodePumpSwapPool(canonical.subarray(0, POOL_MIN_BYTES - 1))).toThrow(
       LayoutError,
     );
+  });
+});
+
+describe('the SOL a pool counts beyond its quote vault', () => {
+  /**
+   * Some pools price against more SOL than they hold. Quoting the raw vault
+   * balance put the engine a constant 2.8 times away from the market on such a
+   * pool; adding this took the same replay from 8,937 bps of error to 28.
+   */
+  function withOffset(value: bigint): Uint8Array {
+    const data = new Uint8Array(POOL_WITH_OFFSET_BYTES);
+    data.set(bytes(PUMPSWAP_POOL.base64).subarray(0, POOL_MIN_BYTES));
+    new DataView(data.buffer).setBigUint64(POOL_OFFSETS.quoteReserveOffset, value, true);
+    return data;
+  }
+
+  it('reads the offset when the account carries one', () => {
+    expect(pumpSwapReserveOffset(withOffset(17_584_505_389n))).toBe(17_584_505_389n);
+  });
+
+  it('is zero on a pool that counts only its vault', () => {
+    expect(pumpSwapReserveOffset(withOffset(0n))).toBe(0n);
+  });
+
+  it('is zero when the account is too short to carry one', () => {
+    // Reading past the end would produce a number, and a wrong reserve is far
+    // worse than no adjustment: adding nothing leaves the old behaviour, which
+    // is exact on every pool that has no offset to add.
+    expect(pumpSwapReserveOffset(bytes(PUMPSWAP_POOL.base64).subarray(0, POOL_MIN_BYTES))).toBe(0n);
   });
 });
