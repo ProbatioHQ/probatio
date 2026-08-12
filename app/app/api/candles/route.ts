@@ -2,6 +2,7 @@ import { readCandles } from '@probatio/db';
 import { TIMEFRAMES, timeframeSeconds, type Timeframe } from '@probatio/candles';
 import { PUMPFUN_TOKEN_DECIMALS, PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { backfillChart, backfillInFlight } from '@/lib/chart-backfill';
+import { continuous } from '@/lib/continuous-candles';
 import { noteViewed } from '@/lib/watched';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
@@ -76,7 +77,7 @@ export async function GET(request: Request): Promise<Response> {
     // market cap figure traders actually read.
     tokenDecimals: PUMPFUN_TOKEN_DECIMALS,
     totalSupply: PUMPFUN_TOKEN_TOTAL_SUPPLY.toString(),
-    candles: withoutGaps(
+    candles: continuous(
       candles.map((candle) => ({
         time: candle.openTime,
         open: candle.open,
@@ -89,60 +90,4 @@ export async function GET(request: Request): Promise<Response> {
       timeframeSeconds(timeframe),
     ),
   });
-}
-
-interface WireCandle {
-  time: number;
-  open: string;
-  high: string;
-  low: string;
-  close: string;
-  volume: string;
-  trades: number;
-}
-
-/**
- * A continuous line, not a scatter of dashes.
- *
- * A candle is only stored for a bucket that saw a trade, so a token that trades
- * in bursts leaves empty buckets between them and the chart drew each survivor
- * floating on its own with gaps in between. A market does not disappear because
- * nobody traded for a minute; it stays where it was. So every empty bucket
- * between two real ones is filled with a flat candle at the last price, exactly
- * as every other charting tool does it, and the line becomes continuous.
- *
- * Bounded, because a token with an hour between two trades would otherwise
- * generate an hour of one-second candles. Past the cap the gap is left as a gap
- * rather than blowing up the response.
- */
-const MAX_FILLED = 2_000;
-
-function withoutGaps(candles: WireCandle[], size: number): WireCandle[] {
-  if (candles.length < 2 || size <= 0) return candles;
-
-  const filled: WireCandle[] = [];
-  for (let i = 0; i < candles.length; i += 1) {
-    const candle = candles[i]!;
-    filled.push(candle);
-
-    const next = candles[i + 1];
-    if (!next) break;
-
-    for (
-      let time = candle.time + size;
-      time < next.time && filled.length < MAX_FILLED;
-      time += size
-    ) {
-      filled.push({
-        time,
-        open: candle.close,
-        high: candle.close,
-        low: candle.close,
-        close: candle.close,
-        volume: '0',
-        trades: 0,
-      });
-    }
-  }
-  return filled;
 }

@@ -180,8 +180,13 @@ export function PriceChart({
 
           const first = body.candles[0];
           const last = body.candles[body.candles.length - 1];
+          // Count buckets that actually traded, not the flat fills stitched in
+          // between them. The fill makes the series continuous but says nothing
+          // about how busy the token is, and the page sizes its buckets from
+          // how busy it is — counting the fills would read a quiet token as a
+          // frantic one and pick a timeframe too fine to draw.
           onHistory?.({
-            candles: body.candles.length,
+            candles: body.candles.filter((candle) => candle.trades > 0).length,
             spanSeconds: first && last ? last.time - first.time : 0,
           });
         })
