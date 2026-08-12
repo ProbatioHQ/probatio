@@ -171,8 +171,9 @@ export default function Home() {
           <span className="caret" />
         </span>
         <p style={{ maxWidth: '58ch' }}>
-          Launch is the start. After it: every Solana venue, then prediction markets and tokenized
-          stocks, and eventually real capital allocated to the traders whose records hold up.
+          Launch is the start. After it: duels and ranked trading bots, then prediction markets,
+          tokenized stocks and leverage, and eventually real capital allocated to the traders
+          whose records hold up.
         </p>
         <a href="/roadmap" className="button-link">
           See the roadmap

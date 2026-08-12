@@ -37,34 +37,6 @@ const STATUS_LABEL: Record<Phase['status'], string> = {
 const PHASES: readonly Phase[] = [
   {
     tag: '01',
-    status: 'now',
-    name: 'Prove it works',
-    summary: 'The foundation everything else stands on: an honest simulator and a record nobody can fake.',
-    items: [
-      {
-        title: 'Fills measured against reality',
-        detail:
-          'Every fill quoted from the real pool at the moment you click, with real slippage and real delay, then checked against the trades that actually happened rather than taken on trust.',
-      },
-      {
-        title: 'A record written to Solana',
-        detail:
-          'Each trade hashed as it fills and committed to the chain, so your whole history can be verified by anyone without asking this site anything.',
-      },
-      {
-        title: 'Ranked seasons',
-        detail:
-          'Everyone starts on the same balance under rules published and hashed before the season runs. Ranked on percentage return, so it measures skill and not stake.',
-      },
-      {
-        title: 'A coach that reads your own trades',
-        detail:
-          'Patterns pulled from your round trips: what you keep doing, and what it is costing you.',
-      },
-    ],
-  },
-  {
-    tag: '02',
     status: 'next',
     name: 'A competitive arena',
     summary: 'Solo practice is the start. This turns a private simulator into somewhere you compete and get watched.',
@@ -92,7 +64,7 @@ const PHASES: readonly Phase[] = [
     ],
   },
   {
-    tag: '03',
+    tag: '02',
     status: 'later',
     name: 'Beyond memecoins',
     summary: 'A record in one market is narrow. These make it broad, and each one is measured the same honest way.',
@@ -120,7 +92,7 @@ const PHASES: readonly Phase[] = [
     ],
   },
   {
-    tag: '04',
+    tag: '03',
     status: 'exploring',
     name: 'Get paid to be good',
     summary: 'The reason to prove anything is that being good should be worth something. This is where the record cashes in.',
@@ -155,9 +127,11 @@ export default function RoadmapPage() {
       <div className="page-head">
         <h1>Roadmap</h1>
         <p className="dim">
-          Launch is the start line. This is where it goes after. What gets added, what gets
-          better, and where a proven record eventually leads. Each phase is marked with how real
-          it is: shipping at launch, coming next, or still a direction we are chasing.
+          The honest simulator, records committed to Solana, ranked seasons and the coach are
+          here at launch. This page is not about them. It is everything after: what the record
+          lets us build next, and where being good enough eventually pays. Each phase is marked
+          with how real it is, because a wish painted as a promise is the one thing this site
+          exists not to do.
         </p>
       </div>
 
