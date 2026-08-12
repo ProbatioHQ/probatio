@@ -65,6 +65,62 @@ const PHASES: readonly Phase[] = [
   },
   {
     tag: '02',
+    status: 'next',
+    name: 'Teams and tournaments',
+    summary: 'One trader against one is the start. This is the whole scene: squads, brackets, and prizes worth showing up for.',
+    items: [
+      {
+        title: 'Guilds and team seasons',
+        detail:
+          'Trade as a squad, pool your records, and rank against other guilds. A season your friends are in is a season you come back to.',
+      },
+      {
+        title: 'Bracketed tournaments',
+        detail:
+          'Knockout rounds with a real prize pool, seeded by record, run to a final anyone can watch.',
+      },
+      {
+        title: 'Creator and streamer tools',
+        detail:
+          'Overlays, embeds and a shareable live record, so a trader can build an audience here the way they do everywhere else.',
+      },
+      {
+        title: 'Rivalries that carry',
+        detail:
+          'A head to head history between two traders that follows them season to season, not just one duel and forget.',
+      },
+    ],
+  },
+  {
+    tag: '03',
+    status: 'later',
+    name: 'An edge worth having',
+    summary: 'The market leaves a trail on chain. This turns that trail into things that make you a better trader.',
+    items: [
+      {
+        title: 'On-chain intelligence',
+        detail:
+          'Whale wallets, smart money and fresh liquidity surfaced as they move, so you see what is happening while it still matters.',
+      },
+      {
+        title: 'Alerts that reach you',
+        detail:
+          'Set the conditions that matter to you and get told the moment they happen, wherever you are.',
+      },
+      {
+        title: 'An AI sparring partner',
+        detail:
+          'A model that trades the same tokens beside you and tells you afterwards where it went a different way, and why.',
+      },
+      {
+        title: 'Your own numbers, deeper',
+        detail:
+          'Drawdown, timing, which setups actually pay for you. The coach, but with your whole history behind it.',
+      },
+    ],
+  },
+  {
+    tag: '04',
     status: 'later',
     name: 'Beyond memecoins',
     summary: 'A record in one market is narrow. These make it broad, and each one is measured the same honest way.',
@@ -92,7 +148,7 @@ const PHASES: readonly Phase[] = [
     ],
   },
   {
-    tag: '03',
+    tag: '05',
     status: 'exploring',
     name: 'Get paid to be good',
     summary: 'The reason to prove anything is that being good should be worth something. This is where the record cashes in.',
@@ -115,7 +171,7 @@ const PHASES: readonly Phase[] = [
       {
         title: 'A credential you can take anywhere',
         detail:
-          'A record checkable by anyone, off this site as easily as on it. A résumé for trading that no employer or allocator has to take on faith.',
+          'A record checkable by anyone, off this site as easily as on it. A resume for trading that no employer or allocator has to take on faith.',
       },
     ],
   },
