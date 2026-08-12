@@ -29,6 +29,8 @@ import type { Sample, SkipReason, ValidationReport } from './replay';
 export interface PoolSwap {
   readonly signature: string;
   readonly slot: number;
+  /** Unix seconds, from the block. Null when the node did not carry it. */
+  readonly blockTime: number | null;
   readonly isBuy: boolean;
   /** Reserves before, in the order the engine wants them. */
   readonly solBefore: bigint;
@@ -201,6 +203,7 @@ export function asPoolSwap(
   return {
     signature: transaction.signature,
     slot: transaction.slot,
+    blockTime: transaction.blockTime,
     isBuy,
     solBefore,
     tokenBefore,

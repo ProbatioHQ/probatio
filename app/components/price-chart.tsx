@@ -6,6 +6,7 @@ import {
   HistogramSeries,
   LineSeries,
   createChart,
+  type AutoscaleInfo,
   type CandlestickData,
   type HistogramData,
   type IChartApi,
@@ -325,6 +326,15 @@ export function PriceChart({
       borderVisible: false,
       wickUpColor: '#3fe08a',
       wickDownColor: '#ff5f56',
+      // Never let the axis fall below zero. A market cap cannot be negative, and
+      // the library's default padding under a wide range pushed the scale into
+      // negative numbers, which read as a broken chart. Clamp the low at zero
+      // and keep the library's own high.
+      autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
+        const info = original();
+        if (!info?.priceRange || info.priceRange.minValue >= 0) return info;
+        return { ...info, priceRange: { ...info.priceRange, minValue: 0 } };
+      },
     });
 
     // Its own scale, pinned to the bottom quarter, so volume never competes

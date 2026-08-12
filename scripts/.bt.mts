@@ -1,0 +1,13 @@
+import { PoolReader, RpcClient } from '@probatio/pools';
+import { collectPoolSwaps } from '@probatio/validation';
+const rpc = new RpcClient({ endpoint: 'https://api.mainnet-beta.solana.com', timeoutMs: 30000, minIntervalMs: 130 });
+const reader = new PoolReader(rpc);
+const mint = '61ZVbJ18J8WqPuxhbZDSwzWGT2gy3kRqpgyCK5Jkpump';
+const pools = await reader.findPumpSwapPools(mint);
+const pool = await reader.deepestPool(pools);
+const cfg = await reader.globalConfig();
+const swaps = await collectPoolSwaps(rpc, pool!.address, pool!.pool, { maxTransactions: 250, concurrency: 2 }, cfg!.protocolFeeRecipients);
+const bts = swaps.filter(s=>s.blockTime).map(s=>s.blockTime!).sort((a,b)=>a-b);
+console.log(`${swaps.length} swaps, ${bts.length} with blockTime`);
+console.log(`earliest ${new Date(bts[0]*1000).toISOString().slice(11,19)}  latest ${new Date(bts.at(-1)!*1000).toISOString().slice(11,19)}  span ${((bts.at(-1)!-bts[0])/60).toFixed(1)} min`);
+console.log(`distinct minutes: ${new Set(bts.map(t=>Math.floor(t/60))).size}`);
