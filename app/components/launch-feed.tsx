@@ -1,6 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DEFAULT_FILTERS,
+  activeFilterCount,
+  matchesFilters,
+  type Filters,
+} from '@/lib/feed-filters';
 
 /**
  * The launch feed, in three lanes.
@@ -56,57 +62,6 @@ const LANES: { key: LaneKey; title: string; prompt: string; blurb: string }[] = 
 const MAX_ROWS = 60;
 /** The preview shows enough to prove it is moving. The terminal shows the feed. */
 const PREVIEW_ROWS = 8;
-
-/**
- * What the feed can be filtered on, and deliberately only what the feed
- * actually knows.
- *
- * The reference terminals carry filters for holders, snipers, bundles, insider
- * percentages and audit flags. This indexes pump.fun launches and reads their
- * curves, so it knows a token's market cap, how far along its curve it is, how
- * old it is, and a floor on how many tokens its creator has launched. Those are
- * real, so those are here. A filter for a number the feed does not have would
- * be a control that lies about doing something, which is worse than not having
- * it.
- *
- * Every range uses 0 to mean "no bound", so an untouched filter is off. The set
- * applies to all three lanes at once: one question asked of new, bonding and
- * bonded together, rather than three panels to keep in sync.
- */
-interface Filters {
-  /** Comma-separated. A token must match at least one to show. Empty means all. */
-  include: string;
-  /** Comma-separated. A token matching any of these is hidden. */
-  exclude: string;
-  /** Dollars. Hides the long tail of launches nobody has bought a thing from. */
-  minMarketCapUsd: number;
-  /** Dollars. 0 means no ceiling. */
-  maxMarketCapUsd: number;
-  /** Percent of the bonding curve sold. 0 means no floor. */
-  minProgressPct: number;
-  /** Percent. 0 means no ceiling. */
-  maxProgressPct: number;
-  /** Minutes since launch. 0 means no floor. */
-  minAgeMin: number;
-  /** Minutes since launch. 0 means no ceiling. */
-  maxAgeMin: number;
-  /** 0 means no limit. Anything else hides serial launchers. */
-  maxCreatorLaunches: number;
-  hideImageless: boolean;
-}
-
-const DEFAULT_FILTERS: Filters = {
-  include: '',
-  exclude: '',
-  minMarketCapUsd: 0,
-  maxMarketCapUsd: 0,
-  minProgressPct: 0,
-  maxProgressPct: 0,
-  minAgeMin: 0,
-  maxAgeMin: 0,
-  maxCreatorLaunches: 0,
-  hideImageless: false,
-};
 
 /**
  * One filter set per lane, kept apart on purpose.
@@ -170,31 +125,6 @@ function RangeRow({
       </div>
     </div>
   );
-}
-
-/** Split a keyword box into lowercased terms, ignoring empties. */
-function keywords(raw: string): string[] {
-  return raw
-    .toLowerCase()
-    .split(',')
-    .map((term) => term.trim())
-    .filter((term) => term.length > 0);
-}
-
-/** True when any filter is actually doing something, for the panel's badge. */
-function activeFilterCount(filters: Filters): number {
-  let n = 0;
-  if (keywords(filters.include).length > 0) n += 1;
-  if (keywords(filters.exclude).length > 0) n += 1;
-  if (filters.minMarketCapUsd > 0) n += 1;
-  if (filters.maxMarketCapUsd > 0) n += 1;
-  if (filters.minProgressPct > 0) n += 1;
-  if (filters.maxProgressPct > 0) n += 1;
-  if (filters.minAgeMin > 0) n += 1;
-  if (filters.maxAgeMin > 0) n += 1;
-  if (filters.maxCreatorLaunches > 0) n += 1;
-  if (filters.hideImageless) n += 1;
-  return n;
 }
 
 const FILTER_KEY = 'probatio.feed.filters';
@@ -641,56 +571,11 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
       const rows = lanes?.[lane] ?? [];
       if (!terminal) return rows.slice(0, PREVIEW_ROWS);
 
-      // Each lane is filtered by its own set.
+      // Each lane is filtered by its own set. The rule itself lives in
+      // lib/feed-filters, so it can be tested without a browser.
       const filters = laneFilters[lane];
-      const include = keywords(filters.include);
-      const exclude = keywords(filters.exclude);
       const nowSeconds = Math.floor(now / 1000);
-
-      return rows.filter((token) => {
-        if (filters.hideImageless && !token.image) return false;
-
-        // Name and symbol, matched together so "cat" finds both a CAT ticker
-        // and a token called Cat Coin.
-        if (include.length > 0 || exclude.length > 0) {
-          const haystack = `${token.name} ${token.symbol}`.toLowerCase();
-          if (include.length > 0 && !include.some((term) => haystack.includes(term))) return false;
-          if (exclude.some((term) => haystack.includes(term))) return false;
-        }
-
-        if (
-          filters.maxCreatorLaunches > 0 &&
-          (token.creatorLaunches ?? 1) > filters.maxCreatorLaunches
-        ) {
-          return false;
-        }
-
-        // Age is always known, so both bounds apply everywhere.
-        const ageMin = Math.max(0, nowSeconds - token.launchedAt) / 60;
-        if (filters.minAgeMin > 0 && ageMin < filters.minAgeMin) return false;
-        if (filters.maxAgeMin > 0 && ageMin > filters.maxAgeMin) return false;
-
-        // Curve progress. A curve nobody has read yet has an unknown position,
-        // and hiding it would empty the new lane where that is the normal
-        // state, so an unknown value passes rather than being judged as zero.
-        if (token.progressBps !== null) {
-          const pct = token.progressBps / 100;
-          if (filters.minProgressPct > 0 && pct < filters.minProgressPct) return false;
-          if (filters.maxProgressPct > 0 && pct > filters.maxProgressPct) return false;
-        }
-
-        // Market cap, in dollars, which needs the rate. An unread curve has no
-        // cap to judge; it passes for the same reason progress does.
-        if ((filters.minMarketCapUsd > 0 || filters.maxMarketCapUsd > 0) && solUsd !== null) {
-          if (token.marketCap) {
-            const usd = (Number(BigInt(token.marketCap)) / 1e9) * solUsd;
-            if (filters.minMarketCapUsd > 0 && usd < filters.minMarketCapUsd) return false;
-            if (filters.maxMarketCapUsd > 0 && usd > filters.maxMarketCapUsd) return false;
-          }
-        }
-
-        return true;
-      });
+      return rows.filter((token) => matchesFilters(token, filters, { solUsd, nowSeconds }));
     },
     [lanes, terminal, laneFilters, solUsd, now],
   );
