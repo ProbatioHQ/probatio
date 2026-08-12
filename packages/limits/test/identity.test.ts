@@ -33,10 +33,14 @@ describe('finding the caller', () => {
     ).toBe('203.0.113.7');
   });
 
-  it('does not fall off the front when there are fewer hops than proxies', () => {
+  it('refuses to identify a caller when there are fewer hops than proxies', () => {
+    // Fewer entries than trusted proxies means the proxies that should have
+    // prepended them did not, so the list is the caller's to write. Falling
+    // back to the leftmost entry here handed a spoofer a fresh bucket per
+    // request; the safe answer is that the caller cannot be identified.
     expect(
       clientAddress(headers({ 'x-forwarded-for': '203.0.113.7' }), { trustedProxies: 3 }),
-    ).toBe('203.0.113.7');
+    ).toBeNull();
   });
 
   it('reads an edge header that a caller cannot forge the same way', () => {

@@ -61,8 +61,15 @@ export function clientAddress(
 
     // Count in from the right, past the proxies we actually have. Anything
     // further left is whatever the caller chose to claim.
+    //
+    // A list shorter than the trusted hop count means the proxies that should
+    // have prepended entries did not, so the whole header is the caller's to
+    // write. Falling back to the leftmost entry here was the bug: it handed a
+    // caller a fresh bucket per request under a direct-to-node deployment that
+    // left TRUSTED_PROXIES at its default. Treat that as unidentifiable, the
+    // same harshness as the no-proxy case, rather than trusting hop zero.
     const index = hops.length - 1 - (trusted - 1);
-    const address = index >= 0 ? hops[index] : hops[0];
+    const address = index >= 0 ? hops[index] : null;
     if (address) return normalize(address);
   }
 

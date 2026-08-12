@@ -241,13 +241,20 @@ export function TokenView({
                   // The reader's own pick wins and ends the fitting for good.
                   if (timeframeChosen) return;
                   const fitted = fitTimeframe(candles, spanSeconds);
-                  if (fitted && fitted !== timeframe) setTimeframe(fitted);
+                  if (fitted && fitted !== timeframe) {
+                    // Switch, but do not lock on the same poll: the frame we are
+                    // moving to was chosen from the previous frame's candle
+                    // count, so let its own data confirm the fit next poll
+                    // before committing to it.
+                    setTimeframe(fitted);
+                    return;
+                  }
                   // Keep re-fitting while the history is still walking in, then
-                  // lock once it is all here. Fitting on the first poll alone
-                  // sized the chart to the two or three candles that had arrived
-                  // before the backfill landed and then never corrected, which
-                  // is how a token with minutes of history showed as a couple of
-                  // candles at the wrong bucket.
+                  // lock once it is all here and the frame agrees with its own
+                  // data. Fitting on the first poll alone sized the chart to the
+                  // two or three candles that arrived before the backfill landed
+                  // and never corrected, which is how a token with minutes of
+                  // history showed as a couple of candles at the wrong bucket.
                   if (!backfilling) setTimeframeChosen(true);
                 }}
               />

@@ -14,6 +14,7 @@ import {
   type TimeOfDay,
 } from '@probatio/analytics';
 import { allTrades, priceRange, type TradeRow } from '@probatio/db';
+import type { Timeframe } from '@probatio/candles';
 import type { Client } from '@libsql/client';
 
 /**
@@ -23,8 +24,16 @@ import type { Client } from '@libsql/client';
  * loading the log, and looking up the price range each position lived through.
  */
 
-/** The timeframe the excursion ranges are read at. */
-const RANGE_TIMEFRAME = '1m';
+/**
+ * The timeframe the excursion ranges are read at.
+ *
+ * This is a candle timeframe key, and the keys are `m1`/`m5`/... not `1m`. It
+ * read `'1m'` for a long time, which matched no stored candle, so `priceRange`
+ * returned null for every trip and the whole excursion and efficiency section
+ * of a trader's stats silently reported zero regardless of their history. Typed
+ * as a real `Timeframe` now so a wrong key is a compile error, not a silent one.
+ */
+const RANGE_TIMEFRAME: Timeframe = 'm1';
 
 export interface Report {
   readonly metrics: Metrics;

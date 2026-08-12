@@ -37,12 +37,21 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
     setStage('confirming');
     setMessage(null);
 
-    const response = await fetch('/api/season/enter', { method: 'POST' });
-    const body = (await response.json()) as { error?: string; entered?: boolean; seasonName?: string };
-
-    if (!response.ok || !body.entered) {
+    let body: { error?: string; entered?: boolean; seasonName?: string };
+    try {
+      const response = await fetch('/api/season/enter', { method: 'POST' });
+      body = (await response.json()) as typeof body;
+      if (!response.ok || !body.entered) {
+        setStage('error');
+        setMessage(body.error ?? 'Could not enter.');
+        return;
+      }
+    } catch {
+      // A dropped connection or a non-JSON error page must not leave the button
+      // stuck on "confirming" with nothing said. Entry is free, so there is
+      // nothing to lose by trying again.
       setStage('error');
-      setMessage(body.error ?? 'Could not enter.');
+      setMessage('The network could not be reached. Try again in a moment.');
       return;
     }
 
@@ -61,11 +70,20 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
     setStage('building');
     setMessage(null);
 
-    const intentResponse = await fetch('/api/pay/intent', { method: 'POST' });
-    const intent = (await intentResponse.json()) as IntentResponse;
-    if (!intentResponse.ok) {
+    let intent: IntentResponse;
+    try {
+      const intentResponse = await fetch('/api/pay/intent', { method: 'POST' });
+      intent = (await intentResponse.json()) as IntentResponse;
+      if (!intentResponse.ok) {
+        setStage('error');
+        setMessage(intent.error ?? 'Could not start the payment.');
+        return;
+      }
+    } catch {
+      // Nothing has been signed yet, so a failed intent is safe to surface and
+      // retry. The alternative was a button frozen on "building" forever.
       setStage('error');
-      setMessage(intent.error ?? 'Could not start the payment.');
+      setMessage('The network could not be reached. Nothing was charged; try again.');
       return;
     }
 
@@ -89,22 +107,27 @@ export function EnterSeason({ free = false }: { free?: boolean }) {
     // Finalization is not instant, and a single check would report "not yet"
     // as often as it reported success.
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const response = await fetch('/api/pay/confirm', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ reference: intent.reference, signature }),
-      });
-      const body = (await response.json()) as { error?: string; settled?: boolean };
+      try {
+        const response = await fetch('/api/pay/confirm', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ reference: intent.reference, signature }),
+        });
+        const body = (await response.json()) as { error?: string; settled?: boolean };
 
-      if (response.ok && body.settled) {
-        setStage('entered');
-        setMessage(`You are in ${intent.season.name}.`);
-        return;
-      }
-      if (response.status !== 202) {
-        setStage('error');
-        setMessage(body.error ?? 'The payment could not be confirmed.');
-        return;
+        if (response.ok && body.settled) {
+          setStage('entered');
+          setMessage(`You are in ${intent.season.name}.`);
+          return;
+        }
+        if (response.status !== 202) {
+          setStage('error');
+          setMessage(body.error ?? 'The payment could not be confirmed.');
+          return;
+        }
+      } catch {
+        // One failed poll is not the answer. The transaction is already signed
+        // and sent, so keep asking rather than declaring a loss on a blip.
       }
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }

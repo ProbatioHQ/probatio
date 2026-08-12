@@ -51,7 +51,11 @@ export async function GET(request: Request): Promise<Response> {
   });
   const payoutByPlace = new Map(split.payouts.map((payout) => [payout.place, payout.lamports]));
 
-  const limit = Math.min(Number(url.searchParams.get('limit') ?? PAGE) || PAGE, 200);
+  // Clamped at both ends. Without a lower bound a negative limit made
+  // `standings.slice(0, limit)` drop rows off the end instead of paging, and
+  // put every real rank above the limit so the caller's own row was appended a
+  // second time.
+  const limit = Math.min(Math.max(Math.trunc(Number(url.searchParams.get('limit') ?? PAGE)) || PAGE, 1), 200);
   const user = await currentUser();
 
   const page = board.standings.slice(0, limit);

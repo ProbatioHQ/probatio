@@ -532,18 +532,27 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
     return () => clearTimeout(timer);
   }, [arrived]);
 
+  // The set of mints still missing a picture, as a stable string. Keyed on the
+  // missing set itself rather than the whole `lanes` object so an unrelated
+  // price tick, which arrives faster than the retry delay on a busy feed, does
+  // not keep resetting the timer below and leave those rows blank forever.
+  const missingImageKey = useMemo(() => {
+    if (!lanes) return '';
+    const missing = [...lanes.new, ...lanes.bonding, ...lanes.bonded]
+      .filter((token) => !token.image)
+      .map((token) => token.mint);
+    return [...new Set(missing)].sort().join(',');
+  }, [lanes]);
+
   // Pictures resolve after the token exists, so rows that arrived over the
   // stream without one ask again a moment later rather than staying blank
   // until a reload.
   useEffect(() => {
-    if (!lanes) return;
-    const missing = [...lanes.new, ...lanes.bonding, ...lanes.bonded]
-      .filter((token) => !token.image)
-      .map((token) => token.mint);
-    if (missing.length === 0) return;
+    if (!missingImageKey) return;
+    const mints = missingImageKey.split(',').slice(0, 60).join(',');
 
     const timer = setTimeout(() => {
-      void fetch(`/api/token-images?mints=${[...new Set(missing)].slice(0, 60).join(',')}`)
+      void fetch(`/api/token-images?mints=${mints}`)
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { images: Record<string, string> } | null) => {
           if (!body || Object.keys(body.images).length === 0) return;
@@ -563,7 +572,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
     }, 3_000);
 
     return () => clearTimeout(timer);
-  }, [lanes]);
+  }, [missingImageKey]);
 
   /** Filters are the terminal's; the preview shows what the server sent. */
   const visible = useCallback(

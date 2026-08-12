@@ -115,6 +115,14 @@ export function PriceChart({
   const averages = useRef(new Map<number, ISeriesApi<'Line'>>());
   const priceLines = useRef<IPriceLine[]>([]);
   const fitted = useRef(false);
+  /*
+   * Whether a chart has ever drawn for this mint/timeframe. Held in a ref, not
+   * read from `data`: the poll interval closes over the `data` from the render
+   * that created it, which is null forever, so a `!data` check there reports a
+   * transient failure over a chart that is already on screen. This is written
+   * as the fetches resolve and reset when the token or timeframe changes.
+   */
+  const hasData = useRef(false);
 
   const [data, setData] = useState<CandleResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +130,12 @@ export function PriceChart({
   const [showMa, setShowMa] = useState(true);
   const [drawing, setDrawing] = useState(false);
   const [lineCount, setLineCount] = useState(0);
+  /*
+   * Whether the live price stream has dropped. The candle poll still refreshes
+   * every few seconds, but the in-progress bar stops moving when the stream is
+   * down, and a frozen "live" price a trader might act on should say so.
+   */
+  const [livePaused, setLivePaused] = useState(false);
   /*
    * Read by the chart's click handler, registered once when the chart is
    * created. Written in an effect rather than during render: a ref mutated in
@@ -165,6 +179,9 @@ export function PriceChart({
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    // A new token or timeframe has not drawn yet, so re-arm the "first failure
+    // reports" behaviour rather than inheriting the last chart's success.
+    hasData.current = false;
 
     const read = (): void => {
       void fetch(`/api/candles?mint=${encodeURIComponent(mint)}&timeframe=${timeframe}`)
@@ -176,6 +193,7 @@ export function PriceChart({
             return;
           }
           setError(null);
+          hasData.current = true;
           setData(body);
 
           const first = body.candles[0];
@@ -194,7 +212,7 @@ export function PriceChart({
         .catch(() => {
           // Only the first failure is worth reporting. A dropped poll on a
           // chart that is already drawn should not replace it with an error.
-          if (!cancelled && !data) setError('Could not load the chart.');
+          if (!cancelled && !hasData.current) setError('Could not load the chart.');
         });
     };
 
@@ -235,9 +253,17 @@ export function PriceChart({
 
   useEffect(() => {
     if (typeof EventSource === 'undefined') return;
+    setLivePaused(false);
     const source = new EventSource(`/api/price-stream?mint=${encodeURIComponent(mint)}`);
 
+    // A dropped stream leaves the live bar frozen at its last value. The browser
+    // retries on its own, so this only marks the price as paused and clears it
+    // the moment anything arrives again, rather than tearing anything down.
+    source.onopen = () => setLivePaused(false);
+    source.onerror = () => setLivePaused(true);
+
     source.addEventListener('price', (event) => {
+      setLivePaused(false);
       const bar = series.current;
       const latest = lastBar.current;
       if (!bar || !latest) return;
@@ -534,6 +560,15 @@ export function PriceChart({
         {data?.backfilling && (
           <span className="chart-loading mono dim" role="status">
             reading history<span className="caret" />
+          </span>
+        )}
+
+        {/* The live price stream is down, so the in-progress bar is frozen.
+            Said plainly, because a stale "live" price is one a trader might act
+            on. Not shown while history is still loading, which is its own state. */}
+        {livePaused && !data?.backfilling && (
+          <span className="chart-loading mono loss" role="status">
+            live paused
           </span>
         )}
       </div>

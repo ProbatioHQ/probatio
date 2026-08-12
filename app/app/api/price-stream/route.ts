@@ -36,9 +36,32 @@ export async function GET(request: Request): Promise<Response> {
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let closed = false;
 
   const stream = new ReadableStream({
     start(controller) {
+      // Cleanup that runs once, whichever way the connection ends. The runtime
+      // signals a gone client through `cancel` on some paths and only through
+      // `request.signal` abort on others; without the abort listener a client
+      // that hangs up the wrong way leaks its price listener and a heartbeat
+      // that keeps `noteViewed` pinning the mint in the watched set forever,
+      // holding a live account subscription for a reader who is gone.
+      const close = (): void => {
+        if (closed) return;
+        closed = true;
+        unsubscribe?.();
+        if (heartbeat) clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch {
+          // Already closed by the runtime.
+        }
+      };
+      request.signal.addEventListener('abort', close);
+      if (request.signal.aborted) {
+        close();
+        return;
+      }
       const write = (event: string, payload: unknown): void => {
         try {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
@@ -80,6 +103,9 @@ export async function GET(request: Request): Promise<Response> {
     },
 
     cancel() {
+      // The runtime tears the stream down without an abort in some paths.
+      if (closed) return;
+      closed = true;
       unsubscribe?.();
       if (heartbeat) clearInterval(heartbeat);
     },

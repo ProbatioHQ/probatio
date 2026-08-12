@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useWallet } from './wallet';
 
 /**
  * The guide to a first trade.
@@ -38,6 +39,10 @@ const STEPS = [
 
 export function Onboarding({ compact = false }: { compact?: boolean }) {
   const [progress, setProgress] = useState<Progress | null>(null);
+  // The wallet signs in without a reload, so read progress again whenever that
+  // state changes. Fetched once, the guide sat on "Connect a wallet" after the
+  // user had already connected, telling them to do the thing they just did.
+  const { status, pubkey } = useWallet();
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +59,7 @@ export function Onboarding({ compact = false }: { compact?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [status, pubkey]);
 
   // Nothing at all until the state is known: a guide that flashes the wrong
   // step and then corrects itself is worse than a moment of quiet.

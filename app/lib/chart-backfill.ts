@@ -56,6 +56,16 @@ const MAX_CONCURRENT = DEDICATED ? 6 : 2;
 const running = new Set<string>();
 
 /**
+ * Mints owed a walk that the concurrency cap deferred.
+ *
+ * A token asked for while the cap is full is not walked yet, but it is not done
+ * either, and the chart must be told the difference. Reported as in-flight so
+ * the page keeps waiting for history rather than deciding the two live candles
+ * it has are the whole of it. The next poll, once a slot has freed, starts it.
+ */
+const pending = new Set<string>();
+
+/**
  * Mints already known to have been walked.
  *
  * The route asks for a backfill on every chart poll, which is every three
@@ -70,7 +80,7 @@ const running = new Set<string>();
 const settled = new Set<string>();
 
 export function backfillInFlight(mint: string): boolean {
-  return running.has(mint);
+  return running.has(mint) || pending.has(mint);
 }
 
 /**
@@ -133,7 +143,14 @@ async function poolObservations(
  * dead RPC is not a reason to fail the page.
  */
 export function backfillChart(mint: string): void {
-  if (settled.has(mint) || running.has(mint) || running.size >= MAX_CONCURRENT) return;
+  if (settled.has(mint) || running.has(mint)) return;
+  if (running.size >= MAX_CONCURRENT) {
+    // Owed a walk, not done. Kept in-flight so the chart waits; a later poll
+    // with a free slot picks it up.
+    pending.add(mint);
+    return;
+  }
+  pending.delete(mint);
   running.add(mint);
 
   void (async () => {

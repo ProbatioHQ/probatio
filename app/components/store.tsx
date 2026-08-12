@@ -64,15 +64,24 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
     setStage('building');
     setMessage(null);
 
-    const intentResponse = await fetch('/api/store/intent', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sol: size }),
-    });
-    const intent = (await intentResponse.json()) as IntentResponse;
-    if (!intentResponse.ok) {
+    let intent: IntentResponse;
+    try {
+      const intentResponse = await fetch('/api/store/intent', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sol: size }),
+      });
+      intent = (await intentResponse.json()) as IntentResponse;
+      if (!intentResponse.ok) {
+        setStage('error');
+        setMessage(intent.error ?? 'Could not start the purchase.');
+        return;
+      }
+    } catch {
+      // Nothing has been signed yet. A dropped request must surface as an error
+      // to retry, not a button stuck on "building" with no explanation.
       setStage('error');
-      setMessage(intent.error ?? 'Could not start the purchase.');
+      setMessage('The network could not be reached. Nothing was charged; try again.');
       return;
     }
 
@@ -96,22 +105,27 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
     // The balance is credited only once the transfer is verified on chain, so
     // this waits rather than reporting a purchase the chain has not confirmed.
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const response = await fetch('/api/pay/confirm', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ reference: intent.reference, signature }),
-      });
-      const body = (await response.json()) as { error?: string; settled?: boolean; sol?: number };
+      try {
+        const response = await fetch('/api/pay/confirm', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ reference: intent.reference, signature }),
+        });
+        const body = (await response.json()) as { error?: string; settled?: boolean; sol?: number };
 
-      if (response.ok && body.settled) {
-        setStage('bought');
-        setMessage(`${body.sol ?? size} SOL added to your free play balance.`);
-        return;
-      }
-      if (response.status !== 202) {
-        setStage('error');
-        setMessage(body.error ?? 'The payment could not be confirmed.');
-        return;
+        if (response.ok && body.settled) {
+          setStage('bought');
+          setMessage(`${body.sol ?? size} SOL added to your free play balance.`);
+          return;
+        }
+        if (response.status !== 202) {
+          setStage('error');
+          setMessage(body.error ?? 'The payment could not be confirmed.');
+          return;
+        }
+      } catch {
+        // The transfer is signed and sent; a single failed poll is a blip, not
+        // a reason to stop waiting for the credit.
       }
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }
