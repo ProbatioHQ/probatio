@@ -58,13 +58,25 @@ function toLamports(sol: number): string {
   return String(BigInt(Math.round(sol * Number(LAMPORTS_PER_SOL))));
 }
 
-/** Large token counts are unreadable at full precision. */
-function tokens(amount: string): string {
-  const value = Number(BigInt(amount));
-  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (value >= 1e3) return `${(value / 1e3).toFixed(2)}K`;
-  return value.toFixed(0);
+/** pump.fun tokens carry six decimals, so amounts arrive as base units. */
+const TOKEN_DECIMALS = 6;
+
+/**
+ * Large token counts are unreadable at full precision.
+ *
+ * The input is base units and must be scaled down by the six decimals first, the
+ * same as the positions table. Without that every quantity in this panel read a
+ * million times too large: a holding of three tokens showed as "3.00M", and the
+ * table right below it disagreed with the panel above.
+ */
+function tokens(baseUnits: string): string {
+  const whole = Number(BigInt(baseUnits)) / 10 ** TOKEN_DECIMALS;
+  if (whole >= 1_000_000_000) return `${(whole / 1_000_000_000).toFixed(2)}B`;
+  if (whole >= 1_000_000) return `${(whole / 1_000_000).toFixed(2)}M`;
+  if (whole >= 1_000) return `${(whole / 1_000).toFixed(2)}K`;
+  if (whole >= 1) return whole.toFixed(2);
+  // Below one token, show enough not to read as zero.
+  return whole.toFixed(4);
 }
 
 /** Plain language for a rejection. A trader should not have to read a code. */
@@ -182,7 +194,10 @@ export function TradePanel({
     const typed = Number(amount);
     if (!Number.isFinite(typed) || typed <= 0) return;
     if (side === 'buy') void send(toLamports(typed), 'buy');
-    else void send(String(BigInt(Math.floor(typed))), 'sell');
+    // The field is a token count, and the engine wants base units. Scaling by
+    // the decimals was missing, so a trader who typed 100 to sell a hundred
+    // tokens sold a hundred base units, one ten-thousandth of a token.
+    else void send(String(BigInt(Math.floor(typed * 10 ** TOKEN_DECIMALS))), 'sell');
   }, [amount, send, side]);
 
   // Hotkeys. Digits buy a preset, Q/W/E sell a fraction — close enough to the

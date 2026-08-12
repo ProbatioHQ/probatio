@@ -31,6 +31,8 @@ interface FeedState {
   running: boolean;
   connected: boolean;
   startedAt: number;
+  /** When the socket last delivered a message, to catch a silent-but-open one. */
+  lastNotificationAt: number;
 }
 
 /**
@@ -54,12 +56,21 @@ const FEED_KEY = Symbol.for('probatio.feed-state');
 
 function feedStateStore(): FeedState {
   const store = globalThis as typeof globalThis & { [FEED_KEY]?: FeedState };
-  store[FEED_KEY] ??= { running: false, connected: false, startedAt: 0 };
+  store[FEED_KEY] ??= { running: false, connected: false, startedAt: 0, lastNotificationAt: 0 };
   return store[FEED_KEY];
 }
 
 /** A socket needs a moment to connect. Below this, silence is not an outage. */
 const CONNECT_GRACE_MS = 20_000;
+/**
+ * How long an open socket may deliver nothing before it counts as down.
+ *
+ * The pump.fun program emits a message for every launch and every trade, which
+ * is near-continuous, so minutes of total silence on an open socket means the
+ * node has wedged: connected, delivering nothing, and no close or error to say
+ * so. Generous enough that a genuinely quiet stretch does not trip it.
+ */
+const FEED_SILENCE_MS = 180_000;
 
 export function reportFeedRunning(): void {
   const feedState = feedStateStore();
@@ -69,6 +80,22 @@ export function reportFeedRunning(): void {
 
 export function reportFeedState(connected: boolean): void {
   feedStateStore().connected = connected;
+}
+
+/** Marks that the socket delivered a message, for the silence watchdog. */
+export function reportFeedNotification(): void {
+  feedStateStore().lastNotificationAt = Date.now();
+}
+
+/**
+ * A socket that is open but has stopped delivering. The reference is the later
+ * of connect and the last message, so a fresh connection keeps its grace and a
+ * busy feed never trips.
+ */
+function feedSilent(feedState: FeedState, now: number): boolean {
+  if (!feedState.running || !feedState.connected) return false;
+  const since = Math.max(feedState.startedAt, feedState.lastNotificationAt);
+  return now - since > FEED_SILENCE_MS;
 }
 
 /**
@@ -82,20 +109,27 @@ export function reportFeedState(connected: boolean): void {
  */
 export function feedIsLive(): boolean {
   const feedState = feedStateStore();
-  return feedState.running && feedState.connected;
+  return feedState.running && feedState.connected && !feedSilent(feedState, Date.now());
 }
 
 function feedFailure(): string | null {
   const feedState = feedStateStore();
   if (!feedState.running) return 'feed not running on this instance';
-  if (feedState.connected) return null;
+  const now = Date.now();
 
-  // Still connecting. Reporting that as an outage put "new launches are not
-  // arriving" on the front page while launches were visibly arriving, which is
-  // worse than saying nothing: it teaches people the banner is noise.
-  if (Date.now() - feedState.startedAt < CONNECT_GRACE_MS) return null;
+  if (!feedState.connected) {
+    // Still connecting. Reporting that as an outage put "new launches are not
+    // arriving" on the front page while launches were visibly arriving, which
+    // is worse than saying nothing: it teaches people the banner is noise.
+    if (now - feedState.startedAt < CONNECT_GRACE_MS) return null;
+    return 'websocket disconnected';
+  }
 
-  return 'websocket disconnected';
+  // Open but silent. A wedged node holds the socket up while delivering
+  // nothing, and a status page that reads that as healthy is telling the lie
+  // this module exists to avoid.
+  if (feedSilent(feedState, now)) return 'feed connected but not delivering';
+  return null;
 }
 
 async function probeRpc(): Promise<string | null> {

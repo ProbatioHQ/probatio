@@ -39,6 +39,12 @@ export async function GET(request: Request): Promise<Response> {
 
   const encoder = new TextEncoder();
 
+  // Assigned once the stream starts, so `cancel` can run the same teardown as
+  // the abort path. Without this, a runtime that cancels without firing abort
+  // left the heartbeat interval and both subscriptions alive for the life of
+  // the process, one leak per dropped connection.
+  let teardown = (): void => {};
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let open = true;
@@ -66,21 +72,25 @@ export async function GET(request: Request): Promise<Response> {
         // A brand-new token has no picture yet — the document is published
         // after the mint exists. Whatever is already cached goes out now and
         // the client asks again for the rest.
+        const emit = (images: Map<string, string>): void => {
+          send(
+            'launches',
+            launches.map((launch) => ({
+              mint: launch.mint,
+              name: launch.name,
+              symbol: launch.symbol,
+              creator: launch.creator,
+              launchedAt: launch.launchedAt,
+              image: images.get(launch.mint) ?? null,
+            })),
+          );
+        };
         void knownImages(launches.map((launch) => launch.mint))
-          .then((images) => {
-            send(
-              'launches',
-              launches.map((launch) => ({
-                mint: launch.mint,
-                name: launch.name,
-                symbol: launch.symbol,
-                creator: launch.creator,
-                launchedAt: launch.launchedAt,
-                image: images.get(launch.mint) ?? null,
-              })),
-            );
-          })
-          .catch(() => undefined);
+          .then(emit)
+          // A failed image lookup must not drop the launches themselves. Emit
+          // them with no picture rather than withholding the whole batch until
+          // the next full reload.
+          .catch(() => emit(new Map()));
       });
 
       // Curve progress moves a token between lanes without anything new being
@@ -132,14 +142,17 @@ export async function GET(request: Request): Promise<Response> {
         }
       };
 
+      teardown = close;
       request.signal.addEventListener('abort', close);
       // Already aborted before this ran — a client that hung up during the
       // handshake would otherwise hold a slot with nothing to release it.
       if (request.signal.aborted) close();
     },
     cancel() {
-      // The runtime tears the stream down without an abort in some paths.
-      slot.release();
+      // The runtime tears the stream down without an abort in some paths, so run
+      // the full teardown here too, not just the slot release. close() guards on
+      // `open`, so doing both when both fire is a no-op.
+      teardown();
     },
   });
 

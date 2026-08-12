@@ -176,5 +176,9 @@ export class LogSubscription {
     this.#attempt += 1;
 
     this.#timer = setTimeout(() => this.#connect(), delay);
+    // A pending reconnect must not hold the process alive through a shutdown,
+    // matching AccountSubscription. Without this a shutdown could hang for the
+    // whole backoff ceiling.
+    this.#timer.unref?.();
   }
 }

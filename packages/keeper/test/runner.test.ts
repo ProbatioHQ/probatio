@@ -369,3 +369,36 @@ describe('a trade proves itself end to end', () => {
     expect(result.verified).toBe(true);
   });
 });
+
+describe('a batch failing partway through a trader', () => {
+  it('does not commit the next batch out of order when the first fails', async () => {
+    // Two batches for one trader (maxBatchSize 4, eight trades).
+    for (let index = 0; index < 8; index += 1) await writeTrade(index);
+
+    // A chain that rejects only the very first commitRoot, then behaves.
+    class FailFirst extends FakeChain {
+      calls = 0;
+      override async commitRoot(input: Parameters<FakeChain['commitRoot']>[0]) {
+        this.calls += 1;
+        if (this.calls === 1) throw new Error('transient send failure');
+        return super.commitRoot(input);
+      }
+    }
+    const failing = new FailFirst();
+    const k = new Keeper(db, failing);
+
+    const result = await runOnce(db, k, options);
+
+    // The first batch failed; the second was held rather than committed off the
+    // wrong predecessor. Nothing landed on chain, and the keeper did not halt.
+    expect(result.failed).toBe(1);
+    expect(result.committed).toBe(0);
+    expect(result.halted).toBeNull();
+    expect(failing.records.size).toBe(0);
+
+    // Next cycle, with the chain healthy, both batches commit in order.
+    const again = await runOnce(db, k, options);
+    expect(again.committed).toBe(2);
+    expect(again.halted).toBeNull();
+  });
+});

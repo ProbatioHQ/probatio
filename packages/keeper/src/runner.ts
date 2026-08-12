@@ -64,7 +64,16 @@ export async function runOnce(
   let tradesCommitted = 0;
   let failed = 0;
 
+  // Traders whose earlier batch this cycle did not confirm. Their remaining
+  // batches chain off that one, so committing them now would fold off the last
+  // CONFIRMED accumulator instead, landing out of sequence order and halting the
+  // keeper next cycle when the orphaned batch cannot be reconciled. They wait
+  // for the next cycle, by which point the earlier batch has settled.
+  const blocked = new Set<string>();
+  const traderKey = (batch: Batch): string => `${batch.seasonId}:${batch.userPubkey}`;
+
   for (const batch of batches) {
+    if (blocked.has(traderKey(batch))) continue;
     try {
       const root = await rootFor(db, batch);
       const id = await keeper.commit({
@@ -80,6 +89,7 @@ export async function runOnce(
 
       if (id === null) {
         failed += 1;
+        blocked.add(traderKey(batch));
         // A count with no cause is what an operator cannot act on.
         errors.push(
           `${batch.userPubkey.slice(0, 8)}… season ${batch.seasonId}: ` +
@@ -108,6 +118,7 @@ export async function runOnce(
       // stalling every other trader behind one bad record.
       if (error instanceof LeafMismatchError) {
         failed += 1;
+        blocked.add(traderKey(batch));
         errors.push(error.message);
         continue;
       }
@@ -130,13 +141,28 @@ export async function runOnce(
 
 /** The merkle root over a batch's trades, rebuilt and checked from storage. */
 export async function rootFor(db: Client, batch: Batch): Promise<string> {
-  const trades = await loadTrades(
+  const loaded = await loadTrades(
     db,
     batch.seasonId,
     batch.userPubkey,
     batch.fromTradeId,
     batch.toTradeId,
   );
+
+  // Load spans the id range, which can contain trades already committed if the
+  // uncommitted set for this trader is not contiguous. The root must cover
+  // exactly the batch's own trades, or it commits leaves the batch does not
+  // claim and its leaf_count disagrees with the tree. Keep only the batch's ids,
+  // in the loaded (sequence) order, and refuse if any are missing.
+  const wanted = new Set(batch.tradeIds);
+  const trades = loaded.filter((trade) => wanted.has(trade.id));
+  if (trades.length !== batch.tradeIds.length) {
+    throw new LeafMismatchError(
+      `batch for ${batch.userPubkey.slice(0, 8)}… expected ${batch.tradeIds.length} trades ` +
+        `but ${trades.length} of them loaded in range ${batch.fromTradeId}..${batch.toTradeId}`,
+      batch.fromTradeId,
+    );
+  }
 
   const leaves = leavesFor(trades);
   return toHex(buildTree(leaves.map((leaf) => hashLeaf(leaf))).root);

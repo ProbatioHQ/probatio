@@ -1,4 +1,5 @@
 import { LayoutError, findProgramAddress, pubkeySeed, readPubkey, readU8, utf8Seed } from '@probatio/pools';
+import { stripInvisible } from './sanitize';
 
 /** Metaplex Token Metadata. */
 export const METADATA_PROGRAM_ID = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s';
@@ -71,9 +72,11 @@ function readBorshString(
     data.subarray(start, start + length),
   );
 
-  // Trim the NUL padding Metaplex writes, then ordinary whitespace. Both are
-  // invisible and both break equality comparisons.
-  return { value: raw.replace(/\0+$/, '').trim(), next: start + length };
+  // Strip the NUL padding Metaplex writes, ordinary whitespace, and the
+  // invisible/bidi characters a hostile name uses to impersonate another token
+  // next to money. The off-chain path is cleaned the same way, and this decoder
+  // feeds the leaderboard and positions panel just as directly.
+  return { value: stripInvisible(raw.replace(/\0+$/, '')), next: start + length };
 }
 
 export function decodeTokenMetadata(data: Uint8Array): TokenMetadataAccount {

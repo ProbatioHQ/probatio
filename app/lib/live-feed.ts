@@ -3,7 +3,7 @@ import { LaunchFeed, LogSubscription, toWebSocketUrl } from '@probatio/feed';
 import { PUMP_PROGRAM_ID, extractTradeEvents } from '@probatio/pools';
 import { recordLaunches } from '@probatio/db';
 import { db } from './db';
-import { reportFeedRunning, reportFeedState } from './health';
+import { reportFeedNotification, reportFeedRunning, reportFeedState } from './health';
 import { publishLaunches } from './launch-stream';
 import { resolveLaunchImages } from './token-images';
 import { ingestTradeEvents, startTradeCandles, stopTradeCandles } from './trade-candles';
@@ -27,6 +27,14 @@ let subscription: LogSubscription | null = null;
 const BATCH_SIZE = 25;
 /** How long to hold a partial batch. Quiet minutes still reach the page. */
 const FLUSH_INTERVAL_MS = 5_000;
+/**
+ * A ceiling on the unflushed buffer, so a hung (not failing) database write
+ * during a busy minute cannot grow it without limit. Past this the oldest
+ * launches are dropped, which the page recovers on its next reload.
+ */
+const MAX_PENDING = 500;
+/** A bound on the dedup memory for trade signatures. */
+const SEEN_TRADES_MAX = 5_000;
 
 export function startLiveFeed(): void {
   // `register` can fire more than once across dev reloads, and two
@@ -37,6 +45,22 @@ export function startLiveFeed(): void {
   const feed = new LaunchFeed();
   let pending: Parameters<typeof recordLaunches>[1][number][] = [];
   let flushing = false;
+
+  // Trades are keyed by signature so a duplicated or reconnect-replayed
+  // notification does not re-ingest the same trade. Candle writes accumulate
+  // volume and trade count on conflict, so without this a single duplicate
+  // would permanently inflate both. Launches are already deduped by the
+  // LaunchFeed; this is the trade-path equivalent, bounded like every cache.
+  const seenTrades = new Set<string>();
+  const firstTradeSeen = (signature: string): boolean => {
+    if (seenTrades.has(signature)) return false;
+    seenTrades.add(signature);
+    if (seenTrades.size > SEEN_TRADES_MAX) {
+      const oldest = seenTrades.values().next().value;
+      if (oldest !== undefined) seenTrades.delete(oldest);
+    }
+    return true;
+  };
 
   async function flush(): Promise<void> {
     if (flushing || pending.length === 0) return;
@@ -72,15 +96,31 @@ export function startLiveFeed(): void {
       else if (status === 'closed' && detail) console.warn(`[feed] ${detail}, reconnecting`);
     },
     onNotification: (notification) => {
+      // Proof the socket is alive and delivering, for the silence watchdog that
+      // catches an open-but-wedged node the status reports as healthy.
+      reportFeedNotification();
+
       for (const launch of feed.ingest(notification)) pending.push(launch);
+      if (pending.length > MAX_PENDING) pending = pending.slice(-MAX_PENDING);
       if (pending.length >= BATCH_SIZE) void flush();
+
+      // A reverted transaction is still delivered with its logs, and its
+      // TradeEvent carries the reserves the trade would have left had it not
+      // failed. Ingesting that writes a price and volume that never happened,
+      // which is exactly the disagreement between chart and fill this system
+      // promises cannot occur. The launch path already skips a failed tx; the
+      // trade path must too.
+      if (notification.err != null) return;
 
       // The same messages carry every trade. Charts are built from these
       // rather than from the curve watcher's samples: one sample per bucket
       // makes open, high, low and close the same number, and every candle
-      // draws as a flat line.
+      // draws as a flat line. Deduped by signature so a replay cannot inflate
+      // volume through the accumulating candle write.
       const trades = extractTradeEvents(notification.logs);
-      if (trades.length > 0) ingestTradeEvents(trades);
+      if (trades.length > 0 && firstTradeSeen(notification.signature)) {
+        ingestTradeEvents(trades);
+      }
     },
   });
 

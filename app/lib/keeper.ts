@@ -115,10 +115,25 @@ export function startKeeper(): void {
     }
   };
 
-  void tick().catch((error) => console.error('[keeper] first cycle failed', error));
-  const timer = setInterval(() => {
-    void tick().catch((error) => console.error('[keeper] cycle failed', error));
-  }, CYCLE_MS);
+  // runOnce is only safe when its caller serializes it, and a bare setInterval
+  // does not: a cycle can outlast CYCLE_MS (an unconfirmed commit alone can
+  // block it for the confirm timeout), and a second concurrent tick would read
+  // the same uncommitted trades and commit the same root twice, folding one
+  // batch onto the other and halting the keeper on an accumulator it cannot
+  // reconcile. A tick in flight makes the next one skip its turn.
+  let running = false;
+  const guarded = (label: string): void => {
+    if (running) return;
+    running = true;
+    void tick()
+      .catch((error) => console.error(`[keeper] ${label} failed`, error))
+      .finally(() => {
+        running = false;
+      });
+  };
+
+  guarded('first cycle');
+  const timer = setInterval(() => guarded('cycle'), CYCLE_MS);
   timer.unref?.();
 }
 
