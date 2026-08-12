@@ -1466,14 +1466,12 @@ button,
   font-family: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* Three bars of growing length. The same mark as the favicon. */
+/* The Probatio mark. A transparent PNG, so only the logo shows over the
+   header, not the dark square it was drawn on. */
 .wordmark .mark {
-  width: 14px;
-  height: 14px;
-  background:
-    linear-gradient(to right, var(--text-faint) 6px, transparent 0) 0 1px / 14px 2px no-repeat,
-    linear-gradient(to right, var(--text-dim) 10px, transparent 0) 0 6px / 14px 2px no-repeat,
-    linear-gradient(to right, var(--accent) 14px, transparent 0) 0 11px / 14px 2px no-repeat;
+  width: 26px;
+  height: 22px;
+  background: url('/probatio-logo.png') left center / contain no-repeat;
 }
 
 .site-nav a {
