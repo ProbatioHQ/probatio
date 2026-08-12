@@ -220,10 +220,21 @@ describe('proofs', () => {
 
   it('rejects a proof against a different root', () => {
     const { tree, leaves } = treeOf(8);
-    const other = treeOf(8);
     const proof = buildProof(tree, 3);
-    expect(verifyProof(leaves[3]!, proof, other.tree.root)).toBe(true);
 
+    // The realistic forgery: a same-size tree built from DIFFERENT leaves, so
+    // its root differs. The old test built `other` the same deterministic way,
+    // so its root was byte-identical and it only ever asserted a proof verifies
+    // against its own root. This asserts the proof does NOT verify against a
+    // genuinely different root.
+    const otherLeaves = Array.from({ length: 8 }, (_, i) =>
+      hashLeaf(leaf({ sequence: i + 1, solAmount: 999_999n })),
+    );
+    const otherRoot = buildTree(otherLeaves).root;
+    expect(toHex(otherRoot)).not.toBe(toHex(tree.root));
+    expect(verifyProof(leaves[3]!, proof, otherRoot)).toBe(false);
+
+    // And a different size, the other way a root can differ.
     const different = treeOf(7);
     expect(verifyProof(leaves[3]!, proof, different.tree.root)).toBe(false);
   });

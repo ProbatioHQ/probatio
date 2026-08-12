@@ -376,7 +376,7 @@ export function TradePanel({
             ? 'In flight…'
             : side === 'buy'
               ? `Buy${amount ? ` ${amount} SOL` : ''}`
-              : `Sell${amount ? ` ${tokens(String(Math.floor(Number(amount) || 0)))}` : ''}`}
+              : `Sell${amount ? ` ${tokens(String(Math.floor((Number(amount) || 0) * 10 ** TOKEN_DECIMALS)))}` : ''}`}
         </button>
 
         <button

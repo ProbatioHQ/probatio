@@ -52,7 +52,12 @@ function normalize(figure: string): string {
 export function unsupportedFigures(text: string, brief: Brief): string[] {
   const supported = new Set(
     brief.facts.flatMap((fact) => {
-      const matches = fact.value.match(FIGURE) ?? [];
+      // Both the value and the label, because the model is shown the label too
+      // and several labels carry a reference figure (the "100%" ideal, a "20.0%"
+      // threshold). Building the supported set from the value alone flagged a
+      // faithful quote of one of those as fabricated and dropped the whole
+      // observation, so a correct coach reply came back as "did not check out".
+      const matches = `${fact.label} ${fact.value}`.match(FIGURE) ?? [];
       return matches.map(normalize);
     }),
   );

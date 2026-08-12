@@ -108,7 +108,11 @@ async function writeTrade(
     feeLamports: 12_500n,
     solReserve: 31_000_000_000n,
     tokenReserve: 1_000_000_000_000_000n,
-    deliverableTokens: 1_000_000_000_000_000n,
+    // Deliberately different from tokenReserve, as a real bonding curve is: the
+    // deliverable (real) reserve is below the virtual one price comes from. This
+    // is what the leaf commits to, so if the snapshot did not store it and the
+    // rebuild read tokenReserve instead, these commits would fail to verify.
+    deliverableTokens: 700_000_000_000_000n,
     feeBps: 125,
     poolSource: 'pumpfun-curve' as const,
     priceImpactBps: 10 + index,
@@ -125,6 +129,7 @@ async function writeTrade(
       mint: MINT,
       solReserve: '31000000000',
       tokenReserve: '1000000000000000',
+      deliverableTokens: '700000000000000',
       tokenDecimals: 6,
       feeBps: 125,
       source: 'pumpfun-curve',

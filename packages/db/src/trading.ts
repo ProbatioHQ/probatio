@@ -173,6 +173,13 @@ export interface PoolSnapshotWrite {
   readonly mint: string;
   readonly solReserve: string;
   readonly tokenReserve: string;
+  /**
+   * The tokens the venue could actually deliver, the engine's buy cap. On a
+   * curve this is the real token reserve, which differs from the virtual
+   * `tokenReserve` price comes from, and the trade leaf commits to it, so it has
+   * to be stored to rebuild the leaf rather than reconstructed from the reserve.
+   */
+  readonly deliverableTokens: string;
   readonly tokenDecimals: number;
   readonly feeBps: number;
   readonly source: string;
@@ -255,14 +262,16 @@ export async function recordTrade(
     // moment.
     const snapshot = await tx.execute({
       sql: `INSERT INTO pool_snapshots
-              (mint, sol_reserve, token_reserve, token_decimals, fee_bps, source, slot, observed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              (mint, sol_reserve, token_reserve, deliverable_tokens, token_decimals,
+               fee_bps, source, slot, observed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (mint, slot) DO UPDATE SET observed_at = observed_at
             RETURNING id`,
       args: [
         input.snapshot.mint,
         input.snapshot.solReserve,
         input.snapshot.tokenReserve,
+        input.snapshot.deliverableTokens,
         input.snapshot.tokenDecimals,
         input.snapshot.feeBps,
         input.snapshot.source,

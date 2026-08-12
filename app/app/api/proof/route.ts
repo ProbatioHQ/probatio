@@ -106,36 +106,64 @@ export async function GET(request: Request): Promise<Response> {
   // Every batch, with the leaves that built it, in committed order. Order is
   // part of the claim: a merkle root is not a set, and the same leaves in a
   // different order produce a different root.
-  const batches = await Promise.all(
-    commits.map(async (commit, index) => {
-      const trades = await loadTrades(
-        client,
-        seasonId,
-        trader,
-        commit.fromTradeId,
-        commit.toTradeId,
-      );
-      return {
-        batchIndex: index,
-        root: commit.merkleRoot,
-        leaves: commit.leafCount,
-        engineVersion: commit.engineVersion,
-        previousAccumulator: commit.previousAccumulator,
-        predictedAccumulator: commit.predictedAccumulator,
-        txSignature: commit.txSignature,
-        slot: commit.slot,
-        trades: leavesFor(trades).map((leaf) => ({
-          ...leaf,
-          solAmount: leaf.solAmount.toString(),
-          tokenAmount: leaf.tokenAmount.toString(),
-          feeLamports: leaf.feeLamports.toString(),
-          solReserve: leaf.solReserve.toString(),
-          tokenReserve: leaf.tokenReserve.toString(),
-          deliverableTokens: leaf.deliverableTokens.toString(),
-        })),
-      };
-    }),
-  );
+  //
+  // Wrapped so a rebuild problem returns a JSON error rather than an unhandled
+  // non-JSON 500 the verifier cannot read. A leaf that will not rebuild
+  // (LeafMismatchError) or a count that disagrees with what was committed is a
+  // data problem worth naming, not a crash.
+  let batches;
+  try {
+    batches = await Promise.all(
+      commits.map(async (commit, index) => {
+        const trades = await loadTrades(
+          client,
+          seasonId,
+          trader,
+          commit.fromTradeId,
+          commit.toTradeId,
+        );
+        const leaves = leavesFor(trades);
+        // The stored range can, in a non-contiguous history, load more trades
+        // than the batch committed; a proof over a superset would fold a leaf
+        // count that disagrees with the root and fail a genuine record. Refuse
+        // rather than serve a proof that cannot verify.
+        if (leaves.length !== commit.leafCount) {
+          throw new Error(
+            `batch ${index} rebuilt ${leaves.length} leaves but ${commit.leafCount} were committed`,
+          );
+        }
+        return {
+          batchIndex: index,
+          root: commit.merkleRoot,
+          leaves: commit.leafCount,
+          engineVersion: commit.engineVersion,
+          previousAccumulator: commit.previousAccumulator,
+          predictedAccumulator: commit.predictedAccumulator,
+          txSignature: commit.txSignature,
+          slot: commit.slot,
+          trades: leaves.map((leaf) => ({
+            ...leaf,
+            solAmount: leaf.solAmount.toString(),
+            tokenAmount: leaf.tokenAmount.toString(),
+            feeLamports: leaf.feeLamports.toString(),
+            solReserve: leaf.solReserve.toString(),
+            tokenReserve: leaf.tokenReserve.toString(),
+            deliverableTokens: leaf.deliverableTokens.toString(),
+          })),
+        };
+      }),
+    );
+  } catch (error) {
+    console.error('[proof] could not rebuild proof for', trader, error);
+    return Response.json(
+      {
+        error:
+          'This record could not be rebuilt from storage. Its stored trades disagree ' +
+          'with what was committed, so no honest proof can be served for it.',
+      },
+      { status: 500 },
+    );
+  }
 
   return Response.json({
     trader,

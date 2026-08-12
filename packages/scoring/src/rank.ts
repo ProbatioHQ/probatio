@@ -59,7 +59,9 @@ export function compareStandings(left: Standing, right: Standing): number {
 
   if (left.enteredAt !== right.enteredAt) return left.enteredAt - right.enteredAt;
 
-  // Arbitrary, and it is meant to be. It exists so the ordering is total.
+  // Arbitrary, and it is meant to be. It exists so the ordering is total. The
+  // comparison is the base58 string as-is, which the published ruleset now names
+  // exactly (base58 order, not byte order) so a third party reproduces this tie.
   return left.trader < right.trader ? -1 : left.trader > right.trader ? 1 : 0;
 }
 

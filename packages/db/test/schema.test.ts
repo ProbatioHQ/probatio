@@ -120,6 +120,7 @@ describe('migrations', () => {
       '017_curve_virtual_reserves.sql',
       '018_session_epoch.sql',
       '019_practice_purchases.sql',
+      '020_snapshot_deliverable_tokens.sql',
     ]);
   });
 

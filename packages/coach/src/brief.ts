@@ -74,14 +74,14 @@ export function formatSol(lamports: bigint): string {
   return `${negative ? '-' : ''}${whole}.${fraction.toString().padStart(3, '0')} SOL`;
 }
 
-/** Basis points as a percentage, to one place. */
+/** Basis points as a percentage, rounded to one place. */
 export function formatBps(bps: number): string {
   const sign = bps < 0 ? '-' : '';
-  const absolute = Math.abs(bps);
-  return `${sign}${Math.floor(absolute / 100)}.${Math.round(absolute % 100)
-    .toString()
-    .padStart(2, '0')
-    .slice(0, 1)}%`;
+  // Round to tenths of a percent on the whole value, so 19.99% reads as 20.0%
+  // rather than being truncated to 19.9%. The old form rounded the hundredths
+  // and then sliced the tenths off, which both truncated and failed to carry.
+  const tenths = Math.round(Math.abs(bps) / 10);
+  return `${sign}${Math.floor(tenths / 10)}.${tenths % 10}%`;
 }
 
 export function formatDuration(ms: number): string {

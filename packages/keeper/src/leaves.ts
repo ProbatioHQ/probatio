@@ -65,7 +65,7 @@ export async function loadTrades(
 ): Promise<StoredTrade[]> {
   const result = await db.execute({
     sql: `SELECT t.*, s.ordinal AS season_ordinal,
-                 p.sol_reserve, p.token_reserve, p.fee_bps
+                 p.sol_reserve, p.token_reserve, p.deliverable_tokens, p.fee_bps
           FROM trades t
           JOIN seasons s ON s.id = t.season_id
           JOIN pool_snapshots p ON p.id = t.pool_snapshot_id
@@ -88,8 +88,12 @@ export async function loadTrades(
       fee: String(row['fee']),
       solReserve: String(row['sol_reserve']),
       tokenReserve: String(row['token_reserve']),
-      // Not stored on the snapshot; the leaf carries what the engine used.
-      deliverableTokens: String(row['token_reserve']),
+      // The buy cap the engine used, stored on the snapshot. On a curve this is
+      // the real token reserve, which differs from the virtual `token_reserve`;
+      // reading it back from `token_reserve` (as this once did) rebuilt a leaf
+      // whose hash did not match the one recorded at trade time, so no curve
+      // trade could commit or verify.
+      deliverableTokens: String(row['deliverable_tokens']),
       feeBps: Number(row['fee_bps']),
       poolSource: String(row['pool_source']) as StoredTrade['poolSource'],
       priceImpactBps: Number(row['price_impact_bps']),

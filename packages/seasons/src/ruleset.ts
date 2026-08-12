@@ -88,8 +88,12 @@ export type ScoringRule = 'highest_return';
  * so the rule is published up front and cannot move afterwards.
  *
  * `entered_then_pubkey`: the earlier entrant wins, and if they entered in the
- * same millisecond, the lower public key. The last step is arbitrary and says
- * so; it exists so that the ordering is total, because a ranking that can
+ * same millisecond, the public key that sorts first in base58 order (the string
+ * compared as-is, which is what `compareStandings` runs). Naming the exact
+ * comparison matters: "the lower key" could mean byte order, and byte order and
+ * base58 order disagree for keys whose encodings differ in length, so anyone
+ * reproducing the ranking has to know which one. The last step is arbitrary and
+ * says so; it exists so that the ordering is total, because a ranking that can
  * report two firsts cannot pay one.
  */
 export type Tiebreak = 'entered_then_pubkey';

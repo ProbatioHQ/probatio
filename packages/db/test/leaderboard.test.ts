@@ -91,6 +91,7 @@ async function trade(
   await recordTrade(harness.db, {
     snapshot: {
       mint: MINT, solReserve: '30000000000', tokenReserve: '1000000000000',
+      deliverableTokens: '1000000000000',
       tokenDecimals: 6, feeBps: 125, source: 'pumpfun-curve', slot,
     },
     trade: {

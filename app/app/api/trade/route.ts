@@ -258,6 +258,10 @@ export async function POST(request: Request): Promise<Response> {
         mint,
         solReserve: pool.solReserve.toString(),
         tokenReserve: pool.tokenReserve.toString(),
+        // The buy cap the leaf commits to. Stored, not derived from the reserve,
+        // because on a curve it is the real reserve and differs from the virtual
+        // one the price uses.
+        deliverableTokens: pool.deliverableTokens.toString(),
         tokenDecimals: pool.tokenDecimals || PUMPFUN_TOKEN_DECIMALS,
         feeBps: totalFeeBps(pool.fees),
         source: pool.source,

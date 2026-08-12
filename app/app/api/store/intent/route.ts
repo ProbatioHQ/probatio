@@ -7,7 +7,7 @@ import {
   creditFor,
   tierFor,
 } from '@probatio/payments';
-import { createPaymentIntent, ensureFreePlaySeason } from '@probatio/db';
+import { createPaymentIntent, ensureAccount, ensureFreePlaySeason } from '@probatio/db';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { rpcEndpoint, treasuryAddress } from '@/lib/env';
@@ -62,10 +62,13 @@ export async function POST(request: Request): Promise<Response> {
   const client = await db();
   const now = Date.now();
 
-  // The credit lands in the free-play account, so it has to exist before the
-  // payment does. Cheaper to make it now than to take somebody's money and
-  // discover there is nowhere to put it.
-  await ensureFreePlaySeason(client, now);
+  // The credit lands in the free-play account, so both the season AND the
+  // account have to exist before the payment does. Ensuring only the season
+  // left a first-time buyer, whose very first action was the store, with a
+  // verified on-chain payment and a settle that threw "no account to credit":
+  // a 500 that repeated forever because nothing in this path created the row.
+  const freePlayId = await ensureFreePlaySeason(client, now);
+  await ensureAccount(client, freePlayId, user.pubkey, now);
 
   const intent = createIntent({
     payer: user.pubkey,
