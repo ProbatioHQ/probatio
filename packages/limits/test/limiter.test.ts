@@ -46,7 +46,11 @@ describe('not becoming the leak it exists to prevent', () => {
     for (let i = 0; i < 3; i += 1) limiter.check('a', NOW);
 
     limiter.check('b', NOW + 1_500);
-    expect(limiter.check('a', NOW + 1_500).remaining).toBeLessThan(3);
+    // Retained: 'a' spent all 3 at NOW, refilled ~1.5 by +1500, so this check
+    // leaves ~0 remaining. If it had been wrongly swept it would be a fresh
+    // capacity-3 bucket leaving 2 remaining, so `< 3` could not tell the sweep
+    // bug apart from correct retention. Zero is the value that distinguishes.
+    expect(limiter.check('a', NOW + 1_500).remaining).toBe(0);
   });
 
   it('caps how many callers it will ever track', () => {

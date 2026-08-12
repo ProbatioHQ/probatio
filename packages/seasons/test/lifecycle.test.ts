@@ -86,8 +86,14 @@ describe('scheduling', () => {
 
   it('starts the next season exactly where the last ended', () => {
     // No gap. A gap is a stretch where a ranked trade counts toward nothing.
+    // Derive the boundary independently rather than reading it back out of
+    // `first`: asserting second.startsAt === first.endsAt is trivially true
+    // because scheduleFrom returns its start argument verbatim, so it would pass
+    // even if endsAt were computed wrong. Pinning both to START + 7 days checks
+    // the actual duration math and the contiguity together.
     const first = scheduleFrom(START, 7 * DAY, 2 * DAY);
     const second = scheduleFrom(first.endsAt, 14 * DAY, 2 * DAY);
-    expect(second.startsAt).toBe(first.endsAt);
+    expect(first.endsAt).toBe(START + 7 * DAY);
+    expect(second.startsAt).toBe(START + 7 * DAY);
   });
 });

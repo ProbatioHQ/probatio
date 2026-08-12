@@ -50,16 +50,15 @@ function normalize(figure: string): string {
 }
 
 export function unsupportedFigures(text: string, brief: Brief): string[] {
+  // Only the fact values, which are the trader's actual numbers. Labels used to
+  // carry reference figures ("100% would be the exact low", "0% means every
+  // trade the same size"), and a faithful quote of one was flagged as invented
+  // and dropped the whole reply; but whitelisting them let the model claim an
+  // ideal it did not earn ("your exit timing was 100%") unchecked. The labels
+  // no longer state a bare figure, so the value-only set both accepts honest
+  // references and still catches an invented one.
   const supported = new Set(
-    brief.facts.flatMap((fact) => {
-      // Both the value and the label, because the model is shown the label too
-      // and several labels carry a reference figure (the "100%" ideal, a "20.0%"
-      // threshold). Building the supported set from the value alone flagged a
-      // faithful quote of one of those as fabricated and dropped the whole
-      // observation, so a correct coach reply came back as "did not check out".
-      const matches = `${fact.label} ${fact.value}`.match(FIGURE) ?? [];
-      return matches.map(normalize);
-    }),
+    brief.facts.flatMap((fact) => (fact.value.match(FIGURE) ?? []).map(normalize)),
   );
 
   const found = text.match(FIGURE) ?? [];

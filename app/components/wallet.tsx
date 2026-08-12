@@ -65,13 +65,41 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Reset to signed-out whenever the wallet changes or disconnects its active
+  // account in the extension. The server session belongs to the key that signed
+  // in, so if that key changes underneath us, keeping the old identity would let
+  // a payment be signed by a wallet the session does not match. The cookie is
+  // cleared too, so a stale session cannot act as the old wallet.
+  useEffect(() => {
+    const phantom = getPhantom();
+    if (!phantom?.on) return;
+    const reset = (): void => {
+      void fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+      setPubkey(null);
+      setStatus('signed-out');
+      setError(null);
+    };
+    phantom.on('accountChanged', reset);
+    phantom.on('disconnect', reset);
+    return () => {
+      phantom.off?.('accountChanged', reset);
+      phantom.off?.('disconnect', reset);
+    };
+  }, []);
+
+  // Set synchronously at the top of signIn so two fast clicks in one frame,
+  // before the disabled button re-renders, cannot fire two connect+sign flows.
+  const signingIn = useRef(false);
+
   const signIn = useCallback(async () => {
+    if (signingIn.current) return;
     const phantom = getPhantom();
     if (!phantom) {
       window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener,noreferrer');
       return;
     }
 
+    signingIn.current = true;
     setStatus('working');
     setError(null);
     try {
@@ -98,11 +126,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setPubkey(address);
       setStatus('signed-in');
     } catch (caught) {
-      // Someone closing the wallet popup made a decision. It is not an error
-      // and should not be shown to them as one.
+      // Someone closing the wallet popup made a decision. It is not an error and
+      // should not be shown to them as one. Phantom signals that with the
+      // standard 4001 rejection code, checked before the message text so a
+      // differently worded or localized message still reads as a quiet cancel.
+      const code = (caught as { code?: number } | null)?.code;
       const message = caught instanceof Error ? caught.message : 'Sign-in failed.';
+      const cancelled = code === 4001 || /user rejected|declined/i.test(message);
       setStatus('signed-out');
-      setError(/user rejected|declined/i.test(message) ? null : message);
+      setError(cancelled ? null : message);
+    } finally {
+      signingIn.current = false;
     }
   }, []);
 
@@ -242,17 +276,15 @@ export function WalletButton() {
       </button>
 
       {open && (
-        <div className="wallet-menu" role="menu">
-          <a href="/me" role="menuitem">
-            Your account
-          </a>
-          <a href={`/p/${pubkey}`} role="menuitem">
-            Public record
-          </a>
-          <a href="/season" role="menuitem">
-            This season
-          </a>
-          <button type="button" role="menuitem" onClick={() => void signOut()}>
+        // A plain disclosure of a few links and a button, not an ARIA menu:
+        // role="menu" would promise arrow-key roving focus this does not
+        // implement. Every item is a real link or button reachable by Tab, and
+        // Escape and click-outside close it.
+        <div className="wallet-menu">
+          <a href="/me">Your account</a>
+          <a href={`/p/${pubkey}`}>Public record</a>
+          <a href="/season">This season</a>
+          <button type="button" onClick={() => void signOut()}>
             Disconnect
           </button>
         </div>

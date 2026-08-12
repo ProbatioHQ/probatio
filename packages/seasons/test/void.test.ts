@@ -99,9 +99,11 @@ describe('a season that does not', () => {
 
   it('is void or not, never partly', () => {
     // No adjusted standings, no replay. A replay's result is whatever the
-    // person running it says it is.
+    // person running it says it is. One uncommitted trade is over the default
+    // limit of zero, so this must actually void; asserting only that the field
+    // is a boolean would pass even if assessVoid always returned false.
     const verdict = assessVoid(measured({ uncommittedTrades: 1 }));
-    expect(typeof verdict.isVoid).toBe('boolean');
+    expect(verdict.isVoid).toBe(true);
   });
 });
 

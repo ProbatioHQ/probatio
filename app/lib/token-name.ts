@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { getTokenMetadata, launchByMint, upsertOnchainMetadata } from '@probatio/db';
 import { MetadataReader } from '@probatio/metadata';
 import { RpcClient } from '@probatio/pools';
@@ -27,7 +28,13 @@ export function shortMint(mint: string): string {
   return `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 }
 
-export async function tokenName(mint: string): Promise<TokenName> {
+/**
+ * Memoized per request. The token page reads the name twice, once in
+ * generateMetadata and once in the body, and without this each render did the
+ * launch lookup, the metadata-cache lookup, and up to an eight-second on-chain
+ * read twice for one page view. `cache` collapses the two calls into one.
+ */
+export const tokenName = cache(async (mint: string): Promise<TokenName> => {
   const client = await db();
 
   const launch = await launchByMint(client, mint);
@@ -56,4 +63,4 @@ export async function tokenName(mint: string): Promise<TokenName> {
   }
 
   return { name: shortMint(mint), symbol: null, known: false };
-}
+});

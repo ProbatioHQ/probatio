@@ -87,6 +87,19 @@ describe('assessToken', () => {
     expect(assessToken('m', mostlyFine).severity).toBe('ok');
   });
 
+  it('flags a one-sided generous drift a pooled median would hide', () => {
+    // The engine hands out too many tokens on buys but is fair on sells. Buy and
+    // sell are separate code paths, so a one-sided bug is the likely one. Thirty
+    // fair sells outnumber twenty-one generous buys, so the pooled median sits at
+    // zero and the old single-median check read this exploitable token as ok.
+    const sells = Array.from({ length: 30 }, () => ({ ...sample(0), side: 'sell' as const }));
+    const buys = Array.from({ length: 21 }, () => sample(40));
+    const mixed = [...sells, ...buys];
+
+    expect(assessToken('m', mixed).medianSignedBps).toBeLessThan(DEFAULT_THRESHOLDS.exploitableBps);
+    expect(assessToken('m', mixed).severity).toBe('exploitable');
+  });
+
   it('respects custom thresholds', () => {
     const strict: DriftThresholds = { ...DEFAULT_THRESHOLDS, exploitableBps: 1 };
     expect(assessToken('m', samples(2), strict).severity).toBe('exploitable');

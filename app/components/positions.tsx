@@ -188,6 +188,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
       {snapshot.positions.length === 0 ? (
         <p>Nothing open.</p>
       ) : (
+        <div className="scroller">
         <table>
           <thead>
             <tr>
@@ -216,6 +217,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <h2>Trades</h2>
@@ -228,6 +230,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
           Record shows whether the trade has been written to Solana yet, which is what makes it
           checkable by anyone.
         </p>
+        <div className="scroller">
         <table>
           <thead>
             <tr>
@@ -270,6 +273,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
             ))}
           </tbody>
         </table>
+        </div>
         </>
       )}
     </section>

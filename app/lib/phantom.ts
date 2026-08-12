@@ -10,6 +10,11 @@ export interface PhantomProvider {
   connect(options?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: { toString(): string } }>;
   disconnect(): Promise<void>;
   signMessage(message: Uint8Array, encoding: 'utf8'): Promise<{ signature: Uint8Array }>;
+  // The wallet emits these when the user switches or disconnects the active
+  // account inside the extension. Without listening, the app keeps the old
+  // identity and would sign a payment from a wallet the session does not match.
+  on?(event: 'accountChanged' | 'disconnect', handler: (arg?: unknown) => void): void;
+  off?(event: 'accountChanged' | 'disconnect', handler: (arg?: unknown) => void): void;
 }
 
 declare global {

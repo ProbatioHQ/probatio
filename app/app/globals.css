@@ -1283,6 +1283,32 @@ button,
   gap: 14px;
 }
 
+/* Placeholder blocks shown while a server-rendered page is still loading. */
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(63, 224, 138, 0.04),
+    rgba(63, 224, 138, 0.1),
+    rgba(63, 224, 138, 0.04)
+  );
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
 /* A section heading written the way a terminal writes one. */
 .cmd {
   display: flex;

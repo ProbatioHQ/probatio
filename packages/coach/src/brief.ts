@@ -140,7 +140,7 @@ export function buildBrief(input: BriefInput, minimumTrips = MINIMUM_TRIPS): Bri
   add('averageSize', 'Average position size', metrics.positionSizes.average === null ? null : formatSol(metrics.positionSizes.average));
   add(
     'sizeConsistencyBps',
-    'Position size variation (0% means every trade the same size)',
+    'Position size variation (lower means more consistent sizing)',
     metrics.sizeConsistencyBps === null ? null : formatBps(metrics.sizeConsistencyBps),
   );
 
@@ -158,19 +158,19 @@ export function buildBrief(input: BriefInput, minimumTrips = MINIMUM_TRIPS): Bri
 
   add(
     'entryEfficiencyBps',
-    'Entry timing (100% would be buying the exact low of the hold)',
+    'Entry timing (higher means buying nearer the low of the hold)',
     excursions.averageEntryEfficiencyBps === null ? null : formatBps(excursions.averageEntryEfficiencyBps),
   );
   add(
     'exitEfficiencyBps',
-    'Exit timing (100% would be selling the exact high of the hold)',
+    'Exit timing (higher means selling nearer the high of the hold)',
     excursions.averageExitEfficiencyBps === null ? null : formatBps(excursions.averageExitEfficiencyBps),
   );
   add('averageMfeBps', 'Average best unrealized gain reached', excursions.averageMfeBps === null ? null : formatBps(excursions.averageMfeBps));
   add('averageMaeBps', 'Average worst unrealized loss endured', excursions.averageMaeBps === null ? null : formatBps(excursions.averageMaeBps));
   add(
     'gaveBackWinners',
-    `Trips that were up over ${formatBps(excursions.gaveBackThresholdBps)} and still closed red`,
+    'Trips that ran well into profit and still closed red',
     excursions.count === 0 ? null : String(excursions.gaveBackWinners),
   );
 

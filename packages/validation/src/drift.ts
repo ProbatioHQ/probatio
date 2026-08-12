@@ -77,17 +77,22 @@ function median(values: readonly number[]): number {
 }
 
 function severityOf(
+  generousBps: number,
   medianSignedBps: number,
   medianAbsBps: number,
   samples: number,
   thresholds: DriftThresholds,
 ): DriftSeverity {
-  // Too little evidence to accuse the engine of anything.
+  // Checked first and on the generous signal (the worst of the pooled and the
+  // per-side medians): being generous is the dangerous direction, and it matters
+  // at a far lower magnitude than being wrong. This carries its own sample floor
+  // inside `generousBps`, so it can fire on a one-sided drift even when the
+  // pooled sample count would gate the other checks.
+  if (generousBps >= thresholds.exploitableBps) return 'exploitable';
+
+  // Too little evidence to accuse the engine of anything else.
   if (samples < thresholds.minSamples) return 'ok';
 
-  // Checked first and on the signed value: being generous is the dangerous
-  // direction, and it matters at a far lower magnitude than being wrong.
-  if (medianSignedBps >= thresholds.exploitableBps) return 'exploitable';
   if (medianAbsBps >= thresholds.divergentBps) return 'divergent';
   if (medianAbsBps >= thresholds.watchBps) return 'watch';
   return 'ok';
@@ -118,13 +123,32 @@ export function assessToken(
   const medianSignedBps = median(signed);
   const medianAbsBps = median(absolute);
 
+  // The generous (exploitable) direction is judged per side as well as pooled.
+  // Buy and sell are separate engine code paths (fee off the input and floored,
+  // vs fee off the output and ceiled), so the likely bug is one-sided, and a
+  // single pooled median hides it: a token whose buys run +40bps generous but
+  // whose sells are fair reads as zero when the two are mixed. A side that on
+  // its own has enough samples and a generous median past the threshold is
+  // exploitable, whichever way the pooled median lands.
+  const generousBySide = (side: Sample['side']): number => {
+    const sideSigned = samples.filter((sample) => sample.side === side).map((s) => s.signedErrorBps);
+    return sideSigned.length >= thresholds.minSamples
+      ? median(sideSigned)
+      : Number.NEGATIVE_INFINITY;
+  };
+  const worstGenerousBps = Math.max(
+    samples.length >= thresholds.minSamples ? medianSignedBps : Number.NEGATIVE_INFINITY,
+    generousBySide('buy'),
+    generousBySide('sell'),
+  );
+
   return {
     mint,
     samples: samples.length,
     medianSignedBps,
     medianAbsBps,
     generousSamples: signed.filter((value) => value > 0).length,
-    severity: severityOf(medianSignedBps, medianAbsBps, samples.length, thresholds),
+    severity: severityOf(worstGenerousBps, medianSignedBps, medianAbsBps, samples.length, thresholds),
   };
 }
 

@@ -108,6 +108,10 @@ const nextConfig: NextConfig = {
   // @probatio/sim ships raw TypeScript rather than a build artifact, so the
   // fill engine has exactly one compiled form and the tests, the replay
   // harness in step 11 and the running app all execute identical code.
+  // Every @probatio/* package ships raw TypeScript with no build artifact, so
+  // each one imported by the app must be transpiled here. Listing all of them
+  // rather than the handful the build currently tolerates, so a stricter install
+  // or a server-runtime externalization cannot try to require a .ts file.
   transpilePackages: [
     '@probatio/sim',
     '@probatio/db',
@@ -116,6 +120,20 @@ const nextConfig: NextConfig = {
     '@probatio/candles',
     '@probatio/commit',
     '@probatio/trading',
+    '@probatio/analytics',
+    '@probatio/coach',
+    '@probatio/payments',
+    '@probatio/seasons',
+    '@probatio/scoring',
+    '@probatio/sybil',
+    '@probatio/profile',
+    '@probatio/keeper',
+    '@probatio/limits',
+    '@probatio/health',
+    '@probatio/retention',
+    '@probatio/feed',
+    '@probatio/metadata',
+    '@probatio/validation',
   ],
 
   // Never advertise what is serving this.
