@@ -60,8 +60,18 @@ interface StreamState {
   accounts: Map<string, { mint: string; side: 'curve' | 'base' | 'quote' }>;
   /** Mint → the accounts being watched for it. */
   watching: Map<string, string[]>;
-  /** Mint → the last reserves seen, so one vault changing still yields a price. */
-  reserves: Map<string, { sol: bigint; token: bigint; offset: bigint }>;
+  /**
+   * Mint → the last reserves seen, with the slot each side was read at.
+   *
+   * The two sides carry their own slot because a pool's two vaults arrive as
+   * separate account updates, and a price is only real when both are from the
+   * same swap. Pricing a new SOL reserve against a stale token reserve is what
+   * made the live bar flip between the true price and a wrong one.
+   */
+  reserves: Map<
+    string,
+    { sol: bigint; token: bigint; offset: bigint; solSlot: number; tokenSlot: number }
+  >;
   /** Mint → the most recent price, for a client that connects mid-stream. */
   latest: Map<string, LivePrice>;
   listeners: Set<Listener>;
@@ -139,6 +149,11 @@ function priceFrom(mint: string, slot: number | null): void {
   const held = current.reserves.get(mint);
   if (!held || held.token <= 0n) return;
 
+  // Both sides from the same swap, or not a price. A pool updates its two vaults
+  // in one transaction, so their slots match once both notifications land;
+  // between them the pair is inconsistent and must not be published.
+  if (held.solSlot !== held.tokenSlot) return;
+
   const sol = held.sol + held.offset;
   if (sol <= 0n) return;
 
@@ -159,7 +174,10 @@ function handleUpdate(address: string, data: Uint8Array, slot: number | null): v
   const target = current.accounts.get(address);
   if (!target) return;
 
-  const held = current.reserves.get(target.mint) ?? { sol: 0n, token: 0n, offset: 0n };
+  const held =
+    current.reserves.get(target.mint) ??
+    { sol: 0n, token: 0n, offset: 0n, solSlot: 0, tokenSlot: 0 };
+  const at = slot ?? 0;
 
   try {
     if (target.side === 'curve') {
@@ -167,13 +185,19 @@ function handleUpdate(address: string, data: Uint8Array, slot: number | null): v
       // A completed curve prices nothing; the token moved to a pool and the
       // reconciler will pick that up on its next pass.
       if (curve.complete) return;
+      // A curve carries both reserves in one account, so the two sides are
+      // always from the same read.
       held.sol = curve.virtualSolReserves;
       held.token = curve.virtualTokenReserves;
       held.offset = 0n;
+      held.solSlot = at;
+      held.tokenSlot = at;
+    } else if (target.side === 'quote') {
+      held.sol = decodeTokenAccount(data).amount;
+      held.solSlot = at;
     } else {
-      const vault = decodeTokenAccount(data);
-      if (target.side === 'quote') held.sol = vault.amount;
-      else held.token = vault.amount;
+      held.token = decodeTokenAccount(data).amount;
+      held.tokenSlot = at;
     }
   } catch {
     return;
@@ -263,7 +287,15 @@ async function reconcile(reader: PoolReader, rpc: RpcClient): Promise<void> {
         continue;
       }
 
-      current.reserves.set(mint, { sol: found.sol, token: found.token, offset: found.offset });
+      // One getAccounts read, so both sides share a slot and the first price
+      // publishes immediately.
+      current.reserves.set(mint, {
+        sol: found.sol,
+        token: found.token,
+        offset: found.offset,
+        solSlot: 0,
+        tokenSlot: 0,
+      });
       current.watching.set(
         mint,
         found.accounts.map((entry) => entry.address),
