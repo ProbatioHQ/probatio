@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { EnterSeason } from './enter-season';
+import { countdown } from '@/lib/season-format';
 
 /**
  * The season, and why bringing somebody matters.
@@ -22,6 +23,7 @@ interface Ranked {
   status: 'pending' | 'entry_open' | 'running' | 'closed' | 'finalized';
   startsAt: number;
   endsAt: number;
+  entryClosesAt: number;
   entryClosesInMs: number | null;
   entryCost: string;
   entrants: number;
@@ -44,33 +46,43 @@ function sol(lamports: string): string {
   return `${whole}.${fraction.toString().padStart(2, '0')}`;
 }
 
-function remaining(ms: number): string {
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-  if (hours >= 1) return `${hours}h`;
-  return `${Math.max(1, Math.floor(ms / 60_000))}m`;
-}
-
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
 export function Season() {
   const [season, setSeason] = useState<Ranked | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/season')
-      .then((response) => response.json() as Promise<{ ranked: Ranked | null }>)
-      .then((body) => {
-        if (!cancelled) setSeason(body.ranked);
-      })
-      .catch(() => undefined);
+    const read = (): void => {
+      void fetch('/api/season')
+        .then((response) => response.json() as Promise<{ ranked: Ranked | null }>)
+        .then((body) => {
+          if (!cancelled) setSeason(body.ranked);
+        })
+        .catch(() => undefined);
+    };
+    read();
+    // Re-read on the same cadence as the season page, so the two never drift
+    // by more than a poll rather than by however long this tab has been open.
+    const timer = setInterval(read, 20_000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
+  }, []);
+
+  // The clock ticks locally between reads, computed from the same closing time
+  // the season page uses rather than a snapshot the server sent once.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
   }, []);
 
   // No ranked season is a normal state, not an error. Free play is the product.
   if (!season) return null;
+
+  const entryClosesIn = season.entryClosesAt - now;
 
   const closed = season.status === 'closed' || season.status === 'finalized';
 
@@ -119,10 +131,10 @@ export function Season() {
             <span className="k">Entrants</span>
             <span className="v">{season.entrants}</span>
           </div>
-          {season.entryClosesInMs !== null && (
+          {season.status === 'entry_open' && entryClosesIn > 0 && (
             <div className="stat">
               <span className="k">Entry closes in</span>
-              <span className="v">{remaining(season.entryClosesInMs)}</span>
+              <span className="v">{countdown(entryClosesIn)}</span>
             </div>
           )}
         </div>

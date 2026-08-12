@@ -89,14 +89,21 @@ describe('market cap', () => {
     expect(matchesFilters(token(), filters({ minMarketCapUsd: 4_000, maxMarketCapUsd: 6_000 }), ctx)).toBe(true);
   });
 
-  it('does not judge a token whose curve has not been read', () => {
-    // An unpriced curve in the new lane must not be swept out by a floor.
-    expect(matchesFilters(token({ marketCap: null }), filters({ minMarketCapUsd: 6_000 }), ctx)).toBe(true);
+  it('hides a token whose market cap is unknown when a range is set', () => {
+    // You asked for a band; an unpriced token cannot be confirmed to be in it,
+    // and showing it anyway is what made the filtered bonded lane read n/a.
+    expect(matchesFilters(token({ marketCap: null }), filters({ minMarketCapUsd: 6_000 }), ctx)).toBe(false);
+  });
+
+  it('still shows an unpriced token when no market cap range is set', () => {
+    expect(matchesFilters(token({ marketCap: null }), DEFAULT_FILTERS, ctx)).toBe(true);
   });
 
   it('is inert when no exchange rate is known', () => {
-    // A wrong dollar figure is worse than no filter, so it stands down.
+    // Dollars cannot be computed at all, so it stands down rather than hiding
+    // everything on a number it could not check.
     expect(matchesFilters(token(), filters({ minMarketCapUsd: 6_000 }), { solUsd: null, nowSeconds: NOW })).toBe(true);
+    expect(matchesFilters(token({ marketCap: null }), filters({ minMarketCapUsd: 6_000 }), { solUsd: null, nowSeconds: NOW })).toBe(true);
   });
 });
 
@@ -107,8 +114,10 @@ describe('curve progress', () => {
     expect(matchesFilters(token({ progressBps: 5_000 }), filters({ maxProgressPct: 40 }), ctx)).toBe(false);
   });
 
-  it('lets an unread curve through', () => {
-    expect(matchesFilters(token({ progressBps: null }), filters({ minProgressPct: 90 }), ctx)).toBe(true);
+  it('hides an unread curve when a progress range is set', () => {
+    expect(matchesFilters(token({ progressBps: null }), filters({ minProgressPct: 90 }), ctx)).toBe(false);
+    // ...but shows it when progress is not being filtered.
+    expect(matchesFilters(token({ progressBps: null }), DEFAULT_FILTERS, ctx)).toBe(true);
   });
 });
 

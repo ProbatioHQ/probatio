@@ -93,9 +93,18 @@ export interface FilterContext {
 /**
  * Whether a token survives a filter set.
  *
- * A value the feed has not read yet — an unpriced curve in the new lane, where
- * that is normal — passes rather than being judged as zero, so a market cap or
- * progress floor does not silently empty the one lane that has no market caps.
+ * When a range is set, a token whose value is unknown is hidden, not shown. If
+ * you ask for a market cap between five and fifty thousand, a token whose market
+ * cap has not been read cannot be confirmed to be in that band, and showing it
+ * anyway is what made a filtered bonded lane read as a column of "n/a" rows.
+ * The earlier version let unknowns through so a filter would not empty the new
+ * lane, but the lanes have their own filter sets now — filtering new by market
+ * cap and getting nothing back is a coherent answer, because new tokens do not
+ * have one yet.
+ *
+ * The one exception is the market cap filter with no exchange rate: dollars
+ * cannot be computed at all, so it stands down entirely rather than hiding
+ * everything.
  */
 export function matchesFilters(token: FeedToken, filters: Filters, ctx: FilterContext): boolean {
   if (filters.hideImageless && !token.image) return false;
@@ -121,15 +130,17 @@ export function matchesFilters(token: FeedToken, filters: Filters, ctx: FilterCo
   if (filters.minAgeMin > 0 && ageMin < filters.minAgeMin) return false;
   if (filters.maxAgeMin > 0 && ageMin > filters.maxAgeMin) return false;
 
-  if (token.progressBps !== null) {
+  if (filters.minProgressPct > 0 || filters.maxProgressPct > 0) {
+    if (token.progressBps === null) return false;
     const pct = token.progressBps / 100;
     if (filters.minProgressPct > 0 && pct < filters.minProgressPct) return false;
     if (filters.maxProgressPct > 0 && pct > filters.maxProgressPct) return false;
   }
 
-  // Market cap needs the rate. An unread curve has no cap to judge.
-  if ((filters.minMarketCapUsd > 0 || filters.maxMarketCapUsd > 0) && ctx.solUsd !== null) {
-    if (token.marketCap) {
+  if (filters.minMarketCapUsd > 0 || filters.maxMarketCapUsd > 0) {
+    // No rate means no dollars, so the filter cannot run and does not hide.
+    if (ctx.solUsd !== null) {
+      if (!token.marketCap) return false;
       const usd = (Number(BigInt(token.marketCap)) / 1e9) * ctx.solUsd;
       if (filters.minMarketCapUsd > 0 && usd < filters.minMarketCapUsd) return false;
       if (filters.maxMarketCapUsd > 0 && usd > filters.maxMarketCapUsd) return false;

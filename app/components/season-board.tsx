@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { EnterSeason } from './enter-season';
 import { useWallet } from './wallet';
+import { countdown } from '@/lib/season-format';
 
 /**
  * The season, in full.
@@ -79,17 +80,6 @@ function percent(bps: number): string {
 
 function short(pubkey: string): string {
   return `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
-}
-
-function countdown(ms: number): string {
-  if (ms <= 0) return 'closed';
-  const days = Math.floor(ms / 86_400_000);
-  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
-  const minutes = Math.floor((ms % 3_600_000) / 60_000);
-  const seconds = Math.floor((ms % 60_000) / 1_000);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
 }
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];

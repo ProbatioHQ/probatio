@@ -91,7 +91,7 @@ export default function Home() {
           </div>
 
           <p className="dim" style={{ fontSize: 13.5 }}>
-            Measured against real trades: 0 bps error on every sample.{' '}
+            The fill engine is measured against real trades, not taken on trust.{' '}
             <a href="/docs/fills">See the numbers</a>
           </p>
         </div>
