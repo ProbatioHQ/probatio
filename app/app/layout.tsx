@@ -59,9 +59,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
                 clicks and routes them itself so the page can fade out first;
                 next/link would navigate on its own and the two would race. */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/" className="wordmark">
+            <a href="/" className="wordmark" aria-label="Probatio home">
               <span className="mark" aria-hidden="true" />
-              Probatio
             </a>
             <nav className="site-nav" aria-label="Main">
               <a href="/feed">Terminal</a>
