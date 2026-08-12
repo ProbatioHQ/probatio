@@ -294,3 +294,35 @@ export async function gradsToRefresh(
     bondingCurve: String(row['bonding_curve']),
   }));
 }
+
+/**
+ * Graduated tokens that have never been priced.
+ *
+ * When a token bonds its curve zeroes its reserves, so until the pool behind it
+ * is read it has no market cap and the feed shows it as n/a. The staleness
+ * rotation above will not touch it for minutes, because it was just written and
+ * so is not stale. These are the ones a fresh visitor sees as blank, so they
+ * jump the queue: no price yet, newest first, priced before anything is merely
+ * refreshed.
+ */
+export async function unpricedGrads(
+  db: Client,
+  limit: number,
+): Promise<{ mint: string; bondingCurve: string }[]> {
+  const result = await db.execute({
+    sql: `SELECT l.mint, l.bonding_curve
+          FROM launches l
+          JOIN curve_state c ON c.mint = l.mint
+          WHERE c.complete = 1
+            AND (c.virtual_sol_reserves IS NULL OR c.virtual_sol_reserves = '0'
+                 OR c.virtual_token_reserves IS NULL OR c.virtual_token_reserves = '0')
+          ORDER BY c.updated_at DESC
+          LIMIT ?`,
+    args: [limit],
+  });
+
+  return result.rows.map((row) => ({
+    mint: String(row['mint']),
+    bondingCurve: String(row['bonding_curve']),
+  }));
+}

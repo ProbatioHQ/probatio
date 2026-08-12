@@ -135,6 +135,24 @@ export async function GET(request: Request): Promise<Response> {
       shape(launch, images.get(launch.mint) ?? null, counts.get(launch.creator) ?? 1),
     );
 
+  /**
+   * Biggest first, and a token with no market cap yet goes to the bottom.
+   *
+   * The bonded lane arrives ordered by when each was last priced, which reads
+   * as random to anybody looking at market caps. Sorting it here rather than in
+   * the query because the market cap is derived from reserves in `shape`, not a
+   * column to order by. A null cap is a token the pricing loop has not reached;
+   * it sinks rather than sitting among the real numbers.
+   */
+  const byMarketCap = <T extends { marketCap: string | null }>(rows: T[]): T[] =>
+    [...rows].sort((a, b) => {
+      if (a.marketCap === null) return b.marketCap === null ? 0 : 1;
+      if (b.marketCap === null) return -1;
+      const left = BigInt(a.marketCap);
+      const right = BigInt(b.marketCap);
+      return left > right ? -1 : left < right ? 1 : 0;
+    });
+
   return Response.json({
     query: '',
     // Sent alongside rather than applied here: market caps stay lamports on
@@ -144,7 +162,7 @@ export async function GET(request: Request): Promise<Response> {
     lanes: {
       new: withImages(fresh),
       bonding: withImages(bonding),
-      bonded: withImages(bonded),
+      bonded: byMarketCap(withImages(bonded)),
     },
     bondingFloorBps: BONDING_FLOOR_BPS,
   });

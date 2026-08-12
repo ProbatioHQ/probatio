@@ -2,6 +2,7 @@ import 'server-only';
 import {
   curvesToRefresh,
   gradsToRefresh,
+  unpricedGrads,
   progressBpsFor,
   recordCurveStates,
   writeCandles,
@@ -187,12 +188,22 @@ const GRADS_PER_PASS = 4;
  * starve the rest of the feed of its turn.
  */
 const WATCHED_PER_PASS = 3;
+/**
+ * Newly bonded tokens priced each pass, ahead of everything else.
+ *
+ * A token that just graduated has no price until its pool is read, and the feed
+ * shows it as n/a until then. These jump the queue so that blank does not sit on
+ * screen for the minutes the staleness rotation would take to reach it.
+ */
+const UNPRICED_PER_PASS = 8;
 const GRAD_REFRESH_MS = 4 * 60 * 1_000;
 
 async function gradPass(reader: PoolReader): Promise<void> {
   const client = await db();
   const now = Date.now();
 
+  // Never-priced grads first: they are the n/a rows a fresh visitor sees.
+  const unpriced = await unpricedGrads(client, UNPRICED_PER_PASS);
   const rotation = await gradsToRefresh(client, GRADS_PER_PASS, now - GRAD_REFRESH_MS);
 
   /*
@@ -209,7 +220,14 @@ async function gradPass(reader: PoolReader): Promise<void> {
     .filter((mint) => !rotation.some((entry) => entry.mint === mint))
     .map((mint) => ({ mint }));
 
-  const wanted = [...watched, ...rotation];
+  // Deduplicated by mint, unpriced first, so a token never gets two reads in
+  // one pass and the blank rows are cleared before anything is merely refreshed.
+  const seen = new Set<string>();
+  const wanted = [...unpriced, ...watched, ...rotation].filter((entry) => {
+    if (seen.has(entry.mint)) return false;
+    seen.add(entry.mint);
+    return true;
+  });
   if (wanted.length === 0) return;
 
   const states: CurveWrite[] = [];

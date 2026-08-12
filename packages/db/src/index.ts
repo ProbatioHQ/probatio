@@ -98,6 +98,7 @@ export {
   curveStatesFor,
   curvesToRefresh,
   gradsToRefresh,
+  unpricedGrads,
   newLaunches,
   progressBpsFor,
   recordCurveStates,
