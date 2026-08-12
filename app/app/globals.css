@@ -3290,6 +3290,10 @@ body:has(main.wide) .site-footer .shell {
 
 .chart-change { margin-left: auto; font-size: 13px; }
 
+/* Sits after the change when no change is shown yet it still pins right. */
+.chart-loading { margin-left: auto; font-size: 12px; letter-spacing: 0.02em; }
+.chart-change + .chart-loading { margin-left: 12px; }
+
 .chart-tools {
   display: flex;
   flex-wrap: wrap;

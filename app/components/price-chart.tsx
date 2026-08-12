@@ -525,6 +525,16 @@ export function PriceChart({
             {change.toFixed(2)}%
           </span>
         )}
+
+        {/* Honest about a chart that is not all there yet. Reading a token's past
+            off a public RPC is slow, so a freshly opened token shows the few
+            candles the live feed has caught while the history walks in behind
+            it. Without this, those few candles read as the whole story. */}
+        {data?.backfilling && (
+          <span className="chart-loading mono dim" role="status">
+            reading history<span className="caret" />
+          </span>
+        )}
       </div>
 
       <div className={drawing ? 'chart-canvas drawing' : 'chart-canvas'} style={{ height }}>
