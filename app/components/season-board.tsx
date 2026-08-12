@@ -199,10 +199,7 @@ export function SeasonBoard() {
           <div className="stat-row">
             <div className="stat">
               <span className="k">Prize pool</span>
-              <span className="v hot hero">
-                {sol(season.potLamports)}
-                <span className="unit"> SOL</span>
-              </span>
+              <span className="v hot">{sol(season.potLamports)} SOL</span>
             </div>
             <div className="stat">
               <span className="k">Entrants</span>
