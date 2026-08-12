@@ -142,6 +142,20 @@ describe('settling a payment', () => {
     expect(await paymentsFor(harness.db, PUBKEY)).toHaveLength(2);
   });
 
+  it('refuses to record an entry payment whose reference has no intent', async () => {
+    // Without an intent the entry INSERT ... SELECT matches nothing, so the
+    // payment would be verified while no entry was ever made: paid, not in. That
+    // must fail loudly and roll back, not commit a phantom entry payment.
+    await expect(
+      settlePayment(harness.db, {
+        reference: 'never-created', txSignature: 'sig-x', userPubkey: PUBKEY, seasonId,
+        purpose: 'season_entry', amount: '50000000', now: NOW,
+      }),
+    ).rejects.toThrow(/no payment intent/);
+    // Nothing left behind: the rollback took the payment row with it.
+    expect(await paymentsFor(harness.db, PUBKEY)).toHaveLength(0);
+  });
+
   it('keeps two users apart', async () => {
     await intent('ref-1', PUBKEY);
     await intent('ref-2', OTHER);

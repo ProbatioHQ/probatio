@@ -39,12 +39,10 @@ export interface PositionRow {
  * paid to be here.
  */
 export async function ensureFreePlaySeason(db: Client, now: number): Promise<number> {
-  const existing = await db.execute({
-    sql: 'SELECT id FROM seasons WHERE ordinal = ?',
-    args: [FREE_PLAY_ORDINAL],
-  });
-  if (existing.rows[0]) return Number(existing.rows[0]['id']);
-
+  // ON CONFLICT rather than select-then-insert, for the same reason as
+  // ensureAccount below: this runs on a wallet's first visit, and two
+  // concurrent first requests both saw no row and both inserted, so the loser
+  // hit the ordinal UNIQUE constraint and a first page load 500'd.
   const created = await db.execute({
     sql: `INSERT INTO seasons
             (ordinal, name, ranked, status, starting_balance, entry_cost,
@@ -52,10 +50,18 @@ export async function ensureFreePlaySeason(db: Client, now: number): Promise<num
              engine_version, scoring_formula_hash, created_at)
           VALUES (?, 'Free play', 0, 'running', '10000000000', '0',
                   0, '0', 600, 5000, 1, 'free', ?)
+          ON CONFLICT (ordinal) DO NOTHING
           RETURNING id`,
     args: [FREE_PLAY_ORDINAL, now],
   });
-  return Number(created.rows[0]!['id']);
+  if (created.rows[0]) return Number(created.rows[0]['id']);
+
+  // Lost the race, or it already existed. Theirs is the same season.
+  const existing = await db.execute({
+    sql: 'SELECT id FROM seasons WHERE ordinal = ?',
+    args: [FREE_PLAY_ORDINAL],
+  });
+  return Number(existing.rows[0]!['id']);
 }
 
 /** The trader's account for a season, created at the starting balance if new. */

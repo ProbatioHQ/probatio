@@ -213,7 +213,10 @@ export async function bondingLaunches(
           FROM launches l
           JOIN curve_state c ON c.mint = l.mint
           WHERE c.complete = 0 AND c.progress_bps >= ?
-          ORDER BY c.progress_bps DESC
+          -- progress_bps is a 0..10000 integer with heavy ties, so without a
+          -- stable tiebreak the LIMIT cut and the row order both wander between
+          -- identical requests and a token flickers in and out of the lane.
+          ORDER BY c.progress_bps DESC, l.launched_at DESC, l.mint
           LIMIT ?`,
     args: [minProgressBps, limit],
   });
@@ -229,7 +232,10 @@ export async function bondedLaunches(db: Client, limit: number): Promise<LaunchW
           FROM launches l
           JOIN curve_state c ON c.mint = l.mint
           WHERE c.complete = 1
-          ORDER BY c.updated_at DESC
+          -- A whole batch is written with one shared updated_at, so many rows
+          -- tie; the mint breaks them so the LIMIT cut is stable rather than
+          -- letting a graduated token jump position for no state change.
+          ORDER BY c.updated_at DESC, l.mint
           LIMIT ?`,
     args: [limit],
   });

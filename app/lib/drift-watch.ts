@@ -8,7 +8,7 @@ import {
   assessDrift,
   type ValidationReport,
 } from '@probatio/validation';
-import { mostTradedMints, recordDrift, suspendToken } from '@probatio/db';
+import { mostTradedMints, recordDrift } from '@probatio/db';
 import { ENGINE_VERSION } from '@probatio/sim';
 import { db } from './db';
 import { rpcEndpoint } from './env';
@@ -79,8 +79,19 @@ interface WatchState {
   suspended: number;
   /** Cycles in a row that measured nothing. */
   blindCycles: number;
+  /** Cycles in a row that threw before completing. */
+  failures: number;
   lastSampledAt: number;
 }
+
+/** Consecutive throwing cycles before the monitor is called unhealthy. */
+const MAX_FAILURES = 3;
+/**
+ * How stale `lastRunAt` may get before the monitor counts as wedged. A cycle
+ * that throws before it can update `lastRunAt` freezes it, so a monitor that
+ * fails every tick goes stale here even if the failure counter were missed.
+ */
+const STALE_AFTER = INTERVAL_MS * (MAX_FAILURES + 1);
 
 /**
  * Shared across bundles, for the reason written out in lib/health.ts: this
@@ -100,6 +111,7 @@ function state(): WatchState {
     cycles: 0,
     suspended: 0,
     blindCycles: 0,
+    failures: 0,
     lastSampledAt: 0,
   };
   return store[WATCH_KEY];
@@ -108,24 +120,31 @@ function state(): WatchState {
 /** What the monitor has seen, for the health surface. */
 export function driftStatus(): {
   running: boolean;
-  /** False when it has been unable to measure anything for several cycles. */
+  /** False when it cannot measure, keeps throwing, or has stopped ticking. */
   healthy: boolean;
   lastRunAt: number;
   lastSampledAt: number;
   lastSummary: string;
   cycles: number;
   suspended: number;
+  failures: number;
 } {
   const current = state();
+  // A monitor that stopped checking weeks ago must not report healthy. It has
+  // run at least once but its lastRunAt has not moved in several intervals,
+  // because every cycle now throws before it can update it.
+  const stale = current.lastRunAt > 0 && Date.now() - current.lastRunAt > STALE_AFTER;
   return {
     running: current.running,
-    // Not yet run is not unhealthy. Repeatedly unable to see is.
-    healthy: current.blindCycles < BLIND_CYCLES,
+    // Not yet run is not unhealthy. Repeatedly unable to see, repeatedly
+    // throwing, or frozen is.
+    healthy: current.blindCycles < BLIND_CYCLES && current.failures < MAX_FAILURES && !stale,
     lastRunAt: current.lastRunAt,
     lastSampledAt: current.lastSampledAt,
     lastSummary: current.lastSummary,
     cycles: current.cycles,
     suspended: current.suspended,
+    failures: current.failures,
   };
 }
 
@@ -230,6 +249,21 @@ export async function runDriftCycle(): Promise<void> {
 
   const assessment = assessDrift(reports);
 
+  // The suspensions ride in the same write as the observations, so there is
+  // never a committed "this token is farmable" without the token being off the
+  // board. A token filling better here than on the chain is free money to
+  // whoever notices, so it comes off now and the why is answered afterwards.
+  const suspensions = assessment.suspend.map((mint) => {
+    const token = assessment.tokens.find((entry) => entry.mint === mint);
+    return {
+      mint,
+      reason:
+        `the simulator filled ${token?.medianSignedBps ?? 0}bps better than the chain across ` +
+        `${token?.samples ?? 0} samples`,
+      severity: 'exploitable' as const,
+    };
+  });
+
   await recordDrift(
     client,
     assessment.tokens.map((token) => ({
@@ -242,23 +276,12 @@ export async function runDriftCycle(): Promise<void> {
       severity: token.severity,
     })),
     Date.now(),
+    suspensions,
   );
 
-  // The one automatic action. A token filling better here than on the chain is
-  // free money to whoever notices, so it comes off the board now and the
-  // question of why is answered afterwards.
-  for (const mint of assessment.suspend) {
-    const token = assessment.tokens.find((entry) => entry.mint === mint);
-    await suspendToken(
-      client,
-      mint,
-      `the simulator filled ${token?.medianSignedBps ?? 0}bps better than the chain across ` +
-        `${token?.samples ?? 0} samples`,
-      'exploitable',
-      Date.now(),
-    );
+  for (const suspension of suspensions) {
     current.suspended += 1;
-    console.error(`[drift] suspended ${mint}: ${assessment.summary}`);
+    console.error(`[drift] suspended ${suspension.mint}: ${assessment.summary}`);
   }
 
   current.lastRunAt = Date.now();
@@ -277,10 +300,19 @@ export function startDriftWatch(): void {
   current.running = true;
 
   const tick = (): void => {
-    void runDriftCycle().catch((error) => {
-      // A monitor that can kill the server is worse than no monitor.
-      console.error('[drift] cycle failed', error);
-    });
+    void runDriftCycle()
+      .then(() => {
+        // A completed cycle, even one that measured nothing, clears the wedged
+        // signal. Only a throw before completion counts as a failure.
+        state().failures = 0;
+      })
+      .catch((error) => {
+        // A monitor that can kill the server is worse than no monitor. But a
+        // cycle that throws before it can update lastRunAt would otherwise leave
+        // the health surface reporting a frozen monitor as fine, so count it.
+        state().failures += 1;
+        console.error('[drift] cycle failed', error);
+      });
   };
 
   const first = setTimeout(() => {

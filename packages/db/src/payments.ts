@@ -215,6 +215,24 @@ export async function settlePayment(
         args: [input.seasonId, input.userPubkey, payment.id, input.now, input.reference],
       });
       entryId = entry.rows[0] ? Number(entry.rows[0]['id']) : null;
+
+      // No returned row is two different things: the wallet already had an entry
+      // (fine, the INSERT hit the conflict, and this payment made no new entry so
+      // entryId stays null as the caller expects), or no payment_intent matched
+      // this reference so the SELECT fed the INSERT nothing and no entry exists
+      // at all. The second would leave a verified season_entry payment that
+      // bought no entry, the "paid and did not get in" outcome this function most
+      // wants to avoid. Refuse only that case, loudly; the throw rolls the whole
+      // settlement back so it can be retried rather than silently lost.
+      if (entryId === null) {
+        const already = await tx.execute({
+          sql: 'SELECT id FROM entries WHERE season_id = ? AND user_pubkey = ?',
+          args: [input.seasonId, input.userPubkey],
+        });
+        if (!already.rows[0]) {
+          throw new Error(`no payment intent for reference ${input.reference}; cannot create entry`);
+        }
+      }
     }
 
     /*

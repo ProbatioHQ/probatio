@@ -21,40 +21,81 @@ export interface DriftObservation {
   readonly severity: DriftSeverity;
 }
 
+/** A token to bar from ranked trading, with why. */
+export interface DriftSuspension {
+  readonly mint: string;
+  readonly reason: string;
+  readonly severity: DriftSeverity;
+}
+
+/**
+ * The suspension upsert, shared by the atomic record path and the standalone
+ * one. It does not refresh the timestamp of an already-active suspension: when a
+ * token became farmable is the fact worth keeping, so an active row keeps its
+ * original `suspended_at` and only a previously-lifted one is re-stamped.
+ */
+const SUSPEND_UPSERT = `INSERT INTO suspended_tokens (mint, reason, severity, suspended_at)
+  VALUES (?, ?, ?, ?)
+  ON CONFLICT (mint) DO UPDATE SET
+    reason = excluded.reason,
+    severity = excluded.severity,
+    suspended_at = CASE
+      WHEN suspended_tokens.lifted_at IS NULL THEN suspended_tokens.suspended_at
+      ELSE excluded.suspended_at
+    END,
+    lifted_at = NULL,
+    lifted_note = NULL`;
+
+/**
+ * Record observations and, in the SAME transaction, the suspensions they imply.
+ *
+ * The two used to be separate calls: `recordDrift` committed, then the caller
+ * looped `suspendToken`. A crash or interleave between them left an observation
+ * on record saying a token was farmable while the token was not actually
+ * suspended, so ranked trades kept filling against it. That is the exact window
+ * this module claims cannot exist, so the suspensions ride in the same batch as
+ * the observations, which libsql runs as one transaction.
+ */
 export async function recordDrift(
   db: Client,
   observations: readonly DriftObservation[],
   now: number,
+  suspensions: readonly DriftSuspension[] = [],
 ): Promise<void> {
-  if (observations.length === 0) return;
+  if (observations.length === 0 && suspensions.length === 0) return;
 
   await db.batch(
-    observations.map((observation) => ({
-      sql: `INSERT INTO drift_observations
-              (mint, engine_version, samples, median_signed_bps, median_abs_bps,
-               generous_samples, severity, observed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        observation.mint,
-        observation.engineVersion,
-        observation.samples,
-        observation.medianSignedBps,
-        observation.medianAbsBps,
-        observation.generousSamples,
-        observation.severity,
-        now,
-      ],
-    })),
+    [
+      ...observations.map((observation) => ({
+        sql: `INSERT INTO drift_observations
+                (mint, engine_version, samples, median_signed_bps, median_abs_bps,
+                 generous_samples, severity, observed_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          observation.mint,
+          observation.engineVersion,
+          observation.samples,
+          observation.medianSignedBps,
+          observation.medianAbsBps,
+          observation.generousSamples,
+          observation.severity,
+          now,
+        ],
+      })),
+      ...suspensions.map((suspension) => ({
+        sql: SUSPEND_UPSERT,
+        args: [suspension.mint, suspension.reason, suspension.severity, now],
+      })),
+    ],
     'write',
   );
 }
 
 /**
- * Bar a token from ranked trading.
+ * Bar a token from ranked trading on its own, outside a drift batch.
  *
  * Idempotent, and it does not refresh the timestamp of an existing active
- * suspension — when a token became farmable is the fact worth keeping, and
- * overwriting it on every monitoring pass would erase exactly that.
+ * suspension for the reason in SUSPEND_UPSERT above.
  */
 export async function suspendToken(
   db: Client,
@@ -63,20 +104,7 @@ export async function suspendToken(
   severity: DriftSeverity,
   now: number,
 ): Promise<void> {
-  await db.execute({
-    sql: `INSERT INTO suspended_tokens (mint, reason, severity, suspended_at)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT (mint) DO UPDATE SET
-            reason = excluded.reason,
-            severity = excluded.severity,
-            suspended_at = CASE
-              WHEN suspended_tokens.lifted_at IS NULL THEN suspended_tokens.suspended_at
-              ELSE excluded.suspended_at
-            END,
-            lifted_at = NULL,
-            lifted_note = NULL`,
-    args: [mint, reason, severity, now],
-  });
+  await db.execute({ sql: SUSPEND_UPSERT, args: [mint, reason, severity, now] });
 }
 
 /** Lift a suspension. Deliberate and recorded — never automatic. */

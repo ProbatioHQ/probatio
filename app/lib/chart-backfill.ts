@@ -76,8 +76,26 @@ const pending = new Set<string>();
  *
  * Only ever records "done". A mint absent from this set falls through to the
  * database, so a fresh process is correct rather than merely fast.
+ *
+ * Bounded, because a pump.fun-scale feed charts thousands of distinct mints a
+ * day and this used to keep every one of them for the life of the process, a
+ * slow leak of tens of megabytes over a long uptime. It is only a cache: an
+ * evicted mint costs one database round trip to re-confirm, not a re-walk.
  */
+const SETTLED_MAX = 5_000;
 const settled = new Set<string>();
+
+/** Record a mint as walked, evicting the oldest once the cache is full. */
+function markSettled(mint: string): void {
+  // Re-adding moves it to the newest position, so eviction is by recency.
+  settled.delete(mint);
+  settled.add(mint);
+  while (settled.size > SETTLED_MAX) {
+    const oldest = settled.values().next().value;
+    if (oldest === undefined) break;
+    settled.delete(oldest);
+  }
+}
 
 export function backfillInFlight(mint: string): boolean {
   return running.has(mint) || pending.has(mint);
@@ -160,7 +178,7 @@ export function backfillChart(mint: string): void {
       // Recorded, so this is once per token for the life of the database
       // rather than once per visitor.
       if (await getBackfill(client, mint)) {
-        settled.add(mint);
+        markSettled(mint);
         return;
       }
 
@@ -222,7 +240,7 @@ export function backfillChart(mint: string): void {
         Date.now(),
       );
 
-      settled.add(mint);
+      markSettled(mint);
       if (observations.length === 0) return;
 
       for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
@@ -239,6 +257,15 @@ export function backfillChart(mint: string): void {
       console.error('[chart] backfill failed for', mint, error);
     } finally {
       running.delete(mint);
+      // Pull the next deferred walk in as this slot frees, rather than waiting
+      // for its chart to poll again. A viewer who left while capped would
+      // otherwise strand their mint in `pending` for the life of the process,
+      // where it also reads as forever in-flight.
+      const next = pending.values().next().value;
+      if (next !== undefined) {
+        pending.delete(next);
+        backfillChart(next);
+      }
     }
   })();
 }

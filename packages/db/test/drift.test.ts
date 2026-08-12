@@ -81,6 +81,19 @@ describe('drift observations', () => {
     await expect(recordDrift(db, [], NOW)).resolves.toBeUndefined();
   });
 
+  it('records the observation and its suspension in one write', async () => {
+    // The whole point of the batch: there is never a committed observation that
+    // says a token is farmable without the token being off the board.
+    await recordDrift(
+      db,
+      [observation({ medianSignedBps: 30, severity: 'exploitable' })],
+      NOW,
+      [{ mint: MINT, reason: 'filled better than chain', severity: 'exploitable' }],
+    );
+    expect(await isSuspended(db, MINT)).toBe(true);
+    expect((await driftHistory(db, MINT))[0]!.severity).toBe('exploitable');
+  });
+
   it('rejects an unknown severity', async () => {
     await expect(
       db.execute({

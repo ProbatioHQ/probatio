@@ -69,7 +69,16 @@ const ordinal = seed ? 0 : Math.max(1, previousOrdinal + 1);
 
 // Back to back with no gap: the next season starts exactly where the last one
 // ended. A gap is a stretch in which a ranked trade counts toward nothing.
-const previous = previousOrdinal > 0 ? await seasonByOrdinal(db, previousOrdinal) : null;
+//
+// The seed is ordinal 0, and highestRankedOrdinal returns 0 both when only the
+// seed exists and when no ranked season exists at all. Gating on `> 0` treated
+// the seed as "no previous season", so opening Season 1 the day after the seed
+// launched scheduled it to start now and overlap the still-running seed, which
+// then resolves as the current season and freezes every seed entrant. The fetch
+// disambiguates: seasonByOrdinal is null only when nothing exists, and returns
+// the seed (which Season 1 must chain after) when it does. The seed itself
+// chains after nothing.
+const previous = seed ? null : await seasonByOrdinal(db, previousOrdinal);
 const start = startsAt ?? previous?.endsAt ?? now;
 
 const base = rulesetFor(ordinal);

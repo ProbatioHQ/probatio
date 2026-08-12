@@ -280,13 +280,32 @@ export function startCurveWatch(): void {
   const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 20_000, minIntervalMs: 120 });
   const reader = new PoolReader(rpc);
 
+  // Each pass reads through one rate-limited RPC, so on a slow node a pass can
+  // outlast the 12s interval. Without these guards the next tick starts a second
+  // copy that shares the same throttled client, so both run slower, and the
+  // pile-up compounds every tick until the node recovers. A pass that is still
+  // running simply skips its turn, the same way the drift watcher and the feed
+  // flush protect themselves.
+  let passRunning = false;
+  let gradRunning = false;
+
   const run = (): void => {
-    void pass(rpc).catch((error) => {
-      console.error('[curves] pass failed', error);
-    });
-    void gradPass(reader).catch((error) => {
-      console.error('[curves] graduated pass failed', error);
-    });
+    if (!passRunning) {
+      passRunning = true;
+      void pass(rpc)
+        .catch((error) => console.error('[curves] pass failed', error))
+        .finally(() => {
+          passRunning = false;
+        });
+    }
+    if (!gradRunning) {
+      gradRunning = true;
+      void gradPass(reader)
+        .catch((error) => console.error('[curves] graduated pass failed', error))
+        .finally(() => {
+          gradRunning = false;
+        });
+    }
   };
 
   run();
