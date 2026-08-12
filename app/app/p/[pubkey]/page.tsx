@@ -40,11 +40,14 @@ export default async function ProfilePage({
 
   return (
     <main>
-      <h1>{name ?? shortAddressSafe(pubkey)}</h1>
-      {/* The address is always shown. It is the identity; the name is not. */}
-      <p className="mono dim" style={{ fontSize: 13, wordBreak: 'break-all' }}>
-        {pubkey}
-      </p>
+      <div className="record-head">
+        <div className="page-head">
+          <h1>{name ?? shortAddressSafe(pubkey)}</h1>
+          {/* The address is always shown. It is the identity; the name is not. */}
+          <p className="mono dim record-addr">{pubkey}</p>
+        </div>
+        <span className="record-badge mono">public record</span>
+      </div>
       <ProfileView pubkey={pubkey} />
     </main>
   );

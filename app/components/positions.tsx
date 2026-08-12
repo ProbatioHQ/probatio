@@ -143,31 +143,71 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
 
   const { equity } = snapshot;
 
+  const down = equity.returnBps < 0;
+
   return (
     <section aria-label="Positions">
-      <h2>Account</h2>
-      <dl>
-        <dt>Equity</dt>
-        <dd>{sol(equity.equity)} SOL</dd>
+      {/* The same card the public record uses, so signed in and public read as
+          one product rather than two. Total return is the headline because it
+          is the number a season is ranked on. */}
+      <div className="term record-card">
+        <div className="term-bar">
+          <span className="prompt">~/account</span>
+          <span>free play</span>
+          <span className="lights">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
 
-        <dt>Total return</dt>
-        {/* The number a season is ranked on. */}
-        <dd>
-          {percent(equity.returnBps)} ({signedSol(equity.totalPnl)} SOL)
-        </dd>
+        <div className="term-body">
+          <div className="stat-row record-stats">
+            <div className="stat">
+              <span className="k">Total return</span>
+              <span className={`v hero ${down ? 'loss' : 'gain'}`}>
+                {percent(equity.returnBps)}
+              </span>
+            </div>
+            <div className="stat">
+              <span className="k">Equity</span>
+              <span className="v">
+                {sol(equity.equity)}
+                <span className="unit"> SOL</span>
+              </span>
+            </div>
+            <div className="stat">
+              <span className="k">Cash</span>
+              <span className="v">
+                {sol(equity.cash)}
+                <span className="unit"> SOL</span>
+              </span>
+            </div>
+            <div className="stat">
+              <span className="k">In positions</span>
+              <span className="v">
+                {sol(equity.positionValue)}
+                <span className="unit"> SOL</span>
+              </span>
+            </div>
+          </div>
 
-        <dt>Cash</dt>
-        <dd>{sol(equity.cash)} SOL</dd>
-
-        <dt>In positions</dt>
-        <dd>{sol(equity.positionValue)} SOL</dd>
-
-        <dt>Realized</dt>
-        <dd>{signedSol(equity.realized)} SOL</dd>
-
-        <dt>Unrealized</dt>
-        <dd>{signedSol(equity.unrealized)} SOL</dd>
-      </dl>
+          <div className="account-splits">
+            <span>
+              Realized{' '}
+              <span className={equity.realized.startsWith('-') ? 'loss mono' : 'gain mono'}>
+                {signedSol(equity.realized)} SOL
+              </span>
+            </span>
+            <span>
+              Unrealized{' '}
+              <span className={equity.unrealized.startsWith('-') ? 'loss mono' : 'gain mono'}>
+                {signedSol(equity.unrealized)} SOL
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
 
       <h2>Open positions</h2>
       {snapshot.positions.length === 0 ? (
