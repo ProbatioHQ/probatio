@@ -74,6 +74,39 @@ function short(mint: string): string {
   return `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 }
 
+/**
+ * A token amount a person can read.
+ *
+ * The log used to print raw base units, so a holding of three and a half tokens
+ * read as "3743047" — a number that means nothing without knowing the token has
+ * six decimal places. pump.fun mints all use six, so the base units are divided
+ * back to whole tokens and then abbreviated, because a memecoin balance is
+ * routinely in the millions and a full integer string is just as unreadable in
+ * the other direction.
+ */
+const TOKEN_DECIMALS = 6;
+
+function tokens(baseUnits: string): string {
+  const whole = Number(BigInt(baseUnits)) / 10 ** TOKEN_DECIMALS;
+  if (whole >= 1_000_000_000) return `${(whole / 1_000_000_000).toFixed(2)}B`;
+  if (whole >= 1_000_000) return `${(whole / 1_000_000).toFixed(2)}M`;
+  if (whole >= 1_000) return `${(whole / 1_000).toFixed(2)}K`;
+  if (whole >= 1) return whole.toFixed(2);
+  // Below one token, show enough to not read as zero.
+  return whole.toFixed(4);
+}
+
+/**
+ * Price impact as a percentage, which is the number people trade on.
+ *
+ * "17bp" is basis points, and nobody reading their own trade history thinks in
+ * basis points. Seventeen of them is 0.17%, which is what pump.fun and every
+ * other front end shows.
+ */
+function slippage(bps: number): string {
+  return `${(bps / 100).toFixed(2)}%`;
+}
+
 export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [trades, setTrades] = useState<TradeEntry[]>([]);
@@ -156,7 +189,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td>
                   <a href={`/t/${position.mint}`}>{short(position.mint)}</a>
                 </td>
-                <td>{position.tokenAmount}</td>
+                <td>{tokens(position.tokenAmount)}</td>
                 <td>{sol(position.costBasis)}</td>
                 <td>
                   {/* A price that could not be read is said so, not shown as
@@ -174,6 +207,12 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
       {trades.length === 0 ? (
         <p>No trades yet.</p>
       ) : (
+        <>
+        <p className="dim" style={{ fontSize: 13 }}>
+          Every fill you have made. Slippage is how far the price moved against you on the way in.
+          Record shows whether the trade has been written to Solana yet, which is what makes it
+          checkable by anyone.
+        </p>
         <table>
           <thead>
             <tr>
@@ -182,32 +221,41 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
               <th scope="col">SOL</th>
               <th scope="col">Tokens</th>
               <th scope="col">Fee</th>
-              <th scope="col">Impact</th>
-              {/* What it is, not what it proves. The hash exists from the
-                  moment the trade fills; whether it is on chain is the next
-                  column's job to say. */}
-              <th scope="col">Leaf hash</th>
-              <th scope="col">On chain</th>
+              {/* Slippage, in the percent people trade on rather than the basis
+                  points the engine works in. */}
+              <th scope="col">Slippage</th>
+              {/* One column, not two. "Leaf hash" beside "on chain" was a raw
+                  hash a normal reader has no use for and a status they do. The
+                  hash is what a verifier needs, so it is kept on the row as a
+                  hover title rather than taking a column of its own. */}
+              <th scope="col">Record</th>
             </tr>
           </thead>
           <tbody>
             {trades.map((trade) => (
               <tr key={trade.id}>
-                <td>{trade.side}</td>
-                <td>{short(trade.mint)}</td>
+                <td className={trade.side === 'buy' ? 'gain' : 'loss'}>{trade.side}</td>
+                <td>
+                  <a href={`/t/${trade.mint}`}>{short(trade.mint)}</a>
+                </td>
                 <td>{sol(trade.solAmount)}</td>
-                <td>{trade.tokenAmount}</td>
+                <td>{tokens(trade.tokenAmount)}</td>
                 <td>{sol(trade.fee)}</td>
-                <td>{trade.priceImpactBps}bp{trade.partial && ' · partial'}</td>
-                {/* What a trader hands to the verifier to prove this happened. */}
-                <td><code>{trade.leafHash.slice(0, 12)}…</code></td>
-                <td className={trade.committed ? 'gain' : 'dim'}>
-                  {trade.committed ? 'committed' : 'not yet'}
+                <td>
+                  {slippage(trade.priceImpactBps)}
+                  {trade.partial && ' · partial'}
+                </td>
+                <td
+                  className={trade.committed ? 'gain' : 'dim'}
+                  title={`proof ${trade.leafHash}`}
+                >
+                  {trade.committed ? 'on chain' : 'recording…'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </>
       )}
     </section>
   );

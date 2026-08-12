@@ -839,8 +839,17 @@ hr {
  * once, and later pinned the skip link off screen so it could never slide in
  * when focused. Anything absolutely positioned directly under `body` belongs
  * on this list.
+ *
+ * The header is excluded for the opposite reason: it must sit ABOVE the
+ * content, not level with it. This selector is specific enough to beat the
+ * header's own `z-index: 10`, so without the exclusion the header was clamped
+ * to `z-index: 1` — the same layer as the page content, which renders after it
+ * in the DOM and therefore paints on top. The wallet menu hangs down out of the
+ * header into content territory, so its lower items ended up behind whatever
+ * content box sat under them: the top of the menu was clickable, the bottom was
+ * not, which read as some menu links simply not working.
  */
-body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link) {
+body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link):not(.site-header) {
   position: relative;
   z-index: 1;
 }
