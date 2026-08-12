@@ -33,7 +33,7 @@ interface Ranked {
   nextBand: { places: number; entriesAway: number } | null;
   rulesetHash: string;
   entered: boolean;
-  /** False when this server cannot take an entry — see /api/season. */
+  /** False when this server cannot take an entry. See /api/season. */
   entryAvailable?: boolean;
   /** Why, in the server's words. Null when entry is available. */
   entryUnavailableReason?: string | null;
@@ -181,7 +181,7 @@ export function Season() {
         ) : season.status === 'entry_open' && season.entryAvailable !== false ? (
           <EnterSeason free={BigInt(season.entryCost) === 0n} />
         ) : season.status === 'entry_open' ? (
-          /* The server's reason, not one guessed here — see season-board. */
+          /* The server's reason, not one guessed here. See season-board. */
           <p className="dim">
             {season.entryUnavailableReason ??
               'Entry is not open on this server yet. Free play is, and trades made in it are committed the same way.'}

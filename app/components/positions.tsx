@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
  *
  * The figure that matters most is total return, because that is what a season
  * is ranked on. It is shown against the starting balance rather than against
- * cash, so a trader holding a winner reads as ahead of one holding nothing —
+ * cash, so a trader holding a winner reads as ahead of one holding nothing,
  * which they are, even before they sell.
  */
 
@@ -78,7 +78,7 @@ function short(mint: string): string {
  * A token amount a person can read.
  *
  * The log used to print raw base units, so a holding of three and a half tokens
- * read as "3743047" — a number that means nothing without knowing the token has
+ * read as "3743047", a number that means nothing without knowing the token has
  * six decimal places. pump.fun mints all use six, so the base units are divided
  * back to whole tokens and then abbreviated, because a memecoin balance is
  * routinely in the millions and a full integer string is just as unreadable in

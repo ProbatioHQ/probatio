@@ -7,8 +7,8 @@ import { useEffect, useState } from 'react';
  *
  * Read top to bottom: each figure on its own line, label on the left, value on
  * the right, so it scans in one pass. The number that matters is not the profit,
- * it is how much of the record is committed on chain — a season with trades and
- * no commitments is one nobody can check — so that line is here and said plainly.
+ * it is how much of the record is committed on chain. A season with trades and no
+ * commitments is one nobody can check, so that line is here and said plainly.
  */
 
 interface SeasonRow {
@@ -95,7 +95,7 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
               <div className="readout-row">
                 <span className="k">Win rate</span>
                 <span className="v">
-                  {season.winRateBps === null ? '—' : `${(season.winRateBps / 100).toFixed(0)}%`}
+                  {season.winRateBps === null ? 'n/a' : `${(season.winRateBps / 100).toFixed(0)}%`}
                 </span>
               </div>
               <div className="readout-row">

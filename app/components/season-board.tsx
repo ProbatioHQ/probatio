@@ -38,7 +38,7 @@ interface Ranked {
   nextBand: { places: number; entriesAway: number } | null;
   rulesetHash: string;
   entered: boolean;
-  /** False when this server cannot take an entry — see /api/season. */
+  /** False when this server cannot take an entry. See /api/season. */
   entryAvailable?: boolean;
   /** Why, in the server's words. Null when entry is available. */
   entryUnavailableReason?: string | null;

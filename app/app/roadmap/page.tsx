@@ -1,18 +1,17 @@
 export const metadata = {
   title: 'Roadmap, Probatio',
   description:
-    'Where Probatio goes after launch: more to trade, and a track record that eventually earns real capital.',
+    'Where Probatio goes after launch. A competitive arena, more markets to trade, and a proven record that earns real capital.',
 };
 
 /**
  * Where this goes after launch.
  *
- * Deliberately not a launch checklist. Launch is the start line, not the
- * finish, and this is the argument for why the thing is worth following past
- * it: the record you build here is meant to become worth something, and the
- * ground it can be built on keeps widening. Each phase is marked with how real
- * it is, because a roadmap that dresses a wish up as a commitment is the same
- * dishonesty the rest of the site exists to avoid.
+ * Not a launch checklist. Launch is the start line, not the finish, and this is
+ * the argument for following the thing past it. The record you build here is
+ * meant to become worth something, and the ground under it keeps widening. Each
+ * phase is marked with how real it is, because a roadmap that dresses a wish up
+ * as a commitment is the dishonesty the rest of the site exists to avoid.
  */
 
 interface Item {
@@ -40,52 +39,55 @@ const PHASES: readonly Phase[] = [
     tag: '01',
     status: 'now',
     name: 'Prove it works',
-    summary:
-      'The core the whole thing rests on: an honest simulator, a record nobody can fake, and a season to win.',
+    summary: 'The foundation everything else stands on: an honest simulator and a record nobody can fake.',
     items: [
       {
-        title: 'Honest fills on live tokens',
+        title: 'Fills measured against reality',
         detail:
-          'Every fill quoted against the real pool at the moment you click, with real slippage and real delay. Measured against actual trades rather than asserted.',
+          'Every fill quoted from the real pool at the moment you click, with real slippage and real delay, then checked against the trades that actually happened rather than taken on trust.',
       },
       {
-        title: 'Records committed to Solana',
+        title: 'A record written to Solana',
         detail:
-          'Each trade hashed as it fills and written to the chain in batches, so your history can be checked by anyone without asking us.',
+          'Each trade hashed as it fills and committed to the chain, so your whole history can be verified by anyone without asking this site anything.',
       },
       {
         title: 'Ranked seasons',
         detail:
-          'Everyone starts on the same balance under the same rules, ranked by percentage return. The rules are published and hashed before the season runs.',
+          'Everyone starts on the same balance under rules published and hashed before the season runs. Ranked on percentage return, so it measures skill and not stake.',
       },
       {
-        title: 'A coach that reads your trades',
+        title: 'A coach that reads your own trades',
         detail:
-          'Feedback drawn from your own round trips — what you keep doing, and what it costs you.',
+          'Patterns pulled from your round trips: what you keep doing, and what it is costing you.',
       },
     ],
   },
   {
     tag: '02',
     status: 'next',
-    name: 'More to trade',
-    summary:
-      'The skill you are proving should not be limited to one corner of one chain. This widens the ground.',
+    name: 'A competitive arena',
+    summary: 'Solo practice is the start. This turns a private simulator into somewhere you compete and get watched.',
     items: [
       {
-        title: 'Every Solana venue',
+        title: 'Head to head duels',
         detail:
-          'Beyond pump.fun and PumpSwap to Raydium and the rest, so any Solana token is fair game, priced the same honest way.',
+          'One against one, the same tokens over the same window, both records on chain. Put a stake on it and the winner takes the pot.',
       },
       {
-        title: 'Deeper charting and tooling',
+        title: 'Automated strategies that get ranked',
         detail:
-          'The indicators and drawing tools a serious trader expects, on the native chart, for the tokens no external chart has indexed yet.',
+          'Write an algorithm, connect it to the simulator, and let it trade a season under the same fills and the same clock as everyone else. A bot that can prove itself is a trader too.',
       },
       {
-        title: 'Portfolio and history that reads like a terminal',
+        title: 'Backtesting on real history',
         detail:
-          'Your positions, your realized and unrealized, your whole season at a glance — fast, clean, and built for people who stare at it all day.',
+          'Replay a token through the exact reserves it actually traded against and see how a strategy would have done, before you risk a season on it.',
+      },
+      {
+        title: 'Live spectating and a following',
+        detail:
+          'Watch a top trader fill in real time, and let a record people trust gather an audience the way a real one does.',
       },
     ],
   },
@@ -93,23 +95,27 @@ const PHASES: readonly Phase[] = [
     tag: '03',
     status: 'later',
     name: 'Beyond memecoins',
-    summary:
-      'A track record in one asset class is a narrow thing. These make it a broad one.',
+    summary: 'A record in one market is narrow. These make it broad, and each one is measured the same honest way.',
     items: [
       {
         title: 'Prediction markets',
         detail:
-          'Trade on outcomes, not just tokens — a different skill, measured the same honest way and added to the same record.',
+          'Trade outcomes rather than tokens. A different skill, priced from real markets, added to the same verifiable record.',
       },
       {
-        title: 'Tokenized equities',
+        title: 'Tokenized stocks and indices',
         detail:
-          'Stocks and indices as they arrive on chain, so the record you build here reflects more than one kind of market.',
+          'Equities as they arrive on chain, so a track record here reflects more than one corner of one market.',
       },
       {
-        title: 'Perps and leverage, simulated honestly',
+        title: 'Perpetuals and leverage, simulated honestly',
         detail:
-          'Leverage is where most traders actually blow up. Practising it against real funding and real liquidation, with no real money at risk, is exactly what this is for.',
+          'Leverage is where most traders actually blow up. Practising it against real funding rates and real liquidation, with nothing at stake but your record, is exactly what this is for.',
+      },
+      {
+        title: 'The same engine on other chains',
+        detail:
+          'Hyperliquid, Base, Ethereum. One honest fill engine, pointed wherever the liquidity is.',
       },
     ],
   },
@@ -117,23 +123,27 @@ const PHASES: readonly Phase[] = [
     tag: '04',
     status: 'exploring',
     name: 'Get paid to be good',
-    summary:
-      'The point of proving you can trade is that being good should be worth something. This is where the record cashes in.',
+    summary: 'The reason to prove anything is that being good should be worth something. This is where the record cashes in.',
     items: [
       {
         title: 'Real capital for proven traders',
         detail:
-          'A track record of ranked seasons finishing near the top becomes the thing capital is allocated against. Trade fake money, prove you are good, get real money — the whole idea, made real.',
+          'A record of ranked seasons finishing near the top becomes the thing real money is allocated against, on a profit share. Trade fake money, prove you are good, get real money. The whole idea, made real.',
       },
       {
-        title: 'Follow the people who can trade',
+        title: 'Strategy vaults',
         detail:
-          'When a record is unfakeable, following it means something. Surface the traders whose history holds up, and let people learn from or mirror them.',
+          'A strategy with a record that holds up becomes something other people can back. The capital flows in, the creator earns a cut, and both are settled on chain.',
       },
       {
-        title: 'A credential you can take with you',
+        title: 'Back a trader',
         detail:
-          'A record checkable by anyone, anywhere, is a résumé for trading — usable off this site, not locked inside it.',
+          'When a record cannot be faked, staking on one means something. Put money behind a verified trader and share their upside.',
+      },
+      {
+        title: 'A credential you can take anywhere',
+        detail:
+          'A record checkable by anyone, off this site as easily as on it. A résumé for trading that no employer or allocator has to take on faith.',
       },
     ],
   },
@@ -145,9 +155,9 @@ export default function RoadmapPage() {
       <div className="page-head">
         <h1>Roadmap</h1>
         <p className="dim">
-          Launch is the start line. This is where it goes after — what gets added, what gets
+          Launch is the start line. This is where it goes after. What gets added, what gets
           better, and where a proven record eventually leads. Each phase is marked with how real
-          it is: shipping at launch, coming next, or still an idea we are chasing.
+          it is: shipping at launch, coming next, or still a direction we are chasing.
         </p>
       </div>
 
@@ -178,7 +188,7 @@ export default function RoadmapPage() {
 
       <p className="dim roadmap-foot">
         Written to be honest about what is real. A phase marked <em>exploring</em> is a direction,
-        not a promise — see <a href="/trust">what you have to trust</a> for the rest of that
+        not a promise. See <a href="/trust">what you have to trust</a> for the rest of that
         argument.
       </p>
     </main>

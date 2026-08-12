@@ -67,6 +67,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
               <a href="/feed">Terminal</a>
               <a href="/season">Season</a>
               <a href="/store">Store</a>
+              <a href="/roadmap">Roadmap</a>
               <a href="/docs">How it works</a>
               <a href="/verify">Verify</a>
               <a href="/trust">Trust</a>
