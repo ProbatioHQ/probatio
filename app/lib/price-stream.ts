@@ -11,7 +11,7 @@ import {
 import { priceFromReserves, type Observation } from '@probatio/candles';
 import { ingestObservations } from './trade-candles';
 import { recentlyViewed } from './watched';
-import { rpcEndpoint } from './env';
+import { hasDedicatedRpc, rpcEndpoint } from './env';
 
 /**
  * Prices pushed the moment they change.
@@ -346,7 +346,13 @@ export function startPriceStream(): void {
   if (current.started) return;
   current.started = true;
 
-  const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 20_000, minIntervalMs: 150 });
+  const rpc = new RpcClient({
+    endpoint: rpcEndpoint(),
+    timeoutMs: 20_000,
+    // A dedicated node resolves a watched token's pool without the public
+    // cluster's throttle in the path, so the first live price lands sooner.
+    minIntervalMs: hasDedicatedRpc() ? 30 : 150,
+  });
   const reader = new PoolReader(rpc);
 
   current.subscription = new AccountSubscription({

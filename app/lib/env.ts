@@ -51,6 +51,22 @@ export function rpcEndpoint(): string {
 }
 
 /**
+ * Whether a dedicated RPC is configured, rather than the public cluster.
+ *
+ * The two behave nothing alike under load. The public endpoint rate-limits a
+ * burst of transaction reads so hard that a token's history takes minutes to
+ * walk or never finishes, which is why a freshly opened chart shows a handful
+ * of candles. A paid endpoint serves the same burst in seconds. So the reads
+ * that walk history are gentle and shallow on the public cluster and fast and
+ * deep on a dedicated one, chosen from this rather than from a flag nobody
+ * remembers to set. Anything that is not the public host counts as dedicated.
+ */
+export function hasDedicatedRpc(): boolean {
+  const url = process.env['RPC_URL'];
+  return typeof url === 'string' && url.length > 0 && !url.includes('api.mainnet-beta.solana.com');
+}
+
+/**
  * The key the coach calls with.
  *
  * Optional, unlike the rest. The simulator, the chart and the on-chain record

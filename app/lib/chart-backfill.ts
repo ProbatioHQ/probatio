@@ -11,7 +11,7 @@ import { getBackfill, recordBackfill, writeCandles } from '@probatio/db';
 import { PoolReader, RpcClient, bondingCurveAddress, pumpSwapReserveOffset } from '@probatio/pools';
 import { collectPoolSwaps } from '@probatio/validation';
 import { db } from './db';
-import { rpcEndpoint } from './env';
+import { hasDedicatedRpc, rpcEndpoint } from './env';
 
 /**
  * History for a chart somebody is looking at.
@@ -28,29 +28,30 @@ import { rpcEndpoint } from './env';
  */
 
 /**
- * A cap, not a target.
+ * How deep to walk, and how hard to push, depend entirely on the endpoint.
  *
- * Enough to draw a chart with a shape, far short of a token's full history. The
- * result records that it was truncated rather than pretending otherwise.
- *
- * Raised from 120, which drew a chart thin enough to look broken next to the
- * same token on pump.fun. Configurable because the right number depends
- * entirely on what the RPC endpoint will tolerate: a public one refuses this
- * load, a paid one will not notice it.
+ * Reading a trade is a getTransaction each. A public node rate-limits a burst of
+ * them so hard that a deep read fails to a 429 and the chart gets no history, so
+ * there the walk is shallow, single-file, and patient. A paid node serves the
+ * same burst in seconds, so there it walks a token's whole life at real
+ * concurrency. The endpoint is detected rather than configured, and either
+ * number can still be overridden by env for a token or a node that wants
+ * something else.
  */
-const MAX_TRANSACTIONS = Number(process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? '400');
-/**
- * The pool read is separate and smaller by default.
- *
- * Reading a pool trade is a getTransaction each, which a public endpoint rate
- * limits hard, so a large number fails the whole read to a 429 and the chart
- * gets no post-graduation history at all. A smaller cap is more likely to land
- * a dense recent window even on a throttled node, and a real endpoint should
- * raise it to cover a token's whole life.
- */
-const POOL_MAX_TRANSACTIONS = Number(process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? '200');
-/** Never more than one of these at a time, whatever the traffic. */
-const MAX_CONCURRENT = 2;
+const DEDICATED = hasDedicatedRpc();
+const MAX_TRANSACTIONS = Number(
+  process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '2000' : '400'),
+);
+const POOL_MAX_TRANSACTIONS = Number(
+  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '2000' : '200'),
+);
+/** How many trade reads run at once during a walk. */
+const WALK_CONCURRENCY = DEDICATED ? 8 : 2;
+/** The smallest gap between reads, and how many times a throttled one retries. */
+const READ_INTERVAL_MS = DEDICATED ? 20 : 160;
+const READ_RETRIES = DEDICATED ? 4 : 7;
+/** Never more than this many whole backfills at once, whatever the traffic. */
+const MAX_CONCURRENT = DEDICATED ? 6 : 2;
 
 const running = new Set<string>();
 
@@ -104,7 +105,7 @@ async function poolObservations(
     rpc,
     pool.address,
     pool.pool,
-    { maxTransactions: POOL_MAX_TRANSACTIONS, concurrency: 1 },
+    { maxTransactions: POOL_MAX_TRANSACTIONS, concurrency: WALK_CONCURRENCY },
     config?.protocolFeeRecipients ?? [],
   );
 
@@ -149,16 +150,16 @@ export function backfillChart(mint: string): void {
       const rpc = new RpcClient({
         endpoint: rpcEndpoint(),
         timeoutMs: 30_000,
-        // Gentle and patient: a rate-limited node drops the whole pool read on
-        // the first 429 it does not ride out, and a dropped read means no
-        // post-graduation chart. Slower is better than nothing.
-        minIntervalMs: 160,
-        maxRetries: 7,
+        // Paced to the endpoint. A public node drops the whole read on the first
+        // 429 it cannot ride out, so there this is patient and single-file; a
+        // paid node serves the burst at once, so there it is fast and parallel.
+        minIntervalMs: READ_INTERVAL_MS,
+        maxRetries: READ_RETRIES,
       });
 
       const result = await backfillFromCurve(rpc, mint, bondingCurveAddress(mint), {
         maxTransactions: MAX_TRANSACTIONS,
-        concurrency: 2,
+        concurrency: WALK_CONCURRENCY,
       });
 
       /*

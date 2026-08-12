@@ -104,7 +104,7 @@ export function PriceChart({
    * than a fixed one. See token-view: a quiet token at fifteen-second candles
    * fills well under one percent of its slots and draws as scattered dashes.
    */
-  onHistory?: (info: { candles: number; spanSeconds: number }) => void;
+  onHistory?: (info: { candles: number; spanSeconds: number; backfilling: boolean }) => void;
   unit?: PriceUnit;
   height?: number;
 }) {
@@ -188,6 +188,7 @@ export function PriceChart({
           onHistory?.({
             candles: body.candles.filter((candle) => candle.trades > 0).length,
             spanSeconds: first && last ? last.time - first.time : 0,
+            backfilling: body.backfilling ?? false,
           });
         })
         .catch(() => {
