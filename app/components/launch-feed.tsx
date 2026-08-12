@@ -57,24 +57,130 @@ const MAX_ROWS = 60;
 /** The preview shows enough to prove it is moving. The terminal shows the feed. */
 const PREVIEW_ROWS = 8;
 
+/**
+ * What the feed can be filtered on, and deliberately only what the feed
+ * actually knows.
+ *
+ * The reference terminals carry filters for holders, snipers, bundles, insider
+ * percentages and audit flags. This indexes pump.fun launches and reads their
+ * curves, so it knows a token's market cap, how far along its curve it is, how
+ * old it is, and a floor on how many tokens its creator has launched. Those are
+ * real, so those are here. A filter for a number the feed does not have would
+ * be a control that lies about doing something, which is worse than not having
+ * it.
+ *
+ * Every range uses 0 to mean "no bound", so an untouched filter is off. The set
+ * applies to all three lanes at once: one question asked of new, bonding and
+ * bonded together, rather than three panels to keep in sync.
+ */
 interface Filters {
+  /** Comma-separated. A token must match at least one to show. Empty means all. */
+  include: string;
+  /** Comma-separated. A token matching any of these is hidden. */
+  exclude: string;
   /** Dollars. Hides the long tail of launches nobody has bought a thing from. */
   minMarketCapUsd: number;
-  /** Percent. Raises the floor of the middle lane above the server's own. */
-  minBondedPct: number;
-  hideImageless: boolean;
+  /** Dollars. 0 means no ceiling. */
+  maxMarketCapUsd: number;
+  /** Percent of the bonding curve sold. 0 means no floor. */
+  minProgressPct: number;
+  /** Percent. 0 means no ceiling. */
+  maxProgressPct: number;
+  /** Minutes since launch. 0 means no floor. */
+  minAgeMin: number;
+  /** Minutes since launch. 0 means no ceiling. */
+  maxAgeMin: number;
   /** 0 means no limit. Anything else hides serial launchers. */
   maxCreatorLaunches: number;
+  hideImageless: boolean;
   paused: boolean;
 }
 
 const DEFAULT_FILTERS: Filters = {
+  include: '',
+  exclude: '',
   minMarketCapUsd: 0,
-  minBondedPct: 50,
-  hideImageless: false,
+  maxMarketCapUsd: 0,
+  minProgressPct: 0,
+  maxProgressPct: 0,
+  minAgeMin: 0,
+  maxAgeMin: 0,
   maxCreatorLaunches: 0,
+  hideImageless: false,
   paused: false,
 };
+
+/**
+ * A min/max pair, the shape every numeric filter here takes.
+ *
+ * Empty reads as no bound, which is why the value shown is blank at zero rather
+ * than a literal 0 — a floor of zero and no floor are the same thing, and
+ * printing the zero invites somebody to think they set one.
+ */
+function RangeRow({
+  label,
+  min,
+  max,
+  onMin,
+  onMax,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  onMin: (value: number) => void;
+  onMax: (value: number) => void;
+}) {
+  const parse = (raw: string): number => {
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  };
+  return (
+    <div className="filter-range">
+      <span className="range-label">{label}</span>
+      <div className="range-inputs">
+        <input
+          type="number"
+          min={0}
+          placeholder="Min"
+          value={min === 0 ? '' : min}
+          onChange={(event) => onMin(parse(event.target.value))}
+        />
+        <input
+          type="number"
+          min={0}
+          placeholder="Max"
+          value={max === 0 ? '' : max}
+          onChange={(event) => onMax(parse(event.target.value))}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Split a keyword box into lowercased terms, ignoring empties. */
+function keywords(raw: string): string[] {
+  return raw
+    .toLowerCase()
+    .split(',')
+    .map((term) => term.trim())
+    .filter((term) => term.length > 0);
+}
+
+/** True when any filter is actually doing something, for the panel's badge. */
+function activeFilterCount(filters: Filters): number {
+  let n = 0;
+  if (keywords(filters.include).length > 0) n += 1;
+  if (keywords(filters.exclude).length > 0) n += 1;
+  if (filters.minMarketCapUsd > 0) n += 1;
+  if (filters.maxMarketCapUsd > 0) n += 1;
+  if (filters.minProgressPct > 0) n += 1;
+  if (filters.maxProgressPct > 0) n += 1;
+  if (filters.minAgeMin > 0) n += 1;
+  if (filters.maxAgeMin > 0) n += 1;
+  if (filters.maxCreatorLaunches > 0) n += 1;
+  if (filters.hideImageless) n += 1;
+  return n;
+}
 
 const FILTER_KEY = 'probatio.feed.filters';
 
@@ -505,29 +611,56 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
       const rows = lanes?.[lane] ?? [];
       if (!terminal) return rows.slice(0, PREVIEW_ROWS);
 
+      const include = keywords(filters.include);
+      const exclude = keywords(filters.exclude);
+      const nowSeconds = Math.floor(now / 1000);
+
       return rows.filter((token) => {
         if (filters.hideImageless && !token.image) return false;
+
+        // Name and symbol, matched together so "cat" finds both a CAT ticker
+        // and a token called Cat Coin.
+        if (include.length > 0 || exclude.length > 0) {
+          const haystack = `${token.name} ${token.symbol}`.toLowerCase();
+          if (include.length > 0 && !include.some((term) => haystack.includes(term))) return false;
+          if (exclude.some((term) => haystack.includes(term))) return false;
+        }
+
         if (
           filters.maxCreatorLaunches > 0 &&
           (token.creatorLaunches ?? 1) > filters.maxCreatorLaunches
         ) {
           return false;
         }
-        if (lane === 'bonding' && (token.progressBps ?? 0) < filters.minBondedPct * 100) {
-          return false;
+
+        // Age is always known, so both bounds apply everywhere.
+        const ageMin = Math.max(0, nowSeconds - token.launchedAt) / 60;
+        if (filters.minAgeMin > 0 && ageMin < filters.minAgeMin) return false;
+        if (filters.maxAgeMin > 0 && ageMin > filters.maxAgeMin) return false;
+
+        // Curve progress. A curve nobody has read yet has an unknown position,
+        // and hiding it would empty the new lane where that is the normal
+        // state, so an unknown value passes rather than being judged as zero.
+        if (token.progressBps !== null) {
+          const pct = token.progressBps / 100;
+          if (filters.minProgressPct > 0 && pct < filters.minProgressPct) return false;
+          if (filters.maxProgressPct > 0 && pct > filters.maxProgressPct) return false;
         }
-        if (filters.minMarketCapUsd > 0 && solUsd !== null) {
-          // A token whose curve has not been read has no market cap to judge.
-          // Hiding it would empty the new lane, which is exactly the lane where
-          // an unread curve is the normal state.
-          if (!token.marketCap) return lane === 'new';
-          const usd = (Number(BigInt(token.marketCap)) / 1e9) * solUsd;
-          if (usd < filters.minMarketCapUsd) return false;
+
+        // Market cap, in dollars, which needs the rate. An unread curve has no
+        // cap to judge; it passes for the same reason progress does.
+        if ((filters.minMarketCapUsd > 0 || filters.maxMarketCapUsd > 0) && solUsd !== null) {
+          if (token.marketCap) {
+            const usd = (Number(BigInt(token.marketCap)) / 1e9) * solUsd;
+            if (filters.minMarketCapUsd > 0 && usd < filters.minMarketCapUsd) return false;
+            if (filters.maxMarketCapUsd > 0 && usd > filters.maxMarketCapUsd) return false;
+          }
         }
+
         return true;
       });
     },
-    [lanes, terminal, filters, solUsd],
+    [lanes, terminal, filters, solUsd, now],
   );
 
   return (
@@ -571,11 +704,14 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             <>
               <button
                 type="button"
-                className={showFilters ? 'preset on' : 'preset'}
+                className={showFilters || activeFilterCount(filters) > 0 ? 'preset on' : 'preset'}
                 onClick={() => setShowFilters((was) => !was)}
                 aria-expanded={showFilters}
               >
                 Filters
+                {activeFilterCount(filters) > 0 && (
+                  <span className="filter-badge">{activeFilterCount(filters)}</span>
+                )}
               </button>
               <button
                 type="button"
@@ -591,36 +727,65 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
 
         {terminal && showFilters && (
           <div className="feed-filters">
-            <label className="field">
-              <span>Minimum market cap</span>
-              <select
-                value={filters.minMarketCapUsd}
-                onChange={(event) =>
-                  setFilters((was) => ({ ...was, minMarketCapUsd: Number(event.target.value) }))
-                }
+            <div className="filter-head">
+              <span className="dim">Applies to all three lanes.</span>
+              <button
+                type="button"
+                className="linklike"
+                onClick={() => setFilters(DEFAULT_FILTERS)}
+                disabled={activeFilterCount(filters) === 0}
               >
-                <option value={0}>Any</option>
-                <option value={5_000}>$5K</option>
-                <option value={15_000}>$15K</option>
-                <option value={50_000}>$50K</option>
-                <option value={100_000}>$100K</option>
-              </select>
-            </label>
+                Reset
+              </button>
+            </div>
 
-            <label className="field">
-              <span>About to bond, at least</span>
-              <select
-                value={filters.minBondedPct}
-                onChange={(event) =>
-                  setFilters((was) => ({ ...was, minBondedPct: Number(event.target.value) }))
-                }
-              >
-                <option value={50}>50%</option>
-                <option value={70}>70%</option>
-                <option value={85}>85%</option>
-                <option value={95}>95%</option>
-              </select>
-            </label>
+            <div className="filter-grid">
+              <label className="field">
+                <span>Search names</span>
+                <input
+                  type="text"
+                  placeholder="cat, dog, pepe"
+                  value={filters.include}
+                  onChange={(event) =>
+                    setFilters((was) => ({ ...was, include: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="field">
+                <span>Hide names</span>
+                <input
+                  type="text"
+                  placeholder="test, scam"
+                  value={filters.exclude}
+                  onChange={(event) =>
+                    setFilters((was) => ({ ...was, exclude: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
+
+            <RangeRow
+              label="Market cap ($)"
+              min={filters.minMarketCapUsd}
+              max={filters.maxMarketCapUsd}
+              onMin={(v) => setFilters((was) => ({ ...was, minMarketCapUsd: v }))}
+              onMax={(v) => setFilters((was) => ({ ...was, maxMarketCapUsd: v }))}
+            />
+            <RangeRow
+              label="Curve progress (%)"
+              min={filters.minProgressPct}
+              max={filters.maxProgressPct}
+              onMin={(v) => setFilters((was) => ({ ...was, minProgressPct: v }))}
+              onMax={(v) => setFilters((was) => ({ ...was, maxProgressPct: v }))}
+            />
+            <RangeRow
+              label="Age (minutes)"
+              min={filters.minAgeMin}
+              max={filters.maxAgeMin}
+              onMin={(v) => setFilters((was) => ({ ...was, minAgeMin: v }))}
+              onMax={(v) => setFilters((was) => ({ ...was, maxAgeMin: v }))}
+            />
 
             <label className="field">
               <span>Creator&apos;s launches, at most</span>
@@ -635,8 +800,8 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
               >
                 <option value={0}>Any</option>
                 <option value={1}>First launch only</option>
-                <option value={3}>3</option>
-                <option value={10}>10</option>
+                <option value={3}>3 or fewer</option>
+                <option value={10}>10 or fewer</option>
               </select>
             </label>
 
@@ -652,15 +817,15 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             </label>
 
             <p className="dim filter-note">
-              Every token here launched on pump.fun. That is the only feed this indexes, so
-              there is no launchpad to choose between. A creator&apos;s launch count is a floor,
-              counted from what this feed has seen rather than their whole history.
+              Only what this feed can actually measure. It indexes pump.fun launches and reads
+              their curves, so it knows market cap, curve progress, age and a floor on a
+              creator&apos;s launches. It does not track holders, snipers or insider wallets, so
+              there are no filters here pretending to.
             </p>
 
-            {solUsd === null && (
+            {solUsd === null && (filters.minMarketCapUsd > 0 || filters.maxMarketCapUsd > 0) && (
               <p className="dim" style={{ fontSize: 12 }}>
-                No exchange rate right now, so caps are shown in SOL and the market cap filter is
-                inactive.
+                No exchange rate right now, so the market cap filter is paused until one returns.
               </p>
             )}
           </div>

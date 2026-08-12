@@ -3083,14 +3083,102 @@ main.wide {
 
 .feed-filters {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 14px 20px;
-  padding: 14px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
   border-radius: 9px;
   border: 1px solid var(--line);
   background: var(--ink-sunken);
   animation: menu-in 140ms ease both;
+}
+
+.filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+/* Search and hide boxes sit side by side, then wrap on a phone. */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.filter-grid .field { max-width: none; }
+
+.filter-grid input {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  padding: 7px 10px;
+}
+
+/* A min/max pair on one line, label to the left. */
+.filter-range {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.range-label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.range-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.range-inputs input {
+  width: 96px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  padding: 7px 10px;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+}
+
+.range-inputs input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Strip the number spinners; they clutter a dark field. */
+.range-inputs input::-webkit-outer-spin-button,
+.range-inputs input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.range-inputs input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .feed-filters .field { max-width: 200px; }
