@@ -3534,3 +3534,204 @@ body:has(main.wide) .site-footer .shell {
 .store-busy {
   color: var(--accent);
 }
+
+/* ============================================================ readout
+   A clean vertical stat list: label left, value right, a hair-line between
+   rows so the eye can run straight down it. Used by the account and the public
+   record so the two read the same, and kept plain on purpose — the earlier
+   version leaned on huge glowing numbers and became harder to read, not easier. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+.readout-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.readout-row:last-child {
+  border-bottom: 0;
+}
+
+.readout-row .k {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.readout-row .v {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--text);
+  text-align: right;
+}
+
+.panel-note {
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+/* ============================================================ roadmap
+   A vertical timeline of phases: a numbered rail down the left, each phase a
+   clean block with a status pill and its items. Terminal palette, plain
+   layout, readable first. */
+
+.roadmap {
+  max-width: 760px;
+}
+
+.phases {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phase {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 18px;
+}
+
+/* The rail: a number in a ring, joined by a line to the next. */
+.phase-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.phase-tag {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line-bright);
+  background: var(--ink-raised);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.phase:not(:last-child) .phase-rail::after {
+  content: '';
+  position: absolute;
+  top: 40px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--line);
+}
+
+.phase-body {
+  padding-bottom: 30px;
+}
+
+.phase-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.phase-head h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.phase-status {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.phase-status.s-now {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.phase-status.s-next {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-color: var(--line-bright);
+}
+.phase-status.s-later,
+.phase-status.s-exploring {
+  color: var(--text-faint);
+  border-color: var(--line);
+}
+
+.phase-summary {
+  margin: 8px 0 16px;
+  font-size: 14px;
+  max-width: 58ch;
+}
+
+.phase-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.phase-items li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 16px;
+  border-left: 2px solid var(--line);
+}
+
+.phase-item-title {
+  font-size: 14.5px;
+  color: var(--text);
+  font-weight: 550;
+}
+
+.phase-item-detail {
+  font-size: 13px;
+  max-width: 60ch;
+}
+
+.roadmap-foot {
+  margin-top: 8px;
+  font-size: 13px;
+  max-width: 60ch;
+}
+
+@media (max-width: 560px) {
+  .phase {
+    grid-template-columns: 40px 1fr;
+    gap: 12px;
+  }
+  .phase-tag {
+    width: 34px;
+    height: 34px;
+    font-size: 12px;
+  }
+  .phase:not(:last-child) .phase-rail::after {
+    top: 34px;
+  }
+}

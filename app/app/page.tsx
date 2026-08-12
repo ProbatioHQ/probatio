@@ -164,6 +164,20 @@ export default function Home() {
           Verify any record
         </a>
       </section>
+
+      <section className="term-body check" style={{ alignItems: 'flex-start', gap: 12 }}>
+        <span className="cmd">
+          where this goes
+          <span className="caret" />
+        </span>
+        <p style={{ maxWidth: '58ch' }}>
+          Launch is the start. After it: every Solana venue, then prediction markets and tokenized
+          stocks, and eventually real capital allocated to the traders whose records hold up.
+        </p>
+        <a href="/roadmap" className="button-link">
+          See the roadmap
+        </a>
+      </section>
     </main>
   );
 }

@@ -5,10 +5,10 @@ import { useEffect, useState } from 'react';
 /**
  * A trader's public record.
  *
- * The number that matters is not the profit, it is how much of the record is
- * committed on chain. A season with trades and no commitments is a season
- * nobody can check, and that is said plainly rather than left for somebody to
- * work out.
+ * Read top to bottom: each figure on its own line, label on the left, value on
+ * the right, so it scans in one pass. The number that matters is not the profit,
+ * it is how much of the record is committed on chain — a season with trades and
+ * no commitments is one nobody can check — so that line is here and said plainly.
  */
 
 interface SeasonRow {
@@ -40,6 +40,12 @@ function sol(lamports: string): string {
   return `${negative ? '-' : ''}${whole}.${fraction.toString().padStart(2, '0')}`;
 }
 
+function laneLabel(season: SeasonRow): string {
+  if (season.freePlay) return 'Free play';
+  if (season.ranked) return 'Ranked season';
+  return 'Past season';
+}
+
 export function ProfileView({ pubkey }: { pubkey: string }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [failed, setFailed] = useState(false);
@@ -59,54 +65,72 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
     };
   }, [pubkey]);
 
-  if (failed) return <p>Could not load this record.</p>;
-  if (!profile) return <p>Loading…</p>;
+  if (failed) return <p className="dim">Could not load this record.</p>;
+  if (!profile) return <p className="dim">Loading…</p>;
 
   if (!profile.exists) {
-    return <p>This wallet has never traded here.</p>;
+    return <p className="dim">This wallet has never traded here.</p>;
   }
 
   return (
-    <>
-      {profile.seasons.map((season) => (
-        <section key={season.seasonId} aria-label={`Season ${season.seasonId}`} className="panel">
-          <h2>{season.freePlay ? 'Free play' : season.ranked ? 'Ranked season' : 'Past season'}</h2>
-          <dl>
-            <dt>Trades</dt>
-            <dd className="mono">{season.trades}</dd>
-            <dt>Closed positions</dt>
-            <dd className="mono">{season.roundTrips}</dd>
-            <dt>Win rate</dt>
-            <dd className="mono">
-              {season.winRateBps === null ? ', ' : `${(season.winRateBps / 100).toFixed(1)}%`}
-            </dd>
-            <dt>Profit and loss</dt>
-            <dd className={`mono ${season.netPnl.startsWith('-') ? 'loss' : 'gain'}`}>
-              {sol(season.netPnl)} SOL
-            </dd>
-            <dt>Committed on chain</dt>
-            <dd>
-              {season.committedTrades} of {season.trades} trades
-              {season.committedBatches > 0 && ` in ${season.committedBatches} batches`}
-            </dd>
-          </dl>
+    <div className="stack">
+      {profile.seasons.map((season) => {
+        const negative = season.netPnl.startsWith('-');
+        const fullyCommitted = season.committedTrades >= season.trades && season.trades > 0;
 
-          {season.committedTrades < season.trades && (
-            <p>
-              Trades not yet committed cannot be checked by anyone. They are committed in
-              batches, so recent ones may still be waiting.
-            </p>
-          )}
-        </section>
-      ))}
+        return (
+          <section key={season.seasonId} aria-label={laneLabel(season)} className="panel">
+            <div className="panel-head">
+              <h2>{laneLabel(season)}</h2>
+            </div>
 
-      <p>
-        <a href={`/verify?trader=${encodeURIComponent(profile.trader)}`}>
-          Check this record yourself
-        </a>{' '}
-       , the verifier runs in your browser against an RPC you choose. Nothing on this page
-        is taken on our word.
+            <div className="readout">
+              <div className="readout-row">
+                <span className="k">Profit and loss</span>
+                <span className={`v ${season.trades === 0 ? '' : negative ? 'loss' : 'gain'}`}>
+                  {negative ? '' : '+'}
+                  {sol(season.netPnl)} SOL
+                </span>
+              </div>
+              <div className="readout-row">
+                <span className="k">Win rate</span>
+                <span className="v">
+                  {season.winRateBps === null ? '—' : `${(season.winRateBps / 100).toFixed(0)}%`}
+                </span>
+              </div>
+              <div className="readout-row">
+                <span className="k">Trades</span>
+                <span className="v">{season.trades}</span>
+              </div>
+              <div className="readout-row">
+                <span className="k">Closed positions</span>
+                <span className="v">{season.roundTrips}</span>
+              </div>
+              <div className="readout-row">
+                <span className="k">On chain</span>
+                <span className={`v ${fullyCommitted ? 'gain' : ''}`}>
+                  {fullyCommitted
+                    ? 'all committed'
+                    : `${season.committedTrades} of ${season.trades}`}
+                </span>
+              </div>
+            </div>
+
+            {!fullyCommitted && (
+              <p className="dim panel-note">
+                Trades not yet committed cannot be checked. They are committed in batches, so
+                recent ones may still be waiting.
+              </p>
+            )}
+          </section>
+        );
+      })}
+
+      <p className="dim">
+        <a href={`/verify?trader=${encodeURIComponent(profile.trader)}`}>Check this record yourself</a>
+        . The verifier runs in your browser against an RPC you choose. Nothing here is taken on
+        our word.
       </p>
-    </>
+    </div>
   );
 }

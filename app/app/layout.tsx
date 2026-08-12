@@ -91,8 +91,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <div className="shell">
             <span>Practice money. Real prices. Records anyone can check.</span>
             <span>
-              <a href="/docs">How it works</a> · <a href="/verify">Verify a record</a> ·{' '}
-              <a href="/trust">What you have to trust</a>
+              <a href="/docs">How it works</a> · <a href="/roadmap">Roadmap</a> ·{' '}
+              <a href="/verify">Verify a record</a> · <a href="/trust">What you have to trust</a>
             </span>
           </div>
         </footer>
