@@ -70,6 +70,30 @@ function buffer(): TradeBuffer {
   return store[BUFFER_KEY];
 }
 
+/**
+ * Buffer observations that did not come from a curve trade event.
+ *
+ * A graduated token trades on a pool, not the curve, so its trades never reach
+ * `ingestTradeEvents`. The price stream sees every one of those swaps over its
+ * account subscription and builds a price from it the same way; this lets it
+ * drop those into the same buffer, so a graduated chart fills in per trade
+ * rather than per poll. Same bounds, same flush.
+ */
+export function ingestObservations(mint: string, incoming: readonly Observation[]): void {
+  if (incoming.length === 0) return;
+  const { pending } = buffer();
+  let observations = pending.get(mint);
+  if (!observations) {
+    if (pending.size >= MAX_MINTS) return;
+    observations = [];
+    pending.set(mint, observations);
+  }
+  for (const observation of incoming) {
+    if (observations.length >= MAX_PER_MINT) break;
+    observations.push(observation);
+  }
+}
+
 export function ingestTradeEvents(events: readonly TradeEvent[]): void {
   const { pending } = buffer();
   for (const event of events) {

@@ -8,7 +8,8 @@ import {
   decodeTokenAccount,
   pumpSwapReserveOffset,
 } from '@probatio/pools';
-import { priceFromReserves } from '@probatio/candles';
+import { priceFromReserves, type Observation } from '@probatio/candles';
+import { ingestObservations } from './trade-candles';
 import { recentlyViewed } from './watched';
 import { rpcEndpoint } from './env';
 
@@ -70,7 +71,15 @@ interface StreamState {
    */
   reserves: Map<
     string,
-    { sol: bigint; token: bigint; offset: bigint; solSlot: number; tokenSlot: number }
+    {
+      sol: bigint;
+      token: bigint;
+      offset: bigint;
+      solSlot: number;
+      tokenSlot: number;
+      /** SOL reserve at the last recorded candle, for the volume of the next. */
+      recordedSol: bigint;
+    }
   >;
   /** Mint → the most recent price, for a client that connects mid-stream. */
   latest: Map<string, LivePrice>;
@@ -157,16 +166,34 @@ function priceFrom(mint: string, slot: number | null): void {
   const sol = held.sol + held.offset;
   if (sol <= 0n) return;
 
+  const price = priceFromReserves(sol, held.token);
+  const now = Date.now();
+
   publish({
     mint,
     // The same function the candles and the fill engine use. A price that
     // reached a chart by another route would be a second opinion.
-    price: priceFromReserves(sol, held.token),
+    price,
     solReserve: sol,
     tokenReserve: held.token,
     slot,
-    at: Date.now(),
+    at: now,
   });
+
+  // Record it as a candle too, so a graduated token's chart fills in with every
+  // real swap rather than only with the twelve-second poll. The volume is the
+  // SOL the pool moved since the last one recorded. Skipped on the very first
+  // price, which has nothing to measure a move against.
+  if (held.recordedSol > 0n) {
+    const moved = sol > held.recordedSol ? sol - held.recordedSol : held.recordedSol - sol;
+    const observation: Observation = {
+      timestamp: Math.floor(now / 1_000),
+      price,
+      volumeLamports: moved,
+    };
+    ingestObservations(mint, [observation]);
+  }
+  held.recordedSol = sol;
 }
 
 function handleUpdate(address: string, data: Uint8Array, slot: number | null): void {
@@ -176,7 +203,7 @@ function handleUpdate(address: string, data: Uint8Array, slot: number | null): v
 
   const held =
     current.reserves.get(target.mint) ??
-    { sol: 0n, token: 0n, offset: 0n, solSlot: 0, tokenSlot: 0 };
+    { sol: 0n, token: 0n, offset: 0n, solSlot: 0, tokenSlot: 0, recordedSol: 0n };
   const at = slot ?? 0;
 
   try {
@@ -295,6 +322,7 @@ async function reconcile(reader: PoolReader, rpc: RpcClient): Promise<void> {
         offset: found.offset,
         solSlot: 0,
         tokenSlot: 0,
+        recordedSol: 0n,
       });
       current.watching.set(
         mint,
