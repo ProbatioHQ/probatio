@@ -3092,6 +3092,39 @@ main.wide {
   animation: menu-in 140ms ease both;
 }
 
+/* One tab per lane, so each lane's filters are edited on their own. */
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-faint);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.filter-tab:hover {
+  color: var(--text-dim);
+}
+
+.filter-tab.on {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .filter-head {
   display: flex;
   align-items: center;

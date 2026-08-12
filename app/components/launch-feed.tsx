@@ -93,7 +93,6 @@ interface Filters {
   /** 0 means no limit. Anything else hides serial launchers. */
   maxCreatorLaunches: number;
   hideImageless: boolean;
-  paused: boolean;
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -107,7 +106,23 @@ const DEFAULT_FILTERS: Filters = {
   maxAgeMin: 0,
   maxCreatorLaunches: 0,
   hideImageless: false,
-  paused: false,
+};
+
+/**
+ * One filter set per lane, kept apart on purpose.
+ *
+ * A trader wants different things from each lane. In the new lane the question
+ * is which of a hundred fresh launches is worth a look; in the bonded lane it
+ * is which graduated token has held a market cap worth trading. Those are not
+ * the same filter, so they are not the same filter set. The panel edits one
+ * lane at a time, and each lane's column is filtered by its own.
+ */
+type LaneFilters = Record<LaneKey, Filters>;
+
+const DEFAULT_LANE_FILTERS: LaneFilters = {
+  new: { ...DEFAULT_FILTERS },
+  bonding: { ...DEFAULT_FILTERS },
+  bonded: { ...DEFAULT_FILTERS },
 };
 
 /**
@@ -330,8 +345,12 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   const [arrived, setArrived] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
   const [solUsd, setSolUsd] = useState<number | null>(null);
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [laneFilters, setLaneFilters] = useState<LaneFilters>(DEFAULT_LANE_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  /** Which lane the open panel is editing. */
+  const [filterTab, setFilterTab] = useState<LaneKey>('new');
+  /** Pausing the arrival of new rows is a feed-wide choice, not a per-lane one. */
+  const [paused, setPaused] = useState(false);
 
   const searching = query.trim().length > 0;
 
@@ -345,15 +364,15 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
    * reading a value from a render that was never committed.
    */
   const searchingRef = useRef(searching);
-  const pausedRef = useRef(filters.paused);
+  const pausedRef = useRef(paused);
 
   useEffect(() => {
     searchingRef.current = searching;
   }, [searching]);
 
   useEffect(() => {
-    pausedRef.current = filters.paused;
-  }, [filters.paused]);
+    pausedRef.current = paused;
+  }, [paused]);
   /** False until the first save has been deliberately skipped. */
   const savedOnce = useRef(false);
 
@@ -363,7 +382,18 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
     if (!terminal) return;
     try {
       const saved = localStorage.getItem(FILTER_KEY);
-      if (saved) setFilters({ ...DEFAULT_FILTERS, ...(JSON.parse(saved) as Partial<Filters>) });
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { lanes?: Partial<Record<LaneKey, Partial<Filters>>> };
+      // Only the new per-lane shape is read. Anything else is an older single
+      // filter set, and merging its fields onto three lanes would be a guess;
+      // dropping it just means the filters open empty once.
+      if (parsed.lanes) {
+        setLaneFilters({
+          new: { ...DEFAULT_FILTERS, ...parsed.lanes.new },
+          bonding: { ...DEFAULT_FILTERS, ...parsed.lanes.bonding },
+          bonded: { ...DEFAULT_FILTERS, ...parsed.lanes.bonded },
+        });
+      }
     } catch {
       // A corrupt or unavailable store is not worth failing a page over.
     }
@@ -383,11 +413,11 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
     }
 
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+      localStorage.setItem(FILTER_KEY, JSON.stringify({ lanes: laneFilters }));
     } catch {
       // Private browsing, a full quota — neither is this page's problem.
     }
-  }, [filters, terminal]);
+  }, [laneFilters, terminal]);
 
   const load = useCallback(
     async (search: string) => {
@@ -611,6 +641,8 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
       const rows = lanes?.[lane] ?? [];
       if (!terminal) return rows.slice(0, PREVIEW_ROWS);
 
+      // Each lane is filtered by its own set.
+      const filters = laneFilters[lane];
       const include = keywords(filters.include);
       const exclude = keywords(filters.exclude);
       const nowSeconds = Math.floor(now / 1000);
@@ -660,7 +692,21 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
         return true;
       });
     },
-    [lanes, terminal, filters, solUsd, now],
+    [lanes, terminal, laneFilters, solUsd, now],
+  );
+
+  // The lane the panel is editing, and a setter that touches only that lane.
+  const tabFilters = laneFilters[filterTab];
+  const laneTitle = LANES.find((laneDef) => laneDef.key === filterTab)?.title ?? 'new';
+  const updateTab = useCallback(
+    (patch: (was: Filters) => Filters) => {
+      setLaneFilters((prev) => ({ ...prev, [filterTab]: patch(prev[filterTab]) }));
+    },
+    [filterTab],
+  );
+  const totalActiveFilters = LANES.reduce(
+    (sum, laneDef) => sum + activeFilterCount(laneFilters[laneDef.key]),
+    0,
   );
 
   return (
@@ -672,8 +718,8 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             launches is streaming; connected to a server that is hearing
             nothing is stalled, which used to read as streaming while the
             banner above said the opposite. */}
-        <span className={live && feedLive !== false && !filters.paused ? 'pill live' : 'pill'}>
-          {filters.paused
+        <span className={live && feedLive !== false && !paused ? 'pill live' : 'pill'}>
+          {paused
             ? 'paused'
             : !live
               ? 'reconnecting'
@@ -704,22 +750,22 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             <>
               <button
                 type="button"
-                className={showFilters || activeFilterCount(filters) > 0 ? 'preset on' : 'preset'}
+                className={showFilters || totalActiveFilters > 0 ? 'preset on' : 'preset'}
                 onClick={() => setShowFilters((was) => !was)}
                 aria-expanded={showFilters}
               >
                 Filters
-                {activeFilterCount(filters) > 0 && (
-                  <span className="filter-badge">{activeFilterCount(filters)}</span>
+                {totalActiveFilters > 0 && (
+                  <span className="filter-badge">{totalActiveFilters}</span>
                 )}
               </button>
               <button
                 type="button"
-                className={filters.paused ? 'preset on' : 'preset'}
-                onClick={() => setFilters((was) => ({ ...was, paused: !was.paused }))}
-                aria-pressed={filters.paused}
+                className={paused ? 'preset on' : 'preset'}
+                onClick={() => setPaused((was) => !was)}
+                aria-pressed={paused}
               >
-                {filters.paused ? 'Paused' : 'Pause'}
+                {paused ? 'Paused' : 'Pause'}
               </button>
             </>
           )}
@@ -727,15 +773,37 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
 
         {terminal && showFilters && (
           <div className="feed-filters">
+            {/* One tab per lane, because each lane is filtered on its own. The
+                count on a tab is how many filters that lane has set, so a lane
+                quietly filtering is visible without opening it. */}
+            <div className="filter-tabs" role="tablist">
+              {LANES.map((laneDef) => {
+                const count = activeFilterCount(laneFilters[laneDef.key]);
+                return (
+                  <button
+                    key={laneDef.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={filterTab === laneDef.key}
+                    className={filterTab === laneDef.key ? 'filter-tab on' : 'filter-tab'}
+                    onClick={() => setFilterTab(laneDef.key)}
+                  >
+                    {laneDef.title}
+                    {count > 0 && <span className="filter-badge">{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="filter-head">
-              <span className="dim">Applies to all three lanes.</span>
+              <span className="dim">Filtering the {laneTitle} lane.</span>
               <button
                 type="button"
                 className="linklike"
-                onClick={() => setFilters(DEFAULT_FILTERS)}
-                disabled={activeFilterCount(filters) === 0}
+                onClick={() => updateTab(() => ({ ...DEFAULT_FILTERS }))}
+                disabled={activeFilterCount(tabFilters) === 0}
               >
-                Reset
+                Reset this lane
               </button>
             </div>
 
@@ -745,10 +813,8 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
                 <input
                   type="text"
                   placeholder="cat, dog, pepe"
-                  value={filters.include}
-                  onChange={(event) =>
-                    setFilters((was) => ({ ...was, include: event.target.value }))
-                  }
+                  value={tabFilters.include}
+                  onChange={(event) => updateTab((was) => ({ ...was, include: event.target.value }))}
                 />
               </label>
 
@@ -757,45 +823,40 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
                 <input
                   type="text"
                   placeholder="test, scam"
-                  value={filters.exclude}
-                  onChange={(event) =>
-                    setFilters((was) => ({ ...was, exclude: event.target.value }))
-                  }
+                  value={tabFilters.exclude}
+                  onChange={(event) => updateTab((was) => ({ ...was, exclude: event.target.value }))}
                 />
               </label>
             </div>
 
             <RangeRow
               label="Market cap ($)"
-              min={filters.minMarketCapUsd}
-              max={filters.maxMarketCapUsd}
-              onMin={(v) => setFilters((was) => ({ ...was, minMarketCapUsd: v }))}
-              onMax={(v) => setFilters((was) => ({ ...was, maxMarketCapUsd: v }))}
+              min={tabFilters.minMarketCapUsd}
+              max={tabFilters.maxMarketCapUsd}
+              onMin={(v) => updateTab((was) => ({ ...was, minMarketCapUsd: v }))}
+              onMax={(v) => updateTab((was) => ({ ...was, maxMarketCapUsd: v }))}
             />
             <RangeRow
               label="Curve progress (%)"
-              min={filters.minProgressPct}
-              max={filters.maxProgressPct}
-              onMin={(v) => setFilters((was) => ({ ...was, minProgressPct: v }))}
-              onMax={(v) => setFilters((was) => ({ ...was, maxProgressPct: v }))}
+              min={tabFilters.minProgressPct}
+              max={tabFilters.maxProgressPct}
+              onMin={(v) => updateTab((was) => ({ ...was, minProgressPct: v }))}
+              onMax={(v) => updateTab((was) => ({ ...was, maxProgressPct: v }))}
             />
             <RangeRow
               label="Age (minutes)"
-              min={filters.minAgeMin}
-              max={filters.maxAgeMin}
-              onMin={(v) => setFilters((was) => ({ ...was, minAgeMin: v }))}
-              onMax={(v) => setFilters((was) => ({ ...was, maxAgeMin: v }))}
+              min={tabFilters.minAgeMin}
+              max={tabFilters.maxAgeMin}
+              onMin={(v) => updateTab((was) => ({ ...was, minAgeMin: v }))}
+              onMax={(v) => updateTab((was) => ({ ...was, maxAgeMin: v }))}
             />
 
             <label className="field">
               <span>Creator&apos;s launches, at most</span>
               <select
-                value={filters.maxCreatorLaunches}
+                value={tabFilters.maxCreatorLaunches}
                 onChange={(event) =>
-                  setFilters((was) => ({
-                    ...was,
-                    maxCreatorLaunches: Number(event.target.value),
-                  }))
+                  updateTab((was) => ({ ...was, maxCreatorLaunches: Number(event.target.value) }))
                 }
               >
                 <option value={0}>Any</option>
@@ -808,9 +869,9 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             <label className="field checkbox">
               <input
                 type="checkbox"
-                checked={filters.hideImageless}
+                checked={tabFilters.hideImageless}
                 onChange={(event) =>
-                  setFilters((was) => ({ ...was, hideImageless: event.target.checked }))
+                  updateTab((was) => ({ ...was, hideImageless: event.target.checked }))
                 }
               />
               <span>Hide tokens with no image</span>
@@ -823,11 +884,12 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
               there are no filters here pretending to.
             </p>
 
-            {solUsd === null && (filters.minMarketCapUsd > 0 || filters.maxMarketCapUsd > 0) && (
-              <p className="dim" style={{ fontSize: 12 }}>
-                No exchange rate right now, so the market cap filter is paused until one returns.
-              </p>
-            )}
+            {solUsd === null &&
+              (tabFilters.minMarketCapUsd > 0 || tabFilters.maxMarketCapUsd > 0) && (
+                <p className="dim" style={{ fontSize: 12 }}>
+                  No exchange rate right now, so the market cap filter is paused until one returns.
+                </p>
+              )}
           </div>
         )}
 
