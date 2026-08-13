@@ -46,6 +46,16 @@ export default function DocsIndex() {
         </p>
       </section>
 
+      <section className="panel">
+        <h2>
+          <a href="/docs/sdk">SDK</a>
+        </h2>
+        <p>
+          Read a record and check it against the chain yourself, in a few lines of TypeScript.
+          The verification this site runs, as a library that never trusts the server.
+        </p>
+      </section>
+
       <p>
         <a href="/trust">What you still have to trust</a> is the list of things none of this
         covers.

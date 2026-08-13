@@ -86,33 +86,35 @@ decides. Nobody has to trust that the leaderboard is honest; they can recompute 
 
 ---
 
-## Build on it
+## SDK
 
-A record does not need Probatio to be believed, so the verification the site runs is
-open to everyone else.
-
-**SDK** reads a trader's verified track record, a season's standings and results, and
-checks any record against the chain without touching a Probatio server.
+A record does not need Probatio to be believed, so the same verification the site
+runs is a library anyone can use. `@probatio/sdk` fetches the trades a trader
+committed, rebuilds their hashes, folds them into an accumulator and compares it to
+the one Solana holds, at an address derived from constants in the package, over an
+RPC you choose. A `verified: true` never comes from a server's say-so.
 
 ```ts
-import { verifyRecord, trackRecord } from '@probatio/sdk';
+import { Probatio } from '@probatio/sdk';
 
-const ok = await verifyRecord(wallet, { rpc });   // rebuilds the chain, compares to Solana
-const stats = await trackRecord(wallet);          // return, drawdown, seasons, proofs
+const probatio = new Probatio({ rpc: 'https://api.mainnet-beta.solana.com' });
+
+// Check a trader's record against the chain, yourself.
+const result = await probatio.verifyRecord(wallet);
+result.verified;             // true only when the chain holds what these trades produce
+result.checks;               // every step, so you can show your work
+
+// Read the public record and the standings.
+const record = await probatio.getRecord(wallet);
+const board = await probatio.getStandings({ season: 1 });
 ```
 
-**CLI** verifies from a terminal, against an endpoint you choose.
+Every method is also a standalone function (`verifyRecord`, `getProof`, `getRecord`,
+`getStandings`), and the low-level primitives (`hashLeaf`, `buildTree`, `verifyProof`,
+`extendChain`) are re-exported for callers who already hold the data.
 
-```bash
-npx @probatio/cli verify <wallet>
-```
-
-**MCP server** lets an AI agent vet or back a trader on proof rather than promises,
-with tools to fetch a verified record, check it, and read live standings.
-
-```jsonc
-{ "mcpServers": { "probatio": { "command": "npx", "args": ["@probatio/mcp"] } } }
-```
+A **CLI** (`npx @probatio/cli verify <wallet>`) and an **MCP server** for agents to
+vet or back a trader on proof rather than promises are built on the same core.
 
 ---
 

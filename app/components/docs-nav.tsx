@@ -15,6 +15,7 @@ const PAGES = [
   { href: '/docs/fills', label: 'Fills', blurb: 'Slippage, delay, and the measured error' },
   { href: '/docs/records', label: 'Records', blurb: 'How a trade becomes unrevisable' },
   { href: '/docs/scoring', label: 'Scoring', blurb: 'How a season is won' },
+  { href: '/docs/sdk', label: 'SDK', blurb: 'Verify a record in a few lines' },
 ];
 
 export function DocsNav() {
