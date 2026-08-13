@@ -10,8 +10,11 @@
 
 <br/><br/>
 
+[![SDK](https://img.shields.io/badge/SDK-passing-3fe08a?style=flat-square)](#sdk-cli-and-mcp)
+[![CLI](https://img.shields.io/badge/CLI-passing-3fe08a?style=flat-square)](#sdk-cli-and-mcp)
+[![MCP](https://img.shields.io/badge/MCP-passing-3fe08a?style=flat-square)](#sdk-cli-and-mcp)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-3fe08a?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-1308%20passing-3fe08a?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-1321%20passing-3fe08a?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-Anchor-dea584?style=flat-square&logo=rust&logoColor=white)
 ![Self-hostable](https://img.shields.io/badge/self--hostable-yes-3fe08a?style=flat-square)
@@ -213,7 +216,7 @@ Requires Node 22 or later and a Solana RPC endpoint.
 ```bash
 npm install
 cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
-npm test                                # 1308 tests, no network
+npm test                                # 1321 tests, no network
 npm --prefix app run dev
 ```
 
