@@ -54,6 +54,7 @@ VERIFIED  ace in season 1, 9 trade(s) checked`}</code>
         <pre>
           <code>{`probatio record <wallet>            # name, and the seasons they traded
 probatio standings                 # the current ranked season's board
+probatio season                    # pot, payouts, and the ruleset-hash check
 probatio proof <wallet>            # the raw inputs verify recomputes from, as JSON`}</code>
         </pre>
       </section>

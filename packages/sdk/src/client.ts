@@ -1,7 +1,7 @@
 import { DEFAULT_API_BASE } from './constants';
-import { ProbatioError, getProof, getRecord, getStandings, type ReadOptions } from './read';
+import { ProbatioError, getProof, getRecord, getSeason, getStandings, type ReadOptions } from './read';
 import { verifyRecord, type VerifyOptions } from './verify';
-import type { ProfileRecord, ProofBundle, Standings, VerifiedRecord } from './types';
+import type { ProfileRecord, ProofBundle, SeasonInfo, Standings, VerifiedRecord } from './types';
 
 /**
  * A configured client, so the base URL, RPC and fetch are set once.
@@ -55,6 +55,11 @@ export class Probatio {
   /** The standings of the current ranked season. */
   getStandings(options: { readonly limit?: number | undefined } = {}): Promise<Standings> {
     return getStandings({ ...this.#read(), limit: options.limit });
+  }
+
+  /** The current ranked season: pot, projected payouts, and the ruleset hash to check. */
+  getSeason(): Promise<SeasonInfo> {
+    return getSeason(this.#read());
   }
 
   /** Verify a record against the chain. Needs an rpc, from here or the config. */

@@ -26,6 +26,7 @@ Usage
   probatio verify <wallet> [--rpc <url>] [--season <n>] [--api <url>] [--json]
   probatio record <wallet> [--api <url>] [--json]
   probatio standings [--limit <n>] [--api <url>] [--json]
+  probatio season [--api <url>] [--json]
   probatio proof <wallet> [--season <n>] [--api <url>]
 
 Options
@@ -109,6 +110,14 @@ function client(flags: Flags, fetchImpl?: typeof fetch): Probatio {
   return new Probatio({ apiBase: flags.api, rpc: flags.rpc, fetchImpl });
 }
 
+/** Lamports (a decimal string) as SOL, without a float ever touching the amount. */
+function formatSol(lamports: string): string {
+  const n = BigInt(lamports);
+  const whole = n / 1_000_000_000n;
+  const frac = (n % 1_000_000_000n).toString().padStart(9, '0').replace(/0+$/, '');
+  return frac ? `${whole}.${frac}` : `${whole}`;
+}
+
 function printVerify(result: VerifiedRecord, io: CliIo): void {
   io.out('');
   for (const check of result.checks) {
@@ -183,6 +192,30 @@ async function cmdStandings(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): 
   return 0;
 }
 
+async function cmdSeason(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Promise<number> {
+  const info = await client(flags, fetchImpl).getSeason();
+  if (flags.json) {
+    io.out(JSON.stringify(info, null, 2));
+    return 0;
+  }
+  const season = info.ranked;
+  if (!season) {
+    io.out('no ranked season is running (free play is open)');
+    return 0;
+  }
+  io.out(`${season.name} (season ${season.ordinal}) ${season.status}`);
+  io.out(`  ${season.entrants} entrant(s), pot ${formatSol(season.potLamports)} SOL`);
+  io.out(
+    season.rulesetHash === season.rulesetHashNow
+      ? '  ruleset: matches the hash recorded on chain'
+      : '  ruleset: CHANGED since the season opened, does not match the recorded hash',
+  );
+  for (const payout of season.payouts) {
+    io.out(`  place ${payout.place}: ${formatSol(payout.lamports)} SOL`);
+  }
+  return 0;
+}
+
 async function cmdProof(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Promise<number> {
   const wallet = flags.positional[0];
   if (!wallet) {
@@ -216,6 +249,8 @@ export async function run(
         return await cmdRecord(flags, io, fetchImpl);
       case 'standings':
         return await cmdStandings(flags, io, fetchImpl);
+      case 'season':
+        return await cmdSeason(flags, io, fetchImpl);
       case 'proof':
         return await cmdProof(flags, io, fetchImpl);
       case undefined:

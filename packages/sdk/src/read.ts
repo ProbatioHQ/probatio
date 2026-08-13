@@ -1,5 +1,5 @@
 import { DEFAULT_API_BASE } from './constants';
-import type { ProfileRecord, ProofBundle, Standings } from './types';
+import type { ProfileRecord, ProofBundle, SeasonInfo, Standings } from './types';
 
 /**
  * Reading the public record.
@@ -84,4 +84,13 @@ export async function getStandings(
   if (options.limit !== undefined) params.set('limit', String(options.limit));
   const query = params.toString();
   return getJson<Standings>(`${base(options)}/api/leaderboard${query ? `?${query}` : ''}`, options);
+}
+
+/**
+ * The current ranked season: its status, pot, projected payouts, and the two
+ * ruleset hashes to compare (recorded vs recomputed). `ranked` is null when only
+ * free play is running.
+ */
+export async function getSeason(options: ReadOptions = {}): Promise<SeasonInfo> {
+  return getJson<SeasonInfo>(`${base(options)}/api/season`, options);
 }

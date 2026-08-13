@@ -16,7 +16,7 @@ export type { ProbatioConfig } from './client';
 export { verifyRecord, verifyBundle } from './verify';
 export type { VerifyOptions } from './verify';
 
-export { ProbatioError, getProof, getRecord, getStandings } from './read';
+export { ProbatioError, getProof, getRecord, getSeason, getStandings } from './read';
 export type { ReadOptions } from './read';
 
 export { DEFAULT_API_BASE, PROGRAM_ID } from './constants';
@@ -27,7 +27,10 @@ export type {
   ProfileSeason,
   ProofBatch,
   ProofBundle,
+  RankedSeason,
   RawLeaf,
+  SeasonInfo,
+  SeasonPayout,
   SeasonStanding,
   SeasonStatus,
   Standings,

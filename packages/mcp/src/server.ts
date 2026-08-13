@@ -70,6 +70,14 @@ register(
 );
 
 register(
+  'get_season',
+  'The current ranked season: its status, pot, projected payouts, and the two ' +
+    'ruleset hashes to compare (recorded on chain vs recomputed now).',
+  {},
+  async () => asText(await tools.getSeason()),
+);
+
+register(
   'get_proof',
   'The raw inputs to check a record: every committed trade, its batch, and the ' +
     'roots. What verify_record recomputes from.',

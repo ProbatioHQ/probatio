@@ -110,15 +110,16 @@ const result = await probatio.verifyRecord(wallet);
 result.verified;             // true only when the chain holds what these trades produce
 result.checks;               // every step, so you can show your work
 
-// Read the public record, the raw proof inputs, and the standings.
+// Read the public record, the raw proof inputs, the standings, and the season.
 const record = await probatio.getRecord(wallet);
 const proof = await probatio.getProof(wallet);
 const board = await probatio.getStandings();
+const season = await probatio.getSeason();   // pot, payouts, and the ruleset hash to check
 ```
 
 Point it at your own instance with `apiBase`, and pass a `season` to check a past one.
 Every method is also a standalone function (`verifyRecord`, `getProof`, `getRecord`,
-`getStandings`), and the low-level primitives (`hashLeaf`, `buildTree`, `verifyProof`,
+`getStandings`, `getSeason`), and the low-level primitives (`hashLeaf`, `buildTree`, `verifyProof`,
 `extendChain`) are re-exported for callers who already hold the data. It carries no
 web3 dependency; verification is a raw JSON-RPC call over `fetch`, so it runs in a
 browser, a worker, or a server unchanged.
@@ -131,6 +132,7 @@ The same core from a terminal, which is the plainest form of "do not trust us, c
 npx @probatio/cli verify <wallet> --rpc https://api.mainnet-beta.solana.com
 npx @probatio/cli record <wallet>
 npx @probatio/cli standings
+npx @probatio/cli season                # pot, payouts, and the ruleset-hash check
 npx @probatio/cli proof <wallet>        # the raw inputs verify recomputes from
 ```
 
@@ -142,8 +144,8 @@ and `--json` prints the raw result instead of a summary.
 ### `@probatio/mcp`
 
 An MCP server, so an agent can vet or back a trader on proof rather than on a
-leaderboard's word. It speaks over stdio and exposes four tools, `verify_record`,
-`get_record`, `get_standings` and `get_proof`, over the same SDK.
+leaderboard's word. It speaks over stdio and exposes five tools, `verify_record`,
+`get_record`, `get_standings`, `get_season` and `get_proof`, over the same SDK.
 
 ```json
 {

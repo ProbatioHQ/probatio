@@ -12,7 +12,7 @@ export default function McpDocs() {
       <p>
         An agent that wants to vet or back a trader should not have to take a leaderboard&apos;s
         word for it. <code>@probatio/mcp</code> gives it the same reach the SDK has: read a
-        record, and check it against Solana. It speaks over stdio and exposes four tools built on
+        record, and check it against Solana. It speaks over stdio and exposes five tools built on
         the same core, so the verdict an agent sees is one it could have recomputed itself.
       </p>
 
@@ -44,7 +44,7 @@ export default function McpDocs() {
 
       <section className="panel">
         <h2>The tools</h2>
-        <p>Four, each a plain wrapper over the SDK.</p>
+        <p>Five, each a plain wrapper over the SDK.</p>
         <pre>
           <code>{`verify_record   { wallet, rpc?, season? }
     Rebuild a trader's committed trades, fold the accumulator, and
@@ -55,6 +55,10 @@ get_record      { wallet }
 
 get_standings   { limit? }
     The standings of the current ranked season, or null when none runs.
+
+get_season      { }
+    The current ranked season: status, pot, projected payouts, and the
+    ruleset hash recorded on chain versus the one recomputed now.
 
 get_proof       { wallet, season? }
     The raw inputs verify_record recomputes from: every committed

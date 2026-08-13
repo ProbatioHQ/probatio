@@ -23,12 +23,25 @@ const STANDINGS = {
 
 const EMPTY_PROOF = { trader: WALLET, seasonId: 5, seasonOrdinal: 0, batches: [], note: 'nothing yet' };
 
+const SEASON = {
+  ranked: {
+    id: 1, ordinal: 1, name: 'Season 1', status: 'running',
+    startsAt: 0, endsAt: 100, entryClosesAt: 50, entryClosesInMs: 10,
+    entryCost: '50000000', startingBalance: '10000000000', scoring: 'highest_return',
+    entrants: 3, potLamports: '150000000', entriesLamports: '150000000', sponsorLamports: '0',
+    paidPlaces: 1, payouts: [{ place: 1, lamports: '135000000' }], houseLamports: '15000000',
+    rulesetHash: 'abcd', rulesetHashNow: 'abcd', entered: false,
+  },
+  freePlay: { open: true, startingBalance: '10000000000' },
+};
+
 function mockFetch(): typeof fetch {
   return (async (url: string | URL, init?: RequestInit) => {
     const u = String(url);
     if (u.includes('/api/proof')) return new Response(JSON.stringify(EMPTY_PROOF), { status: 200 });
     if (u.includes('/api/profile')) return new Response(JSON.stringify(RECORD), { status: 200 });
     if (u.includes('/api/leaderboard')) return new Response(JSON.stringify(STANDINGS), { status: 200 });
+    if (u.includes('/api/season')) return new Response(JSON.stringify(SEASON), { status: 200 });
     const body = JSON.parse(String(init?.body ?? '{}')) as { method?: string };
     if (body.method === 'getAccountInfo') {
       return new Response(JSON.stringify({ result: { value: null } }), { status: 200 });
@@ -89,6 +102,17 @@ describe('probatio cli', () => {
     const { io, out } = capture();
     expect(await run(['standings', api, base], io, mockFetch())).toBe(0);
     expect(out.join('\n')).toMatch(/Season 1/);
+  });
+
+  it('reads the current season with SOL amounts and the ruleset check', async () => {
+    const { io, out } = capture();
+    expect(await run(['season', api, base], io, mockFetch())).toBe(0);
+    const text = out.join('\n');
+    expect(text).toMatch(/Season 1/);
+    expect(text).toMatch(/pot 0\.15 SOL/);
+    expect(text).toMatch(/place 1: 0\.135 SOL/);
+    expect(text).toMatch(/ruleset: matches/);
+    expect(text).not.toMatch(/undefined|NaN/);
   });
 
   it('dumps the raw proof bundle', async () => {

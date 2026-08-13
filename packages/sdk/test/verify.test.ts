@@ -94,12 +94,40 @@ const STANDINGS = {
   final: false,
 };
 
-/** A fetch that serves a proof bundle, a leaderboard, and an RPC account. */
+const SEASON = {
+  ranked: {
+    id: 1,
+    ordinal: 1,
+    name: 'Season 1',
+    status: 'running',
+    startsAt: 0,
+    endsAt: 100,
+    entryClosesAt: 50,
+    entryClosesInMs: 10,
+    entryCost: '50000000',
+    startingBalance: '10000000000',
+    scoring: 'highest_return',
+    entrants: 3,
+    potLamports: '150000000',
+    entriesLamports: '150000000',
+    sponsorLamports: '0',
+    paidPlaces: 1,
+    payouts: [{ place: 1, lamports: '135000000' }],
+    houseLamports: '15000000',
+    rulesetHash: 'abcd',
+    rulesetHashNow: 'abcd',
+    entered: false,
+  },
+  freePlay: { open: true, startingBalance: '10000000000' },
+};
+
+/** A fetch that serves a proof bundle, a leaderboard, a season, and an RPC account. */
 function mockFetch(proof: ProofBundle | null, onChainAccumulator: string | null): typeof fetch {
   return (async (url: string | URL, init?: RequestInit) => {
     const u = String(url);
     if (u.includes('/api/proof')) return new Response(JSON.stringify(proof ?? {}), { status: 200 });
     if (u.includes('/api/leaderboard')) return new Response(JSON.stringify(STANDINGS), { status: 200 });
+    if (u.includes('/api/season')) return new Response(JSON.stringify(SEASON), { status: 200 });
     const body = JSON.parse(String(init?.body ?? '{}')) as { method?: string };
     if (body.method === 'getAccountInfo') {
       const value =
@@ -163,6 +191,14 @@ describe('Probatio client', () => {
   it('standalone getStandings hits the leaderboard', async () => {
     const standings = await getStandings({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(null, null) });
     expect(standings.final).toBe(false);
+  });
+
+  it('reads the current season and both ruleset hashes', async () => {
+    const client = new Probatio({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(null, null) });
+    const info = await client.getSeason();
+    expect(info.ranked?.name).toBe('Season 1');
+    expect(info.ranked?.rulesetHash).toBe(info.ranked?.rulesetHashNow);
+    expect(info.freePlay.open).toBe(true);
   });
 
   it('getStandings sends limit but never a season the endpoint would ignore', async () => {

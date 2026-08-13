@@ -138,3 +138,49 @@ export interface Standings {
   /** True once the season is finalized; until then the board moves with the market. */
   readonly final: boolean;
 }
+
+/** One place's projected payout, lamports as a decimal string. */
+export interface SeasonPayout {
+  readonly place: number;
+  readonly lamports: string;
+}
+
+/**
+ * The current ranked season, the `ranked` half of `/api/season`.
+ *
+ * `rulesetHash` is what the program recorded when the season was created;
+ * `rulesetHashNow` is what today's published rules hash to. They match unless
+ * the rules were edited since, which is the tamper check the endpoint exists to
+ * let anyone make. Amounts are lamports as decimal strings, and the payouts are
+ * what the pot would pay right now, so they move as entrants arrive.
+ */
+export interface RankedSeason {
+  readonly id: number;
+  readonly ordinal: number;
+  readonly name: string;
+  readonly status: SeasonStatus;
+  readonly startsAt: number;
+  readonly endsAt: number;
+  readonly entryClosesAt: number;
+  readonly entryClosesInMs: number;
+  readonly entryCost: string;
+  readonly startingBalance: string;
+  readonly scoring: string;
+  readonly entrants: number;
+  readonly potLamports: string;
+  readonly entriesLamports: string;
+  readonly sponsorLamports: string;
+  readonly paidPlaces: number;
+  readonly payouts: readonly SeasonPayout[];
+  readonly houseLamports: string;
+  readonly rulesetHash: string;
+  readonly rulesetHashNow: string;
+  readonly entered: boolean;
+}
+
+/** The season as anybody can see it, from `/api/season`. */
+export interface SeasonInfo {
+  /** The current ranked season, or null when only free play is running. */
+  readonly ranked: RankedSeason | null;
+  readonly freePlay: { readonly open: boolean; readonly startingBalance: string };
+}
