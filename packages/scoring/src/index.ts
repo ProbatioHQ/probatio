@@ -23,3 +23,13 @@ export {
   VOID_SEASON_ROOT,
 } from './results';
 export type { ResultLeaf } from './results';
+
+export { FinalizeError, buildFinalization, verifyFinalization } from './finalize';
+export type {
+  Entrant,
+  Finalization,
+  FinalizationInput,
+  FinalizedRow,
+  PlacePayout,
+  VerifyResult,
+} from './finalize';
