@@ -48,7 +48,7 @@ register(
   "Verify a trader's Probatio record against Solana. Rebuilds their committed " +
     'trades, folds the accumulator, and compares it to the one on chain. Returns ' +
     'verified plus every check. Needs an rpc, in the call or from PROBATIO_RPC.',
-  { wallet: z.string(), rpc: z.string().optional(), season: z.number().int().optional() },
+  { wallet: z.string(), rpc: z.string().optional(), season: z.number().int().nonnegative().optional() },
   async (args) =>
     asText(
       await tools.verifyRecord(args as { wallet: string; rpc?: string; season?: number }),
@@ -65,7 +65,7 @@ register(
 register(
   'get_standings',
   'The standings of the current ranked season, or null when none is running.',
-  { limit: z.number().int().optional() },
+  { limit: z.number().int().nonnegative().optional() },
   async (args) => asText(await tools.getStandings(args as { limit?: number })),
 );
 
@@ -73,7 +73,7 @@ register(
   'get_proof',
   'The raw inputs to check a record: every committed trade, its batch, and the ' +
     'roots. What verify_record recomputes from.',
-  { wallet: z.string(), season: z.number().int().optional() },
+  { wallet: z.string(), season: z.number().int().nonnegative().optional() },
   async (args) => asText(await tools.getProof(args as { wallet: string; season?: number })),
 );
 

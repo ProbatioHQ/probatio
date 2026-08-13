@@ -114,4 +114,35 @@ describe('probatio cli', () => {
     expect(await run(['record', WALLET, api, base, '--json'], io, mockFetch())).toBe(0);
     expect(JSON.parse(out.join('\n')).trader).toBe(WALLET);
   });
+
+  it('accepts the --flag=value form', async () => {
+    const { io, out } = capture();
+    expect(await run(['record', WALLET, `--api=${base}`], io, mockFetch())).toBe(0);
+    expect(out.join('\n')).toMatch(/ace/);
+  });
+
+  it('rejects a flag whose value is another flag instead of swallowing it', async () => {
+    const { io, err } = capture();
+    // --api used to consume --json as its value; now it is a usage error.
+    expect(await run(['record', WALLET, '--api', '--json'], io, mockFetch())).toBe(2);
+    expect(err.join('\n')).toMatch(/--api needs a value/);
+  });
+
+  it('rejects a non-numeric --limit instead of sending NaN', async () => {
+    const { io, err } = capture();
+    expect(await run(['standings', api, base, '--limit', 'foo'], io, mockFetch())).toBe(2);
+    expect(err.join('\n')).toMatch(/--limit must be a non-negative integer/);
+  });
+
+  it('rejects a negative --season', async () => {
+    const { io, err } = capture();
+    expect(await run(['verify', WALLET, '--rpc', 'http://rpc', '--season', '-1'], io, mockFetch())).toBe(2);
+    expect(err.join('\n')).toMatch(/--season must be a non-negative integer/);
+  });
+
+  it('rejects an unknown option', async () => {
+    const { io, err } = capture();
+    expect(await run(['record', WALLET, '--nope'], io, mockFetch())).toBe(2);
+    expect(err.join('\n')).toMatch(/unknown option: --nope/);
+  });
 });

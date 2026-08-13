@@ -46,16 +46,61 @@ interface Flags {
   positional: string[];
 }
 
+/** A bad command line. `run` turns it into a clear message and exit code 2. */
+class UsageError extends Error {}
+
+const VALUE_FLAGS = new Set(['--rpc', '--api', '--season', '--limit']);
+
+/** A value that is really the next option (a bare `--json`), not a negative number. */
+function looksLikeFlag(value: string): boolean {
+  return value.startsWith('-') && !/^-?\d+$/.test(value);
+}
+
+function count(name: string, value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new UsageError(`${name} must be a non-negative integer, got "${value}"`);
+  }
+  return n;
+}
+
+/**
+ * Turn argv into flags, rejecting rather than guessing.
+ *
+ * Accepts both `--flag value` and `--flag=value`. A value-taking flag with no
+ * value, or a following token that is itself an option, is an error, not a
+ * silent misread. `--season` and `--limit` must be non-negative integers, so a
+ * typo like `--limit foo` fails here instead of sending `?limit=NaN` onward.
+ */
 function parseFlags(args: readonly string[]): Flags {
   const flags: Flags = { json: false, positional: [] };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i]!;
-    if (arg === '--json') flags.json = true;
-    else if (arg === '--rpc') flags.rpc = args[(i += 1)];
-    else if (arg === '--api') flags.api = args[(i += 1)];
-    else if (arg === '--season') flags.season = Number(args[(i += 1)]);
-    else if (arg === '--limit') flags.limit = Number(args[(i += 1)]);
-    else if (!arg.startsWith('-')) flags.positional.push(arg);
+    if (!arg.startsWith('-')) {
+      flags.positional.push(arg);
+      continue;
+    }
+
+    const eq = arg.indexOf('=');
+    const name = eq === -1 ? arg : arg.slice(0, eq);
+    const inline = eq === -1 ? undefined : arg.slice(eq + 1);
+
+    if (name === '--json') {
+      flags.json = true;
+      continue;
+    }
+    if (!VALUE_FLAGS.has(name)) {
+      throw new UsageError(`unknown option: ${name}`);
+    }
+
+    const value = inline ?? args[(i += 1)];
+    if (value === undefined || (inline === undefined && looksLikeFlag(value))) {
+      throw new UsageError(`${name} needs a value`);
+    }
+    if (name === '--rpc') flags.rpc = value;
+    else if (name === '--api') flags.api = value;
+    else if (name === '--season') flags.season = count(name, value);
+    else flags.limit = count(name, value);
   }
   return flags;
 }
@@ -156,7 +201,13 @@ export async function run(
   fetchImpl?: typeof fetch,
 ): Promise<number> {
   const [command, ...rest] = argv;
-  const flags = parseFlags(rest);
+  let flags: Flags;
+  try {
+    flags = parseFlags(rest);
+  } catch (error) {
+    io.err(error instanceof Error ? error.message : String(error));
+    return 2;
+  }
   try {
     switch (command) {
       case 'verify':
@@ -179,7 +230,8 @@ export async function run(
         return 2;
     }
   } catch (error) {
-    io.err(error instanceof ProbatioError ? error.message : `error: ${(error as Error).message}`);
+    if (error instanceof ProbatioError) io.err(error.message);
+    else io.err(`error: ${error instanceof Error ? error.message : String(error)}`);
     return 2;
   }
 }
