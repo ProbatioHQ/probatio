@@ -25,7 +25,7 @@ const HELP = `probatio, the open prop firm
 Usage
   probatio verify <wallet> [--rpc <url>] [--season <n>] [--api <url>] [--json]
   probatio record <wallet> [--api <url>] [--json]
-  probatio standings [--season <n>] [--limit <n>] [--api <url>] [--json]
+  probatio standings [--limit <n>] [--api <url>] [--json]
   probatio proof <wallet> [--season <n>] [--api <url>]
 
 Options
@@ -122,7 +122,7 @@ async function cmdRecord(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Pro
 }
 
 async function cmdStandings(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Promise<number> {
-  const board = await client(flags, fetchImpl).getStandings({ season: flags.season, limit: flags.limit });
+  const board = await client(flags, fetchImpl).getStandings({ limit: flags.limit });
   if (flags.json) {
     io.out(JSON.stringify(board, null, 2));
     return 0;

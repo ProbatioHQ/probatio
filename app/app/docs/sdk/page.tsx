@@ -58,7 +58,7 @@ result.checks;               // each step: roots rebuilt, membership, chain fold
         </p>
         <pre>
           <code>{`const record = await probatio.getRecord(wallet);   // name, seasons, where to prove it
-const board  = await probatio.getStandings({ season: 1 });
+const board  = await probatio.getStandings();      // the current ranked season
 const proof  = await probatio.getProof(wallet);    // the raw inputs verifyRecord checks`}</code>
         </pre>
       </section>

@@ -53,18 +53,18 @@ VERIFIED  ace in season 1, 9 trade(s) checked`}</code>
         <p>The public data behind a trader and a season, no wallet and no signing.</p>
         <pre>
           <code>{`probatio record <wallet>            # name, and the seasons they traded
-probatio standings --season 1      # the board for a season, or the current one
+probatio standings                 # the current ranked season's board
 probatio proof <wallet>            # the raw inputs verify recomputes from, as JSON`}</code>
         </pre>
       </section>
 
       <section className="panel">
         <h2>Options</h2>
-        <p>Every command takes the same handful of flags.</p>
+        <p>A small, shared set of flags.</p>
         <pre>
           <code>{`--rpc <url>     Solana RPC endpoint to check against   (verify)
---season <n>    a specific season ordinal, default the latest committed
---limit <n>     how many standings to return
+--season <n>    a specific season ordinal, default the latest committed   (verify, proof)
+--limit <n>     how many standings to return   (standings)
 --api <url>     a Probatio instance, default https://probatio.app
 --json          print the raw JSON result instead of a summary`}</code>
         </pre>

@@ -64,9 +64,9 @@ register(
 
 register(
   'get_standings',
-  'The standings of a season, or the current one when none is named.',
-  { season: z.number().int().optional(), limit: z.number().int().optional() },
-  async (args) => asText(await tools.getStandings(args as { season?: number; limit?: number })),
+  'The standings of the current ranked season, or null when none is running.',
+  { limit: z.number().int().optional() },
+  async (args) => asText(await tools.getStandings(args as { limit?: number })),
 );
 
 register(

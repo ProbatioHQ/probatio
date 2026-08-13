@@ -52,9 +52,9 @@ export class Probatio {
     return getRecord(trader, this.#read());
   }
 
-  /** A season's standings, or the current one when none is named. */
-  getStandings(options: { readonly season?: number | undefined; readonly limit?: number | undefined } = {}): Promise<Standings> {
-    return getStandings({ ...this.#read(), season: options.season, limit: options.limit });
+  /** The standings of the current ranked season. */
+  getStandings(options: { readonly limit?: number | undefined } = {}): Promise<Standings> {
+    return getStandings({ ...this.#read(), limit: options.limit });
   }
 
   /** Verify a record against the chain. Needs an rpc, from here or the config. */

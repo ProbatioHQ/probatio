@@ -53,8 +53,8 @@ export default function McpDocs() {
 get_record      { wallet }
     The public record: name, the seasons traded, and where to prove it.
 
-get_standings   { season?, limit? }
-    A season's standings, or the current one when none is named.
+get_standings   { limit? }
+    The standings of the current ranked season, or null when none runs.
 
 get_proof       { wallet, season? }
     The raw inputs verify_record recomputes from: every committed

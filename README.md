@@ -113,7 +113,7 @@ result.checks;               // every step, so you can show your work
 // Read the public record, the raw proof inputs, and the standings.
 const record = await probatio.getRecord(wallet);
 const proof = await probatio.getProof(wallet);
-const board = await probatio.getStandings({ season: 1 });
+const board = await probatio.getStandings();
 ```
 
 Point it at your own instance with `apiBase`, and pass a `season` to check a past one.
@@ -130,7 +130,7 @@ The same core from a terminal, which is the plainest form of "do not trust us, c
 ```bash
 npx @probatio/cli verify <wallet> --rpc https://api.mainnet-beta.solana.com
 npx @probatio/cli record <wallet>
-npx @probatio/cli standings --season 1
+npx @probatio/cli standings
 npx @probatio/cli proof <wallet>        # the raw inputs verify recomputes from
 ```
 

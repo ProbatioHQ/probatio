@@ -164,4 +164,15 @@ describe('Probatio client', () => {
     const standings = await getStandings({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(null, null) });
     expect(standings.final).toBe(false);
   });
+
+  it('getStandings sends limit but never a season the endpoint would ignore', async () => {
+    let seen = '';
+    const fetchImpl = (async (url: string | URL) => {
+      seen = String(url);
+      return new Response(JSON.stringify(STANDINGS), { status: 200 });
+    }) as unknown as typeof fetch;
+    await getStandings({ apiBase: 'http://probatio.test', fetchImpl, limit: 25 });
+    expect(seen).toContain('limit=25');
+    expect(seen).not.toContain('season');
+  });
 });

@@ -25,7 +25,7 @@ export interface ProbatioTools {
     season?: number | undefined;
   }): Promise<VerifiedRecord>;
   getRecord(input: { wallet: string }): Promise<ProfileRecord>;
-  getStandings(input: { season?: number | undefined; limit?: number | undefined }): Promise<Standings>;
+  getStandings(input: { limit?: number | undefined }): Promise<Standings>;
   getProof(input: { wallet: string; season?: number | undefined }): Promise<ProofBundle>;
 }
 
@@ -39,7 +39,7 @@ export function createTools(config: ToolConfig = {}): ProbatioTools {
   return {
     verifyRecord: (input) => probatio.verifyRecord(input.wallet, { rpc: input.rpc, season: input.season }),
     getRecord: (input) => probatio.getRecord(input.wallet),
-    getStandings: (input) => probatio.getStandings({ season: input.season, limit: input.limit }),
+    getStandings: (input) => probatio.getStandings({ limit: input.limit }),
     getProof: (input) => probatio.getProof(input.wallet, { season: input.season }),
   };
 }

@@ -70,12 +70,17 @@ export async function getRecord(trader: string, options: ReadOptions = {}): Prom
   return getJson<ProfileRecord>(`${base(options)}/api/profile?trader=${trader}`, options);
 }
 
-/** The standings of a season, or the current one when none is named. */
+/**
+ * The standings of the current ranked season, or `season: null` when none runs.
+ *
+ * The leaderboard is the live board for the season in progress; it has no
+ * past-season mode, so there is no season option here. A finished season's
+ * result is proven from its finalization, not read back from this endpoint.
+ */
 export async function getStandings(
-  options: ReadOptions & { readonly season?: number | undefined; readonly limit?: number | undefined } = {},
+  options: ReadOptions & { readonly limit?: number | undefined } = {},
 ): Promise<Standings> {
   const params = new URLSearchParams();
-  if (options.season !== undefined) params.set('season', String(options.season));
   if (options.limit !== undefined) params.set('limit', String(options.limit));
   const query = params.toString();
   return getJson<Standings>(`${base(options)}/api/leaderboard${query ? `?${query}` : ''}`, options);
