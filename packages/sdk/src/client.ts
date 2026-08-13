@@ -17,13 +17,13 @@ import type { ProfileRecord, ProofBundle, Standings, VerifiedRecord } from './ty
  */
 export interface ProbatioConfig {
   /** Base URL of a Probatio instance. Defaults to https://probatio.app. */
-  readonly apiBase?: string;
+  readonly apiBase?: string | undefined;
   /** A Solana RPC endpoint, used by `verifyRecord`. */
-  readonly rpc?: string;
+  readonly rpc?: string | undefined;
   /** Injected fetch, for tests or a non-browser runtime. */
-  readonly fetchImpl?: typeof fetch;
+  readonly fetchImpl?: typeof fetch | undefined;
   /** Override the program id. Defaults to the canonical one. */
-  readonly programId?: string;
+  readonly programId?: string | undefined;
 }
 
 export class Probatio {
@@ -43,7 +43,7 @@ export class Probatio {
   }
 
   /** The raw inputs to check a record. A season ordinal, or the latest committed. */
-  getProof(trader: string, options: { readonly season?: number } = {}): Promise<ProofBundle> {
+  getProof(trader: string, options: { readonly season?: number | undefined } = {}): Promise<ProofBundle> {
     return getProof(trader, { ...this.#read(), season: options.season });
   }
 
@@ -53,14 +53,14 @@ export class Probatio {
   }
 
   /** A season's standings, or the current one when none is named. */
-  getStandings(options: { readonly season?: number; readonly limit?: number } = {}): Promise<Standings> {
+  getStandings(options: { readonly season?: number | undefined; readonly limit?: number | undefined } = {}): Promise<Standings> {
     return getStandings({ ...this.#read(), season: options.season, limit: options.limit });
   }
 
   /** Verify a record against the chain. Needs an rpc, from here or the config. */
   verifyRecord(
     trader: string,
-    options: { readonly season?: number; readonly rpc?: string } = {},
+    options: { readonly season?: number | undefined; readonly rpc?: string | undefined } = {},
   ): Promise<VerifiedRecord> {
     const rpc = options.rpc ?? this.#config.rpc;
     if (!rpc) throw new ProbatioError('no rpc endpoint configured; pass one to the client or the call');

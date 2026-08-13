@@ -91,9 +91,9 @@ const proof  = await probatio.getProof(wallet);    // the raw inputs verifyRecor
       </section>
 
       <p>
-        A <a href="https://github.com/ProbatioHQ/probatio">command-line tool</a> and an MCP
-        server for agents to vet or back a trader on proof rather than promises are built on
-        this same core.
+        A <a href="/docs/cli">command-line tool</a> and an <a href="/docs/mcp">MCP server</a>{' '}
+        for agents to vet or back a trader on proof rather than promises are built on this same
+        core.
       </p>
     </>
   );

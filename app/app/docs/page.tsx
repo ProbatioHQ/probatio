@@ -48,11 +48,13 @@ export default function DocsIndex() {
 
       <section className="panel">
         <h2>
-          <a href="/docs/sdk">SDK</a>
+          <a href="/docs/sdk">SDK</a>, <a href="/docs/cli">CLI</a> and{' '}
+          <a href="/docs/mcp">MCP</a>
         </h2>
         <p>
-          Read a record and check it against the chain yourself, in a few lines of TypeScript.
-          The verification this site runs, as a library that never trusts the server.
+          Read a record and check it against the chain yourself: in a few lines of TypeScript,
+          from your terminal, or as tools an agent can call. The verification this site runs,
+          shipped three ways, none of which trusts the server.
         </p>
       </section>
 

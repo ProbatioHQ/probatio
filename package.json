@@ -2,7 +2,7 @@
   "name": "probatio",
   "version": "0.0.0",
   "private": true,
-  "description": "Probatio \u2014 a proving ground for traders. Honest simulation, unfakeable records.",
+  "description": "Probatio — a proving ground for traders. Honest simulation, unfakeable records.",
   "license": "AGPL-3.0",
   "workspaces": [
     "packages/*",
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.11",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

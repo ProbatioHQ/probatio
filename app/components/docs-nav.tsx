@@ -16,6 +16,8 @@ const PAGES = [
   { href: '/docs/records', label: 'Records', blurb: 'How a trade becomes unrevisable' },
   { href: '/docs/scoring', label: 'Scoring', blurb: 'How a season is won' },
   { href: '/docs/sdk', label: 'SDK', blurb: 'Verify a record in a few lines' },
+  { href: '/docs/cli', label: 'CLI', blurb: 'Verify from your terminal' },
+  { href: '/docs/mcp', label: 'MCP', blurb: 'The same core, for agents' },
 ];
 
 export function DocsNav() {

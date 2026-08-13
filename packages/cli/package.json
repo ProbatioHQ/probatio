@@ -1,0 +1,16 @@
+{
+  "name": "@probatio/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Verify a Probatio record and read the public data from your terminal.",
+  "bin": { "probatio": "./dist/bin.js" },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "node build.mjs"
+  },
+  "dependencies": { "@probatio/sdk": "*" }
+}

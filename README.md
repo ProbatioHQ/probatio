@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg?v=2" alt="Probatio" width="100%" />
+<img src="docs/banner.svg?v=3" alt="Probatio" width="100%" />
 
 <br/>
 
@@ -11,7 +11,7 @@
 <br/><br/>
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-3fe08a?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-1290%20passing-3fe08a?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-1308%20passing-3fe08a?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-Anchor-dea584?style=flat-square&logo=rust&logoColor=white)
 ![Self-hostable](https://img.shields.io/badge/self--hostable-yes-3fe08a?style=flat-square)
@@ -86,13 +86,19 @@ decides. Nobody has to trust that the leaderboard is honest; they can recompute 
 
 ---
 
-## SDK
+## SDK, CLI and MCP
 
 A record does not need Probatio to be believed, so the same verification the site
-runs is a library anyone can use. `@probatio/sdk` fetches the trades a trader
-committed, rebuilds their hashes, folds them into an accumulator and compares it to
-the one Solana holds, at an address derived from constants in the package, over an
-RPC you choose. A `verified: true` never comes from a server's say-so.
+runs ships three ways: a library, a command, and an MCP server. All three do the one
+thing that matters, and none of them takes a server's word for it. They fetch the
+trades a trader committed, rebuild the hashes, fold them into an accumulator, and
+compare it to the one Solana holds, at an address derived from constants in the
+package, over an RPC you choose. A `verified: true` is a claim about the chain, not
+about us.
+
+### `@probatio/sdk`
+
+The library. A configured client, or a standalone function for each call.
 
 ```ts
 import { Probatio } from '@probatio/sdk';
@@ -104,23 +110,61 @@ const result = await probatio.verifyRecord(wallet);
 result.verified;             // true only when the chain holds what these trades produce
 result.checks;               // every step, so you can show your work
 
-// Read the public record and the standings.
+// Read the public record, the raw proof inputs, and the standings.
 const record = await probatio.getRecord(wallet);
+const proof = await probatio.getProof(wallet);
 const board = await probatio.getStandings({ season: 1 });
 ```
 
+Point it at your own instance with `apiBase`, and pass a `season` to check a past one.
 Every method is also a standalone function (`verifyRecord`, `getProof`, `getRecord`,
 `getStandings`), and the low-level primitives (`hashLeaf`, `buildTree`, `verifyProof`,
-`extendChain`) are re-exported for callers who already hold the data.
+`extendChain`) are re-exported for callers who already hold the data. It carries no
+web3 dependency; verification is a raw JSON-RPC call over `fetch`, so it runs in a
+browser, a worker, or a server unchanged.
 
-A **CLI** (`npx @probatio/cli verify <wallet>`) and an **MCP server** for agents to
-vet or back a trader on proof rather than promises are built on the same core.
+### `@probatio/cli`
+
+The same core from a terminal, which is the plainest form of "do not trust us, check".
+
+```bash
+npx @probatio/cli verify <wallet> --rpc https://api.mainnet-beta.solana.com
+npx @probatio/cli record <wallet>
+npx @probatio/cli standings --season 1
+```
+
+`verify` prints each check, then exits `0` when the record holds against the chain and
+`1` when it does not, so it drops straight into a script or a CI step. `--rpc` names the
+endpoint it checks against, `--api` points at an instance, `--season` picks a past one,
+and `--json` prints the raw result instead of a summary.
+
+### `@probatio/mcp`
+
+An MCP server, so an agent can vet or back a trader on proof rather than on a
+leaderboard's word. It speaks over stdio and exposes four tools, `verify_record`,
+`get_record`, `get_standings` and `get_proof`, over the same SDK.
+
+```json
+{
+  "mcpServers": {
+    "probatio": {
+      "command": "npx",
+      "args": ["-y", "@probatio/mcp"],
+      "env": { "PROBATIO_RPC": "https://api.mainnet-beta.solana.com" }
+    }
+  }
+}
+```
+
+`PROBATIO_RPC` is the endpoint `verify_record` checks against when a call omits one, and
+`PROBATIO_API` points at an instance. The verdict the agent sees is one it could have
+recomputed itself.
 
 ---
 
 ## Architecture
 
-An npm workspace of 22 TypeScript packages plus an Anchor program. Most packages are
+An npm workspace of 24 TypeScript packages plus an Anchor program. Most packages are
 pure (no clock, no network, no database), which is why the whole suite runs offline in
 about ten seconds. The ones that reach outside are marked, and they are the only ones
 that can.
@@ -148,6 +192,9 @@ that can.
 | `retention` | Whether people come back | |
 | `auth` | Sign-in with Solana, and sessions. No email anywhere | |
 | `db` | Schema, migrations, and every query | database |
+| `sdk` | Read and verify a record against the chain, no web3 dependency | network |
+| `cli` | The `probatio` command, over the SDK | network |
+| `mcp` | An MCP server exposing the SDK to agents | network |
 
 Plus `app` (Next.js 16) and `program` (Anchor).
 
@@ -163,7 +210,7 @@ Requires Node 22 or later and a Solana RPC endpoint.
 ```bash
 npm install
 cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
-npm test                                # 1290 tests, no network
+npm test                                # 1308 tests, no network
 npm --prefix app run dev
 ```
 
