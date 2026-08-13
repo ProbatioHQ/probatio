@@ -29,7 +29,7 @@ export interface ReadOptions {
 
 const ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-function resolveFetch(options: ReadOptions): typeof fetch {
+export function resolveFetch(options: ReadOptions): typeof fetch {
   const impl = options.fetchImpl ?? (globalThis.fetch as typeof fetch | undefined);
   if (!impl) throw new ProbatioError('no fetch available; pass fetchImpl');
   return impl;

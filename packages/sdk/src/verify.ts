@@ -17,7 +17,7 @@ import {
   SEASON_SEED,
   TRADER_RECORD_DISCRIMINATOR,
 } from './constants';
-import { ProbatioError, getProof, type ReadOptions } from './read';
+import { ProbatioError, getProof, resolveFetch, type ReadOptions } from './read';
 import type { ProofBundle, RawLeaf, VerifiedRecord, VerifyCheck } from './types';
 
 /**
@@ -110,7 +110,6 @@ export async function verifyBundle(bundle: ProofBundle, options: VerifyOptions):
   if (!options.rpc) {
     throw new ProbatioError('verifyRecord needs an rpc endpoint to check the record against the chain');
   }
-  const doFetch = options.fetchImpl ?? (globalThis.fetch as typeof fetch);
   const programId = options.programId ?? PROGRAM_ID;
   const checks: VerifyCheck[] = [];
 
@@ -182,6 +181,10 @@ export async function verifyBundle(bundle: ProofBundle, options: VerifyOptions):
   let onChainOk = false;
   const account = recordPda(seasonPda(bundle.seasonOrdinal, programId), bundle.trader, programId);
   try {
+    // Resolved here, not up front, so an empty bundle still short-circuits
+    // above without needing a fetch. A missing one becomes a failed on-chain
+    // check with a clear message, not a raw TypeError.
+    const doFetch = resolveFetch(options);
     const result = await rpcCall<{ value: { data?: [string, string]; owner?: string } | null }>(
       options.rpc,
       'getAccountInfo',

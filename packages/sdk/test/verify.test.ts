@@ -9,7 +9,7 @@ import {
   type TradeLeaf,
 } from '@probatio/commit';
 import { PROGRAM_ID, TRADER_RECORD_DISCRIMINATOR } from '../src/constants';
-import { Probatio, ProbatioError, getStandings, verifyRecord } from '../src/index';
+import { Probatio, ProbatioError, getStandings, verifyBundle, verifyRecord } from '../src/index';
 import type { ProofBundle, RawLeaf } from '../src/types';
 
 const TRADER = '7xKXtg2CW3cWCLBmVvKcbAkKM6mzTuKMYqM9dAcuLNwr';
@@ -173,6 +173,20 @@ describe('verifyRecord', () => {
     expect(result.verified).toBe(false);
     expect(result.checks[0]!.label).toBe('Committed record');
     expect(result.tradeCount).toBe(0);
+  });
+
+  it('turns a missing fetch into a clean on-chain check failure, not a TypeError', async () => {
+    const saved = globalThis.fetch;
+    globalThis.fetch = undefined as unknown as typeof fetch;
+    try {
+      const result = await verifyBundle(bundle(), { rpc: 'http://rpc.test' });
+      const check = result.checks.find((c) => c.label === 'On-chain comparison');
+      expect(result.verified).toBe(false);
+      expect(check?.passed).toBe(false);
+      expect(check?.detail).toMatch(/fetch/);
+    } finally {
+      globalThis.fetch = saved;
+    }
   });
 });
 
