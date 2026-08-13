@@ -152,6 +152,53 @@ describe('verifyRecord', () => {
     expect(result.tradeCount).toBe(1);
   });
 
+  it('verifies a multi-leaf, multi-batch record (the real-world shape)', async () => {
+    // Two batches, three then two trades: exercises the merkle tree with more
+    // than one leaf, membership proofs into it, and the fold across batches.
+    const t = (sequence: number): TradeLeaf => ({ ...leaf(), sequence });
+    const b1 = [t(1), t(2), t(3)];
+    const b2 = [t(4), t(5)];
+    const root1 = buildTree(b1.map(hashLeaf)).root;
+    const root2 = buildTree(b2.map(hashLeaf)).root;
+    const acc1 = extendChain(EMPTY_ACCUMULATOR, root1, b1.length, 1);
+    const acc2 = extendChain(acc1, root2, b2.length, 1);
+    const multi: ProofBundle = {
+      trader: TRADER,
+      seasonId: 5,
+      seasonOrdinal: 0,
+      batches: [
+        {
+          batchIndex: 0,
+          root: toHex(root1),
+          leaves: b1.length,
+          engineVersion: 1,
+          previousAccumulator: toHex(EMPTY_ACCUMULATOR),
+          predictedAccumulator: toHex(acc1),
+          txSignature: 's0',
+          slot: 100,
+          trades: b1.map(raw),
+        },
+        {
+          batchIndex: 1,
+          root: toHex(root2),
+          leaves: b2.length,
+          engineVersion: 1,
+          previousAccumulator: toHex(acc1),
+          predictedAccumulator: toHex(acc2),
+          txSignature: 's1',
+          slot: 101,
+          trades: b2.map(raw),
+        },
+      ],
+    };
+    const result = await verifyRecord(TRADER, opts(mockFetch(multi, toHex(acc2))));
+    expect(result.verified).toBe(true);
+    expect(result.tradeCount).toBe(5);
+    expect(result.batchCount).toBe(2);
+    expect(result.computedAccumulator).toBe(toHex(acc2));
+    expect(result.checks.every((c) => c.passed)).toBe(true);
+  });
+
   it('rejects a record the chain does not hold', async () => {
     // The chain holds a different accumulator than the trades produce.
     const other = toHex(extendChain(EMPTY_ACCUMULATOR, fromHex(ROOT), 1, 2));
