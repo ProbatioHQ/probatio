@@ -26,6 +26,7 @@ Usage
   probatio verify <wallet> [--rpc <url>] [--season <n>] [--api <url>] [--json]
   probatio record <wallet> [--api <url>] [--json]
   probatio standings [--season <n>] [--limit <n>] [--api <url>] [--json]
+  probatio proof <wallet> [--season <n>] [--api <url>]
 
 Options
   --rpc <url>     Solana RPC endpoint to check the record against (verify)
@@ -104,10 +105,18 @@ async function cmdRecord(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Pro
     return 0;
   }
   io.out(`${record.display}${record.name ? '' : ' (unnamed)'}`);
-  io.out(record.exists ? `  ${record.seasons.length} season(s) traded` : '  no record yet');
+  if (!record.exists) {
+    io.out('  no record yet');
+    return 0;
+  }
+  io.out(`  ${record.seasons.length} season(s) traded`);
   for (const season of record.seasons) {
-    const ret = season.returnBps === null ? 'n/a' : `${(season.returnBps / 100).toFixed(2)}%`;
-    io.out(`  season ${season.ordinal} ${season.name}: ${ret}, ${season.tradeCount} trade(s)`);
+    const kind = season.ranked ? 'ranked' : season.freePlay ? 'free play' : 'past';
+    const win = `${(season.winRateBps / 100).toFixed(1)}% win`;
+    io.out(
+      `  season ${season.seasonId} (${kind}): ${season.trades} trade(s), ` +
+        `${season.roundTrips} round trip(s), ${win}, ${season.committedTrades} committed`,
+    );
   }
   return 0;
 }
@@ -129,6 +138,18 @@ async function cmdStandings(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): 
   return 0;
 }
 
+async function cmdProof(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Promise<number> {
+  const wallet = flags.positional[0];
+  if (!wallet) {
+    io.err('proof needs a wallet: probatio proof <wallet>');
+    return 2;
+  }
+  // The raw inputs a verifier recomputes from. Always JSON, so it pipes.
+  const bundle = await client(flags, fetchImpl).getProof(wallet, { season: flags.season });
+  io.out(JSON.stringify(bundle, null, 2));
+  return 0;
+}
+
 export async function run(
   argv: readonly string[],
   io: CliIo = stdoutIo,
@@ -144,6 +165,8 @@ export async function run(
         return await cmdRecord(flags, io, fetchImpl);
       case 'standings':
         return await cmdStandings(flags, io, fetchImpl);
+      case 'proof':
+        return await cmdProof(flags, io, fetchImpl);
       case undefined:
       case 'help':
       case '--help':

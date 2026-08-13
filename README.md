@@ -131,6 +131,7 @@ The same core from a terminal, which is the plainest form of "do not trust us, c
 npx @probatio/cli verify <wallet> --rpc https://api.mainnet-beta.solana.com
 npx @probatio/cli record <wallet>
 npx @probatio/cli standings --season 1
+npx @probatio/cli proof <wallet>        # the raw inputs verify recomputes from
 ```
 
 `verify` prints each check, then exits `0` when the record holds against the chain and

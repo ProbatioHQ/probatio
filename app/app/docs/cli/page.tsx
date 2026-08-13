@@ -52,8 +52,9 @@ VERIFIED  ace in season 1, 9 trade(s) checked`}</code>
         <h2>Read the record and the standings</h2>
         <p>The public data behind a trader and a season, no wallet and no signing.</p>
         <pre>
-          <code>{`probatio record <wallet>            # name, seasons traded, and their returns
-probatio standings --season 1      # the board for a season, or the current one`}</code>
+          <code>{`probatio record <wallet>            # name, and the seasons they traded
+probatio standings --season 1      # the board for a season, or the current one
+probatio proof <wallet>            # the raw inputs verify recomputes from, as JSON`}</code>
         </pre>
       </section>
 

@@ -86,10 +86,11 @@ function recordAccount(accumulatorHex: string): string {
 }
 
 const STANDINGS = {
-  season: { ordinal: 1, name: 'Season 1', finalizedAt: null },
+  season: { ordinal: 1, name: 'Season 1', status: 'running', entrants: 1, potLamports: '0', scoring: 'highest_return' },
   standings: [
     { rank: 1, trader: TRADER, name: null, returnBps: 5000, finalEquity: '15', startingBalance: '10', tradeCount: 4, payoutLamports: '0' },
   ],
+  total: 1,
   final: false,
 };
 

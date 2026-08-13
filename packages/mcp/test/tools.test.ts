@@ -3,7 +3,12 @@ import { createTools } from '../src/tools';
 
 const WALLET = '7xKXtg2CW3cWCLBmVvKcbAkKM6mzTuKMYqM9dAcuLNwr';
 const RECORD = { trader: WALLET, name: 'ace', display: 'ace', exists: true, seasons: [], proof: '' };
-const STANDINGS = { season: { ordinal: 1, name: 'Season 1', finalizedAt: null }, standings: [], final: false };
+const STANDINGS = {
+  season: { ordinal: 1, name: 'Season 1', status: 'running', entrants: 0, potLamports: '0', scoring: 'highest_return' },
+  standings: [],
+  total: 0,
+  final: false,
+};
 const EMPTY_PROOF = { trader: WALLET, seasonId: 5, seasonOrdinal: 0, batches: [], note: 'nothing yet' };
 
 function mockFetch(): typeof fetch {

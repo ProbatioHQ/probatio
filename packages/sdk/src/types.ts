@@ -69,13 +69,28 @@ export interface VerifiedRecord {
   readonly checks: readonly VerifyCheck[];
 }
 
+/**
+ * A trader's standing in one season, as `/api/profile` serves it.
+ *
+ * The endpoint keys a season by its row id; it does not carry the ordinal or the
+ * display name, so neither is here. The returns it reports are a trader's own
+ * metrics (win rate, realised PnL), not a season rank; a season's ranked return
+ * lives on the leaderboard, in `SeasonStanding`.
+ */
 export interface ProfileSeason {
-  readonly ordinal: number;
-  readonly name: string;
+  readonly seasonId: number;
   readonly ranked: boolean;
-  readonly returnBps: number | null;
-  readonly tradeCount: number;
-  readonly committed: boolean;
+  readonly freePlay: boolean;
+  /** Trades logged in the season. */
+  readonly trades: number;
+  readonly roundTrips: number;
+  /** Win rate over closed round trips, in basis points. */
+  readonly winRateBps: number;
+  /** Net realised PnL, in base units, as a decimal string. */
+  readonly netPnl: string;
+  /** How much of the record is on chain: batches committed, and the trades under them. */
+  readonly committedBatches: number;
+  readonly committedTrades: number;
 }
 
 /** A trader's public record, from `/api/profile`. */
@@ -101,13 +116,25 @@ export interface SeasonStanding {
   readonly payoutLamports: string;
 }
 
+/** Where a season is in its lifecycle. Mirrors `@probatio/seasons`. */
+export type SeasonStatus = 'pending' | 'entry_open' | 'running' | 'closed' | 'finalized';
+
 /** A season's standings, from `/api/leaderboard`. */
 export interface Standings {
   readonly season: {
     readonly ordinal: number;
     readonly name: string;
-    readonly finalizedAt: number | null;
+    readonly status: SeasonStatus;
+    /** Entrants on the board. */
+    readonly entrants: number;
+    /** The prize pool, in lamports, as a decimal string. */
+    readonly potLamports: string;
+    /** The rule the season is ranked by. */
+    readonly scoring: string;
   } | null;
   readonly standings: readonly SeasonStanding[];
+  /** Total entrants, which may exceed the returned page. Absent when no season is running. */
+  readonly total?: number;
+  /** True once the season is finalized; until then the board moves with the market. */
   readonly final: boolean;
 }

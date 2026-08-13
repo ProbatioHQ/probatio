@@ -29,6 +29,7 @@ export type {
   ProofBundle,
   RawLeaf,
   SeasonStanding,
+  SeasonStatus,
   Standings,
   VerifiedRecord,
   VerifyCheck,

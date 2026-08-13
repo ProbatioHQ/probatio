@@ -8,13 +8,16 @@ const RECORD = {
   name: 'ace',
   display: 'ace',
   exists: true,
-  seasons: [{ ordinal: 1, name: 'Season 1', ranked: true, returnBps: 4200, tradeCount: 9, committed: true }],
+  seasons: [
+    { seasonId: 1, ranked: true, freePlay: false, trades: 9, roundTrips: 4, winRateBps: 5600, netPnl: '1200', committedBatches: 2, committedTrades: 9 },
+  ],
   proof: `/api/proof?trader=${WALLET}`,
 };
 
 const STANDINGS = {
-  season: { ordinal: 1, name: 'Season 1', finalizedAt: null },
+  season: { ordinal: 1, name: 'Season 1', status: 'running', entrants: 1, potLamports: '0', scoring: 'highest_return' },
   standings: [{ rank: 1, trader: WALLET, name: 'ace', returnBps: 4200, finalEquity: '14', startingBalance: '10', tradeCount: 9, payoutLamports: '0' }],
+  total: 1,
   final: false,
 };
 
@@ -72,14 +75,32 @@ describe('probatio cli', () => {
   it('reads a record', async () => {
     const { io, out } = capture();
     expect(await run(['record', WALLET, api, base], io, mockFetch())).toBe(0);
-    expect(out.join('\n')).toMatch(/ace/);
-    expect(out.join('\n')).toMatch(/season 1/);
+    const text = out.join('\n');
+    expect(text).toMatch(/ace/);
+    expect(text).toMatch(/season 1/);
+    // The profile fields must actually render: a drift between these and the
+    // endpoint once printed "season undefined: NaN%".
+    expect(text).toMatch(/9 trade\(s\)/);
+    expect(text).toMatch(/56\.0% win/);
+    expect(text).not.toMatch(/undefined|NaN/);
   });
 
   it('reads standings', async () => {
     const { io, out } = capture();
     expect(await run(['standings', api, base], io, mockFetch())).toBe(0);
     expect(out.join('\n')).toMatch(/Season 1/);
+  });
+
+  it('dumps the raw proof bundle', async () => {
+    const { io, out } = capture();
+    expect(await run(['proof', WALLET, api, base], io, mockFetch())).toBe(0);
+    expect(JSON.parse(out.join('\n')).trader).toBe(WALLET);
+  });
+
+  it('proof needs a wallet', async () => {
+    const { io, err } = capture();
+    expect(await run(['proof'], io, mockFetch())).toBe(2);
+    expect(err.join('\n')).toMatch(/needs a wallet/);
   });
 
   it('rejects an unknown command', async () => {
