@@ -22,6 +22,12 @@ import type { AccountMeta, Instruction } from '@probatio/payments';
 
 export class VaultError extends Error {}
 
+export {
+  AuthorityGateway,
+  type AuthorityReceipt,
+  type AuthorityGatewayOptions,
+} from './gateway';
+
 /** The program that holds the seasons, vaults and entries. */
 export const PROGRAM_ID = 'HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA';
 export const SYSTEM_PROGRAM_ID = '11111111111111111111111111111111';
@@ -210,6 +216,29 @@ export function recordEntry(input: { readonly trader: string; readonly ordinal: 
   };
 }
 
+/** An authority-signed status transition that carries no data. */
+function authorityTransition(name: string, authority: string, ordinal: number, programId: string): Instruction {
+  const season = seasonAddress(ordinal, programId).address;
+  return {
+    programId,
+    keys: [
+      { pubkey: authority, isSigner: true, isWritable: false },
+      { pubkey: season, isSigner: false, isWritable: true },
+    ],
+    data: anchorDiscriminator(name),
+  };
+}
+
+/** `open_entries`: moves a season from Pending to accepting entries. Signed by the authority. */
+export function openEntries(input: { readonly authority: string; readonly ordinal: number; readonly programId?: string }): Instruction {
+  return authorityTransition('open_entries', input.authority, input.ordinal, input.programId ?? PROGRAM_ID);
+}
+
+/** `start_trading`: closes entries and starts the season running. Signed by the authority. */
+export function startTrading(input: { readonly authority: string; readonly ordinal: number; readonly programId?: string }): Instruction {
+  return authorityTransition('start_trading', input.authority, input.ordinal, input.programId ?? PROGRAM_ID);
+}
+
 /** `finalize_season`: writes the results root. Signed by the authority. */
 export function finalizeSeason(input: {
   readonly authority: string;
@@ -289,16 +318,7 @@ export function claimPrize(input: {
 
 /** `void_season`: marks a season Voided so its entries can be refunded. Signed by the authority. */
 export function voidSeason(input: { readonly authority: string; readonly ordinal: number; readonly programId?: string }): Instruction {
-  const programId = input.programId ?? PROGRAM_ID;
-  const season = seasonAddress(input.ordinal, programId).address;
-  return {
-    programId,
-    keys: [
-      { pubkey: input.authority, isSigner: true, isWritable: false },
-      { pubkey: season, isSigner: false, isWritable: true },
-    ],
-    data: anchorDiscriminator('void_season'),
-  };
+  return authorityTransition('void_season', input.authority, input.ordinal, input.programId ?? PROGRAM_ID);
 }
 
 /** `refund_entry`: pays a voided season's entry back from the vault. Signed by the payer. */

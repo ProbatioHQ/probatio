@@ -1,14 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { ed25519 } from '@noble/curves/ed25519.js';
 import {
+  AuthorityGateway,
   PROGRAM_ID,
   SYSTEM_PROGRAM_ID,
+  VaultError,
   anchorDiscriminator,
   claimPrize,
   finalizeSeason,
   initSeason,
+  openEntries,
   recordEntry,
   refundEntry,
+  startTrading,
   voidSeason,
   type SeasonParams,
 } from '../src/index';
@@ -138,6 +143,17 @@ describe('vault instruction encoders', () => {
     expect(view.getUint32(8 + 4 + 16 + 16 + 4 + 4 + 16, true)).toBe(2); // proof length
   });
 
+  it('open_entries and start_trading: authority signs, disc only, two accounts', () => {
+    for (const [name, ix] of [
+      ['open_entries', openEntries({ authority: AUTHORITY, ordinal: 1 })],
+      ['start_trading', startTrading({ authority: AUTHORITY, ordinal: 1 })],
+    ] as const) {
+      assertDiscriminator(ix, name);
+      assertAccounts(ix, name);
+      expect(ix.data.length).toBe(8);
+    }
+  });
+
   it('void_season: authority signs, two accounts', () => {
     const ix = voidSeason({ authority: AUTHORITY, ordinal: 1 });
     assertDiscriminator(ix, 'void_season');
@@ -157,6 +173,21 @@ describe('vault instruction encoders', () => {
     // trader, season, entry, vault, system — entry and vault differ from all inputs.
     const addrs = entry.keys.map((k) => k.pubkey);
     expect(new Set(addrs).size).toBe(addrs.length);
+  });
+
+  it('the authority gateway derives its key and rejects a broken one', () => {
+    const seed = new Uint8Array(32).fill(3);
+    const secret = new Uint8Array(64);
+    secret.set(seed, 0);
+    secret.set(ed25519.getPublicKey(seed), 32);
+    const rpc = {} as never;
+
+    const gateway = new AuthorityGateway({ rpc, authoritySecret: secret });
+    expect(typeof gateway.authority).toBe('string');
+
+    expect(() => new AuthorityGateway({ rpc, authoritySecret: new Uint8Array(32) })).toThrow(VaultError);
+    const mismatched = new Uint8Array(64).fill(9);
+    expect(() => new AuthorityGateway({ rpc, authoritySecret: mismatched })).toThrow(/does not match itself/);
   });
 
   it('rejects an amount that does not fit its field', () => {
