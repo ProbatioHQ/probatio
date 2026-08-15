@@ -8,10 +8,9 @@ import {
   ensureFreePlaySeason,
   highestRankedOrdinal,
   openRankedSeason,
+  recordOnChainEntry,
   seasonByOrdinal,
   seasonTotals,
-  settlePayment,
-  createPaymentIntent,
   upsertUser,
 } from '../src/index';
 
@@ -166,26 +165,15 @@ describe('finding the season to show somebody', () => {
 
 describe('the pot', () => {
   async function enter(user: string, reference: string, seasonId: number): Promise<void> {
-    await createPaymentIntent(
-      harness.db,
-      {
-        reference,
-        userPubkey: user,
-        seasonId,
-        purpose: 'season_entry',
-        recipient: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-        amount: '50000000',
-        expiresAt: START + 600_000,
-      },
-      START,
-    );
-    await settlePayment(harness.db, {
-      reference,
-      txSignature: `sig-${reference}`,
-      userPubkey: user,
+    // A vault entry: the fee is recorded on the entry, which is what the pot is
+    // summed from, not a treasury payment.
+    await recordOnChainEntry(harness.db, {
       seasonId,
-      purpose: 'season_entry',
-      amount: '50000000',
+      userPubkey: user,
+      onchainEntryPubkey: `entry-${reference}`,
+      entryTxSignature: `sig-${reference}`,
+      paid: 50_000_000n,
+      evidence: { funder: null, walletFirstSeenAt: null, walletSignatureCount: null, flags: [] },
       now: START,
     });
   }
@@ -213,9 +201,10 @@ describe('the pot', () => {
     });
   });
 
-  it('is summed from payments rather than counted', async () => {
+  it('is summed from the fees on the entries, not counted', async () => {
     // A counter is a second source of truth that drifts the first time an
-    // increment is missed. This one decides what people are paid.
+    // increment is missed. This one decides what people are paid, so it is
+    // summed from the entries themselves. A stray payment row is irrelevant.
     const seasonId = await openSeason(1);
     await enter(PUBKEY, 'ref-1', seasonId);
 
@@ -225,7 +214,6 @@ describe('the pot', () => {
       args: [OTHER, seasonId, START],
     });
 
-    // Pending money is not in the pot.
     const totals = await seasonTotals(harness.db, seasonId);
     expect(totals.potLamports).toBe(50_000_000n);
   });

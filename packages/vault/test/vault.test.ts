@@ -228,14 +228,16 @@ describe('vault instruction encoders', () => {
   });
 
   it('decides the next lifecycle transition from status and the clock', () => {
-    const base = { entryOpensAtMs: 100, entryClosesAtMs: 200, nowMs: 150 };
+    const base = { entryOpensAtMs: 100, entryClosesAtMs: 200, endsAtMs: 300, nowMs: 150 };
     expect(nextSeasonTransition({ ...base, onChain: false, status: 'pending' })).toBe('init');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'pending' })).toBe('open_entries');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'pending', nowMs: 50 })).toBe('none');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'entry_open' })).toBe('none');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'entry_open', nowMs: 250 })).toBe('start_trading');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'running' })).toBe('none');
-    expect(nextSeasonTransition({ ...base, onChain: true, status: 'finalized' })).toBe('none');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'running', nowMs: 350 })).toBe('finalize');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'closed', nowMs: 350 })).toBe('finalize');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'finalized', nowMs: 350 })).toBe('none');
   });
 
   it('decodes an entry account and rejects a foreign one', () => {

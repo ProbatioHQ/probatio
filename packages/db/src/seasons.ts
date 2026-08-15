@@ -133,14 +133,16 @@ export async function seasonTotals(db: Client, seasonId: number): Promise<Season
     args: [seasonId],
   });
 
-  const payments = await db.execute({
-    sql: `SELECT amount FROM payments
-          WHERE season_id = ? AND purpose = 'season_entry' AND status = 'verified'`,
+  // The entry fees that were paid into the vault, read from the entries
+  // themselves. A vault entry records what it paid on the entry, not as a
+  // treasury payment, so this is what actually sits in the season's vault.
+  const paid = await db.execute({
+    sql: 'SELECT paid FROM entries WHERE season_id = ? AND paid IS NOT NULL',
     args: [seasonId],
   });
 
   let entries = 0n;
-  for (const row of payments.rows) entries += BigInt(String(row['amount']));
+  for (const row of paid.rows) entries += BigInt(String(row['paid']));
 
   const sponsored = await db.execute({
     sql: 'SELECT sponsor_lamports FROM seasons WHERE id = ?',

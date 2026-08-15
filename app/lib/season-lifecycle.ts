@@ -5,6 +5,7 @@ import { currentRankedSeason, seasonOnchainPubkey, setSeasonOnchain, setSeasonSt
 import { db } from './db';
 import { rpcEndpoint } from './env';
 import { authorityKeypair, keeperPublicKey, seasonParamsForRow } from './season-onchain';
+import { finalizeSeasonOnChain } from './season-finalize';
 
 /**
  * Puts a season on chain and walks it through its lifecycle.
@@ -60,6 +61,7 @@ export function startSeasonLifecycle(): void {
       status: season.status,
       entryOpensAtMs: season.entryOpensAt,
       entryClosesAtMs: season.entryClosesAt,
+      endsAtMs: season.endsAt,
       nowMs: now,
     });
     if (transition === 'none') return;
@@ -81,6 +83,9 @@ export function startSeasonLifecycle(): void {
         await gateway.startTrading(season.ordinal);
         await setSeasonStatus(client, { seasonId: season.id, status: 'running' });
         console.log(`[season] started trading for season ${season.ordinal}`);
+      } else if (transition === 'finalize') {
+        await finalizeSeasonOnChain(gateway, client, season, now);
+        console.log(`[season] finalized season ${season.ordinal}`);
       }
     } catch (error) {
       console.error(`[season] ${transition} for season ${season.ordinal} failed`, error);

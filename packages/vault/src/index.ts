@@ -235,23 +235,26 @@ export function seasonParamsFrom(input: {
 }
 
 /** The next on-chain transition a season is due, or none. */
-export type SeasonTransition = 'init' | 'open_entries' | 'start_trading' | 'none';
+export type SeasonTransition = 'init' | 'open_entries' | 'start_trading' | 'finalize' | 'none';
 
 /**
  * Which lifecycle step a season needs next, from its state and the clock.
  *
  * Off chain -> init. Pending past its entry-open time -> open entries. Entry
- * open past its close time -> start trading. Everything else waits. Finalizing
- * is decided elsewhere, against the season's end and its results.
+ * open past its close time -> start trading. Running or closed past its end ->
+ * finalize. Everything else waits. One step is taken per tick, so a season that
+ * is far behind catches up over a few ticks rather than all at once.
  */
 export function nextSeasonTransition(input: {
   readonly onChain: boolean;
   readonly status: string;
   readonly entryOpensAtMs: number | null;
   readonly entryClosesAtMs: number | null;
+  readonly endsAtMs: number | null;
   readonly nowMs: number;
 }): SeasonTransition {
   if (!input.onChain) return 'init';
+  const ended = input.endsAtMs !== null && input.nowMs >= input.endsAtMs;
   if (input.status === 'pending') {
     return input.entryOpensAtMs !== null && input.nowMs >= input.entryOpensAtMs
       ? 'open_entries'
@@ -261,6 +264,9 @@ export function nextSeasonTransition(input: {
     return input.entryClosesAtMs !== null && input.nowMs >= input.entryClosesAtMs
       ? 'start_trading'
       : 'none';
+  }
+  if (input.status === 'running' || input.status === 'closed') {
+    return ended ? 'finalize' : 'none';
   }
   return 'none';
 }
