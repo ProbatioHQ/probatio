@@ -1,9 +1,9 @@
 import 'server-only';
-import { readFileSync } from 'node:fs';
 import { RpcClient } from '@probatio/pools';
 import { Keeper, SolanaGateway, checkIdentity, runOnce } from '@probatio/keeper';
 import { db } from './db';
 import { rpcEndpoint } from './env';
+import { parseSecretKey } from './season-onchain';
 
 /**
  * The loop that puts records on chain.
@@ -26,11 +26,10 @@ function keeperSecret(): Uint8Array | null {
   if (!configured) return null;
 
   try {
-    // Accept the key either inline as a JSON array, for hosts with no
-    // persistent file to point at (Railway, Fly), or as a path to a keypair
-    // file. A value that begins with `[` is the array itself.
-    const json = configured.trim().startsWith('[') ? configured : readFileSync(configured, 'utf8');
-    return Uint8Array.from(JSON.parse(json) as number[]);
+    // Accept the key as a JSON array, a base58 string (as Phantom exports it),
+    // or a path to a keypair file — so a host with no persistent file can run
+    // it from a variable in whichever form the operator has.
+    return parseSecretKey(configured);
   } catch (error) {
     // A configured key that cannot be read is a misconfiguration, not an
     // absence, and silently falling back to committing nothing would look

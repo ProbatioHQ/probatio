@@ -20,12 +20,39 @@ export interface Keypair {
   readonly publicKey: string;
 }
 
+/**
+ * Read a Solana secret key from a configured value, in whatever shape it came.
+ *
+ * Three forms, so an operator does not have to convert anything: the raw byte
+ * array `[n, n, ...]` that `solana-keygen` writes, the base58 string Phantom
+ * gives when you export a private key, or a path to a keypair file. A base58
+ * seed of 32 bytes is expanded to the full keypair.
+ */
+export function parseSecretKey(configured: string): Uint8Array {
+  const trimmed = configured.trim();
+  if (trimmed.startsWith('[')) {
+    return Uint8Array.from(JSON.parse(trimmed) as number[]);
+  }
+  try {
+    const decoded = bs58.decode(trimmed);
+    if (decoded.length === 64) return decoded;
+    if (decoded.length === 32) {
+      const secret = new Uint8Array(64);
+      secret.set(decoded, 0);
+      secret.set(ed25519.getPublicKey(decoded), 32);
+      return secret;
+    }
+  } catch {
+    // Not base58; it must be a path to a keypair file.
+  }
+  return Uint8Array.from(JSON.parse(readFileSync(trimmed, 'utf8')) as number[]);
+}
+
 function loadKeypair(envVar: string): Keypair | null {
   const configured = process.env[envVar];
   if (!configured) return null;
   try {
-    const json = configured.trim().startsWith('[') ? configured : readFileSync(configured, 'utf8');
-    const secret = Uint8Array.from(JSON.parse(json) as number[]);
+    const secret = parseSecretKey(configured);
     if (secret.length !== 64) {
       console.error(`[onchain] ${envVar} is not a 64-byte keypair`);
       return null;
