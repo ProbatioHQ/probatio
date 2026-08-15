@@ -190,5 +190,17 @@ export type {
   TradeWrite,
 } from './trading';
 
+export {
+  claimData,
+  markEntryClaimed,
+  markEntryRefunded,
+  markSeasonVoided,
+  recordFinalization,
+  recordOnChainEntry,
+  setSeasonOnchain,
+  setSeasonStatus,
+} from './payout';
+export type { ClaimData, FinalizedEntry, SeasonLifecycle } from './payout';
+
 export { createTestDatabase } from './testing';
 export type { TestDatabase } from './testing';

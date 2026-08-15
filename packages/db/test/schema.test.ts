@@ -121,6 +121,7 @@ describe('migrations', () => {
       '018_session_epoch.sql',
       '019_practice_purchases.sql',
       '020_snapshot_deliverable_tokens.sql',
+      '021_payout_engine.sql',
     ]);
   });
 
