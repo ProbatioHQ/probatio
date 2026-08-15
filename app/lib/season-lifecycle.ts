@@ -68,6 +68,9 @@ export function startSeasonLifecycle(): void {
 
     try {
       if (transition === 'init') {
+        // The admin has to be named before a season can be created. This
+        // authority is the admin; a config that already exists is left alone.
+        await gateway.initConfig(gateway.authority).catch(() => undefined);
         const params = seasonParamsForRow(season, keeper);
         await gateway.createSeason(params);
         await setSeasonOnchain(client, {

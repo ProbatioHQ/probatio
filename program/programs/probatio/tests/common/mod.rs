@@ -18,6 +18,7 @@ pub use probatio::state::{Entry, Season, SeasonStatus, TraderRecord};
 
 pub const SEASON_SEED: &[u8] = b"season";
 pub const VAULT_SEED: &[u8] = b"vault";
+pub const CONFIG_SEED: &[u8] = b"config";
 pub const ENTRY_SEED: &[u8] = b"entry";
 pub const RECORD_SEED: &[u8] = b"record";
 
@@ -66,12 +67,38 @@ impl Harness {
         svm.airdrop(&authority.pubkey(), 100_000_000_000).unwrap();
         svm.airdrop(&keeper.pubkey(), 100_000_000_000).unwrap();
 
-        Self {
+        let mut harness = Self {
             svm,
             program_id,
             authority,
             keeper,
-        }
+        };
+        // The admin has to exist before a season can be created; the authority
+        // is the admin in the tests.
+        harness.init_config().expect("init_config");
+        harness
+    }
+
+    pub fn config_pda(&self) -> Pubkey {
+        Pubkey::find_program_address(&[CONFIG_SEED], &self.program_id).0
+    }
+
+    pub fn init_config(&mut self) -> Result<(), FailedTransactionMetadata> {
+        let config = self.config_pda();
+        let admin = self.authority.pubkey();
+        let instruction = Instruction::new_with_bytes(
+            self.program_id,
+            &probatio::instruction::InitConfig { admin }.data(),
+            probatio::accounts::InitConfig {
+                payer: self.authority.pubkey(),
+                config,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        );
+        let authority = self.authority.insecure_clone();
+        self.send(instruction, &[&authority], &authority.pubkey())?;
+        Ok(())
     }
 
     /// Move the validator's clock.
@@ -155,6 +182,7 @@ impl Harness {
                 authority: self.authority.pubkey(),
                 season,
                 vault,
+                config: self.config_pda(),
                 system_program: system_program::ID,
             }
             .to_account_metas(None),

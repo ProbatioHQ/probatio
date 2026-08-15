@@ -48,5 +48,11 @@ pub fn handle_finalize_season(ctx: Context<FinalizeSeason>, results_root: [u8; 3
     season.finalized_at = now;
     season.status = SeasonStatus::Finalized;
 
+    // The pot is all there is to award. Each claim draws this down, so total
+    // payouts can never exceed what the entrants paid in, whatever a results
+    // root might say — the authority can misallocate a fixed pot, but cannot
+    // conjure lamports that were never entered.
+    season.awardable = season.pot_lamports;
+
     Ok(())
 }

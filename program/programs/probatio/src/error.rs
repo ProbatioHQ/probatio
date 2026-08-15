@@ -66,4 +66,6 @@ pub enum ProbatioError {
     SeasonAlreadyVoided,
     #[msg("this entry paid nothing, so there is nothing to refund")]
     NothingToRefund,
+    #[msg("the season has already awarded its whole pot")]
+    OverAllocated,
 }

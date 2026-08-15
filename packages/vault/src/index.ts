@@ -35,6 +35,7 @@ export const SYSTEM_PROGRAM_ID = '11111111111111111111111111111111';
 const SEASON_SEED = new TextEncoder().encode('season');
 const VAULT_SEED = new TextEncoder().encode('vault');
 const ENTRY_SEED = new TextEncoder().encode('entry');
+const CONFIG_SEED = new TextEncoder().encode('config');
 
 /** Anchor names an instruction by the first eight bytes of `sha256("global:<name>")`. */
 export function anchorDiscriminator(name: string): Uint8Array {
@@ -148,6 +149,11 @@ export function vaultAddress(season: string, programId = PROGRAM_ID): DerivedAdd
 /** A trader's entry in a season. Seeds `["entry", season, trader]`, one per trader. */
 export function entryAddress(season: string, trader: string, programId = PROGRAM_ID): DerivedAddress {
   return findProgramAddress([ENTRY_SEED, pubkeyBytes(season), pubkeyBytes(trader)], programId);
+}
+
+/** The config singleton that names the admin. Seeds `["config"]`. */
+export function configAddress(programId = PROGRAM_ID): DerivedAddress {
+  return findProgramAddress([CONFIG_SEED], programId);
 }
 
 // --------------------------------------------------------------------------
@@ -271,12 +277,28 @@ export function nextSeasonTransition(input: {
   return 'none';
 }
 
+/** `init_config`: names the admin who may create seasons. Called once. */
+export function initConfig(input: { readonly payer: string; readonly admin: string; readonly programId?: string }): Instruction {
+  const programId = input.programId ?? PROGRAM_ID;
+  const config = configAddress(programId).address;
+  return {
+    programId,
+    keys: [
+      { pubkey: input.payer, isSigner: true, isWritable: true },
+      { pubkey: config, isSigner: false, isWritable: true },
+      system,
+    ],
+    data: concat(anchorDiscriminator('init_config'), pubkeyBytes(input.admin)),
+  };
+}
+
 /** `init_season`: creates the Season and its vault. Signed and paid by the authority. */
 export function initSeason(input: { readonly authority: string; readonly params: SeasonParams; readonly programId?: string }): Instruction {
   const programId = input.programId ?? PROGRAM_ID;
   const p = input.params;
   const season = seasonAddress(p.ordinal, programId).address;
   const vault = vaultAddress(season, programId).address;
+  const config = configAddress(programId).address;
   const data = concat(
     anchorDiscriminator('init_season'),
     i16(p.ordinal),
@@ -300,6 +322,7 @@ export function initSeason(input: { readonly authority: string; readonly params:
       { pubkey: input.authority, isSigner: true, isWritable: true },
       { pubkey: season, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: config, isSigner: false, isWritable: false },
       system,
     ],
     data,

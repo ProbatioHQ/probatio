@@ -25,6 +25,11 @@ declare_id!("HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA");
 pub mod probatio {
     use super::*;
 
+    /// Set who may create seasons. Called once, when the program is stood up.
+    pub fn init_config(ctx: Context<InitConfig>, admin: Pubkey) -> Result<()> {
+        instructions::init_config::handle_init_config(ctx, admin)
+    }
+
     /// Create a season and fix its conditions before anyone can enter it.
     pub fn init_season(ctx: Context<InitSeason>, params: SeasonParams) -> Result<()> {
         instructions::init_season::handle_init_season(ctx, params)

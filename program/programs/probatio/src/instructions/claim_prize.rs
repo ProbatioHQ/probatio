@@ -114,6 +114,15 @@ pub fn handle_claim_prize(
 
     let payout = u64::try_from(claim.payout_lamports).map_err(|_| ProbatioError::InvalidClaim)?;
 
+    // The season's own budget, set to the pot at finalization. Total payouts
+    // cannot exceed it, so a root that awarded more than was entered cannot be
+    // paid past the pot — the last over-claim fails here rather than draining
+    // the vault down to its rent.
+    require!(
+        ctx.accounts.season.awardable >= payout,
+        ProbatioError::OverAllocated
+    );
+
     // The vault must keep enough to stay rent exempt, or paying the last
     // winner would close the account and strand anything left in it.
     let rent = Rent::get()?.minimum_balance(0);
@@ -138,6 +147,10 @@ pub fn handle_claim_prize(
         ),
         payout,
     )?;
+
+    // Drawn down after the transfer, so the budget always reflects what has
+    // actually left the vault.
+    ctx.accounts.season.awardable = ctx.accounts.season.awardable.saturating_sub(payout);
 
     // Marked before returning, so a second proof for the same entry finds it
     // already paid. The entry account is the record of that, not a counter.

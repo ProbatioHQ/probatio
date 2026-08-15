@@ -246,6 +246,58 @@
       ]
     },
     {
+      "name": "init_config",
+      "docs": [
+        "Set who may create seasons. Called once, when the program is stood up."
+      ],
+      "discriminator": [
+        23,
+        235,
+        115,
+        232,
+        168,
+        96,
+        1,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "init_season",
       "docs": [
         "Create a season and fix its conditions before anyone can enter it."
@@ -311,6 +363,29 @@
               {
                 "kind": "account",
                 "path": "season"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "docs": [
+            "Only the admin may create a season. Without this, an ordinal-seeded",
+            "season was open to anyone; now the authority creating it has to be the",
+            "one admin the program was set up with."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -620,6 +695,19 @@
   ],
   "accounts": [
     {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
       "name": "Entry",
       "discriminator": [
         63,
@@ -789,9 +877,39 @@
       "code": 6025,
       "name": "NothingToRefund",
       "msg": "this entry paid nothing, so there is nothing to refund"
+    },
+    {
+      "code": 6026,
+      "name": "OverAllocated",
+      "msg": "the season has already awarded its whole pot"
     }
   ],
   "types": [
+    {
+      "name": "Config",
+      "docs": [
+        "The one account that says who may create seasons.",
+        "",
+        "A singleton at a fixed address, set once. Without it, `init_season` was open",
+        "to anyone: the season address is derived from its ordinal alone, so a",
+        "stranger could stand up a rogue season at an ordinal and take fees under the",
+        "program's name. Requiring the admin closes that — only the operator names a",
+        "season into existence."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "Entry",
       "docs": [
@@ -1026,6 +1144,17 @@
               "When the season was declared void. Zero unless it was."
             ],
             "type": "i64"
+          },
+          {
+            "name": "awardable",
+            "docs": [
+              "The lamports still available to award, set to the pot at finalization and",
+              "drawn down by each claim. The program's own cap on total payouts: even a",
+              "results root that tried to award more than the entrants paid in cannot be",
+              "paid past this, so a mis-built root cannot mint money, only misallocate a",
+              "fixed pot among those who entered."
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",

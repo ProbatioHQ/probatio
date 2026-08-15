@@ -120,6 +120,12 @@ async function main(): Promise<void> {
   await airdrop(trader.publicKey, 2_000_000_000);
 
   const gateway = new AuthorityGateway({ rpc, authoritySecret: authority.secret });
+
+  // The admin has to exist before any season can be created. The authority is
+  // the admin here.
+  await gateway.initConfig(authority.publicKey);
+  console.log('  init_config ok (admin set)');
+
   const ordinal = 1;
   const ruleset = rulesetFor(ordinal);
   const nowSec = await onChainSeconds();

@@ -67,6 +67,13 @@ pub struct Season {
     /// When the season was declared void. Zero unless it was.
     pub voided_at: i64,
 
+    /// The lamports still available to award, set to the pot at finalization and
+    /// drawn down by each claim. The program's own cap on total payouts: even a
+    /// results root that tried to award more than the entrants paid in cannot be
+    /// paid past this, so a mis-built root cannot mint money, only misallocate a
+    /// fixed pot among those who entered.
+    pub awardable: u64,
+
     pub bump: u8,
     pub vault_bump: u8,
 }
@@ -124,3 +131,18 @@ pub const SEASON_SEED: &[u8] = b"season";
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const ENTRY_SEED: &[u8] = b"entry";
 pub const RECORD_SEED: &[u8] = b"record";
+pub const CONFIG_SEED: &[u8] = b"config";
+
+/// The one account that says who may create seasons.
+///
+/// A singleton at a fixed address, set once. Without it, `init_season` was open
+/// to anyone: the season address is derived from its ordinal alone, so a
+/// stranger could stand up a rogue season at an ordinal and take fees under the
+/// program's name. Requiring the admin closes that — only the operator names a
+/// season into existence.
+#[account]
+#[derive(InitSpace)]
+pub struct Config {
+    pub admin: Pubkey,
+    pub bump: u8,
+}

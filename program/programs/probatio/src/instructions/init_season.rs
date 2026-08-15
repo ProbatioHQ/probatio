@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::constants::MAX_BPS;
 use crate::error::ProbatioError;
-use crate::state::{Season, SeasonStatus, SEASON_SEED, VAULT_SEED};
+use crate::state::{Config, Season, SeasonStatus, CONFIG_SEED, SEASON_SEED, VAULT_SEED};
 
 /// Everything that could change a result, fixed before anyone trades.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -47,6 +47,16 @@ pub struct InitSeason<'info> {
     )]
     pub vault: SystemAccount<'info>,
 
+    /// Only the admin may create a season. Without this, an ordinal-seeded
+    /// season was open to anyone; now the authority creating it has to be the
+    /// one admin the program was set up with.
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump = config.bump,
+        constraint = config.admin == authority.key() @ ProbatioError::NotAuthority,
+    )]
+    pub config: Account<'info, Config>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -84,6 +94,8 @@ pub fn handle_init_season(ctx: Context<InitSeason>, params: SeasonParams) -> Res
     season.pot_lamports = 0;
     season.results_root = [0u8; 32];
     season.finalized_at = 0;
+    season.voided_at = 0;
+    season.awardable = 0;
 
     season.bump = ctx.bumps.season;
     season.vault_bump = ctx.bumps.vault;

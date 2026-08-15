@@ -6,6 +6,7 @@ import {
   PROGRAM_ID,
   VaultError,
   finalizeSeason,
+  initConfig,
   initSeason,
   openEntries,
   startTrading,
@@ -92,6 +93,11 @@ export class AuthorityGateway {
       );
     }
     return { signature: sent, slot: settled.slot ?? 0 };
+  }
+
+  /** Name the admin who may create seasons. Called once, when standing up. */
+  initConfig(admin: string): Promise<AuthorityReceipt> {
+    return this.#send(initConfig({ payer: this.#public, admin, programId: this.#programId }));
   }
 
   /** Create the season and its vault on chain. Pays the vault's rent. */

@@ -11,7 +11,9 @@ import {
   anchorDiscriminator,
   decodeEntry,
   claimPrize,
+  configAddress,
   finalizeSeason,
+  initConfig,
   initSeason,
   nextSeasonTransition,
   openEntries,
@@ -96,10 +98,22 @@ describe('vault instruction encoders', () => {
     expect(PROGRAM_ID).toBe(idl.address);
   });
 
+  it('init_config: discriminator, accounts, and a pubkey admin arg', () => {
+    const ix = initConfig({ payer: AUTHORITY, admin: TRADER });
+    assertDiscriminator(ix, 'init_config');
+    assertAccounts(ix, 'init_config');
+    expect(ix.data.length).toBe(8 + 32);
+    expect(bs58.encode(ix.data.subarray(8, 40))).toBe(TRADER); // the admin pubkey
+    // The config account init_season checks is the same singleton.
+    expect(ix.keys[1]!.pubkey).toBe(configAddress().address);
+  });
+
   it('init_season: discriminator, accounts, and a 128-byte SeasonParams', () => {
     const ix = initSeason({ authority: AUTHORITY, params });
     assertDiscriminator(ix, 'init_season');
     assertAccounts(ix, 'init_season');
+    // config is the fourth account, before the system program.
+    expect(ix.keys[3]!.pubkey).toBe(configAddress().address);
     // 8 discriminator + SeasonParams. Decode a few fields back to be sure of the layout.
     expect(ix.data.length).toBe(8 + 128);
     const view = new DataView(ix.data.buffer, ix.data.byteOffset);
