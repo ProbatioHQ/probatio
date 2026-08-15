@@ -1,0 +1,1081 @@
+{
+  "address": "HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA",
+  "metadata": {
+    "name": "probatio",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Season conditions and unfakeable trade records for Probatio"
+  },
+  "docs": [
+    "Probatio's on-chain half.",
+    "",
+    "It holds two things a database cannot be trusted with: the conditions a",
+    "season ran under, and a commitment to every trade made inside it.",
+    "",
+    "The trades themselves are not here. A hash chain per trader commits to all",
+    "of them in thirty-two bytes, which anyone holding the trade data can replay",
+    "and check. What that buys is the one property the whole project rests on —",
+    "a record cannot be edited after the fact, because every later value in the",
+    "chain was already witnessed on chain at the time."
+  ],
+  "instructions": [
+    {
+      "name": "claim_prize",
+      "docs": [
+        "Take a prize out of the vault, against the published results."
+      ],
+      "discriminator": [
+        157,
+        233,
+        139,
+        121,
+        246,
+        62,
+        234,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone may pay the transaction, but the money goes to the trader named",
+            "in the entry and nowhere else."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "season",
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "entry",
+          "docs": [
+            "Proves the claimant entered this season, and records that they were",
+            "paid. Its address derives from the season and the trader, so it cannot",
+            "belong to a different season."
+          ],
+          "writable": true
+        },
+        {
+          "name": "trader",
+          "docs": [
+            "paid, and requiring their signature would strand a prize behind a lost",
+            "key."
+          ],
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "season"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "claim",
+          "type": {
+            "defined": {
+              "name": "ResultClaim"
+            }
+          }
+        },
+        {
+          "name": "proof",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "ProofStep"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "commit_root",
+      "docs": [
+        "Append a batch of trades to a trader's record."
+      ],
+      "discriminator": [
+        142,
+        242,
+        81,
+        248,
+        39,
+        238,
+        194,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "season"
+          ]
+        },
+        {
+          "name": "season"
+        },
+        {
+          "name": "trader",
+          "docs": [
+            "written to — the trader does not have to be online for their own",
+            "trades to be committed."
+          ]
+        },
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "season"
+              },
+              {
+                "kind": "account",
+                "path": "trader"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "batch_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "leaves",
+          "type": "u32"
+        },
+        {
+          "name": "engine_version",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "finalize_season",
+      "docs": [
+        "Publish the results and close the season permanently."
+      ],
+      "discriminator": [
+        183,
+        221,
+        183,
+        7,
+        73,
+        215,
+        158,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "season"
+          ]
+        },
+        {
+          "name": "season",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "results_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_season",
+      "docs": [
+        "Create a season and fix its conditions before anyone can enter it."
+      ],
+      "discriminator": [
+        179,
+        47,
+        101,
+        197,
+        114,
+        97,
+        174,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "season",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  115,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "params.ordinal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Holds entry fees until the season pays out. A bare system account, so",
+            "the program owns no token logic it does not need."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "season"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "SeasonParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_entries",
+      "docs": [
+        "Begin accepting entries."
+      ],
+      "discriminator": [
+        253,
+        125,
+        46,
+        55,
+        66,
+        97,
+        249,
+        105
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "season"
+          ]
+        },
+        {
+          "name": "season",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_entry",
+      "docs": [
+        "Pay to enter a ranked season."
+      ],
+      "discriminator": [
+        10,
+        83,
+        123,
+        171,
+        173,
+        192,
+        240,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "trader",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "season",
+          "writable": true
+        },
+        {
+          "name": "entry",
+          "docs": [
+            "Deriving this from the season and the trader is what enforces one entry",
+            "each — the chain refuses a second, so there is no counter to get wrong",
+            "and no race to lose."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  110,
+                  116,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "season"
+              },
+              {
+                "kind": "account",
+                "path": "trader"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "season"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_keeper",
+      "docs": [
+        "Replace the keeper key."
+      ],
+      "discriminator": [
+        102,
+        94,
+        23,
+        78,
+        157,
+        222,
+        243,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "season"
+          ]
+        },
+        {
+          "name": "season",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "keeper",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "start_trading",
+      "docs": [
+        "Close the entry window and fix the cohort."
+      ],
+      "discriminator": [
+        92,
+        94,
+        243,
+        100,
+        155,
+        170,
+        217,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "season"
+          ]
+        },
+        {
+          "name": "season",
+          "writable": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Entry",
+      "discriminator": [
+        63,
+        18,
+        152,
+        113,
+        215,
+        246,
+        221,
+        250
+      ]
+    },
+    {
+      "name": "Season",
+      "discriminator": [
+        76,
+        67,
+        93,
+        156,
+        180,
+        157,
+        248,
+        47
+      ]
+    },
+    {
+      "name": "TraderRecord",
+      "discriminator": [
+        249,
+        21,
+        148,
+        81,
+        181,
+        162,
+        173,
+        151
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "EntriesClosed",
+      "msg": "this season is not accepting entries"
+    },
+    {
+      "code": 6001,
+      "name": "EntryWindowPassed",
+      "msg": "the entry window for this season has passed"
+    },
+    {
+      "code": 6002,
+      "name": "SeasonFinalized",
+      "msg": "this season has been finalized and cannot be changed"
+    },
+    {
+      "code": 6003,
+      "name": "NotKeeper",
+      "msg": "only the season keeper may commit trade records"
+    },
+    {
+      "code": 6004,
+      "name": "NotAuthority",
+      "msg": "only the season authority may do this"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidStatusTransition",
+      "msg": "a season cannot move backwards through its lifecycle"
+    },
+    {
+      "code": 6006,
+      "name": "EmptyCommit",
+      "msg": "a commit must contain at least one trade"
+    },
+    {
+      "code": 6007,
+      "name": "FreePlayTakesNoEntries",
+      "msg": "free play has no entry cost and takes no entries"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidSchedule",
+      "msg": "the season's end must come after its start"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidBasisPoints",
+      "msg": "basis points cannot exceed 10000"
+    },
+    {
+      "code": 6010,
+      "name": "EmptyResultsRoot",
+      "msg": "the results root cannot be empty"
+    },
+    {
+      "code": 6011,
+      "name": "NotEntered",
+      "msg": "this trader did not enter this season"
+    },
+    {
+      "code": 6012,
+      "name": "SeasonNotFinalized",
+      "msg": "the season has not been finalized"
+    },
+    {
+      "code": 6013,
+      "name": "EntrySeasonMismatch",
+      "msg": "this entry belongs to a different season"
+    },
+    {
+      "code": 6014,
+      "name": "EntryTraderMismatch",
+      "msg": "this entry belongs to a different trader"
+    },
+    {
+      "code": 6015,
+      "name": "AlreadyClaimed",
+      "msg": "this prize has already been claimed"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidClaim",
+      "msg": "the claim is not well formed"
+    },
+    {
+      "code": 6017,
+      "name": "NothingToClaim",
+      "msg": "this result was not awarded a prize"
+    },
+    {
+      "code": 6018,
+      "name": "ProofTooLong",
+      "msg": "the proof is longer than any real tree"
+    },
+    {
+      "code": 6019,
+      "name": "ProofDoesNotMatchResults",
+      "msg": "the proof does not lead to the published results root"
+    },
+    {
+      "code": 6020,
+      "name": "VaultUnderfunded",
+      "msg": "the vault does not hold enough to pay this claim"
+    },
+    {
+      "code": 6021,
+      "name": "SeasonNotOver",
+      "msg": "the season has not ended yet"
+    },
+    {
+      "code": 6022,
+      "name": "EntryWindowStillOpen",
+      "msg": "the entry window has not closed yet"
+    }
+  ],
+  "types": [
+    {
+      "name": "Entry",
+      "docs": [
+        "One trader's registration in one season.",
+        "",
+        "Its address derives from the season and the trader, so the chain enforces",
+        "one entry each — there is no counter to get wrong and no race to lose."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "season",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "paid",
+            "type": "u64"
+          },
+          {
+            "name": "entered_at",
+            "type": "i64"
+          },
+          {
+            "name": "claimed",
+            "docs": [
+              "Set when a prize has been taken. The entry is the record that it was",
+              "paid, so a second proof for the same trader finds it already claimed."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "claimed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProofStep",
+      "docs": [
+        "One step of a merkle path."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sibling",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sibling_on_left",
+            "docs": [
+              "True when the sibling sits on the left. Order matters to the hash."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResultClaim",
+      "docs": [
+        "What a trader claims they finished with."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rank",
+            "type": "u32"
+          },
+          {
+            "name": "starting_balance",
+            "type": "u128"
+          },
+          {
+            "name": "final_equity",
+            "type": "u128"
+          },
+          {
+            "name": "return_bps",
+            "type": "i32"
+          },
+          {
+            "name": "trade_count",
+            "type": "u32"
+          },
+          {
+            "name": "payout_lamports",
+            "type": "u128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Season",
+      "docs": [
+        "A season, and every condition that could change a result.",
+        "",
+        "The conditions live on chain rather than only in a database because the",
+        "claim being made is not merely \"these trades happened\" but \"these trades",
+        "happened under these rules\". Without the rules recorded, anyone can say the",
+        "latency or the fee schedule moved partway through and there is no answer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ordinal",
+            "docs": [
+              "-1 is free play: unranked, no entry cost, no end."
+            ],
+            "type": "i16"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "May create and finalize the season."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper",
+            "docs": [
+              "May append trade commitments. A hot key, deliberately separated from",
+              "the authority so a compromise cannot also rewrite the season's rules."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "SeasonStatus"
+              }
+            }
+          },
+          {
+            "name": "starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "entry_closes_at",
+            "type": "i64"
+          },
+          {
+            "name": "starting_balance",
+            "type": "u64"
+          },
+          {
+            "name": "entry_cost",
+            "type": "u64"
+          },
+          {
+            "name": "house_bps",
+            "type": "u16"
+          },
+          {
+            "name": "house_threshold",
+            "type": "u64"
+          },
+          {
+            "name": "latency_ms",
+            "type": "u32"
+          },
+          {
+            "name": "slippage_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_price_impact_bps",
+            "type": "u16"
+          },
+          {
+            "name": "engine_version",
+            "type": "u32"
+          },
+          {
+            "name": "scoring_formula_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "entry_count",
+            "type": "u32"
+          },
+          {
+            "name": "pot_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "results_root",
+            "docs": [
+              "Merkle root of the final rankings. Zero until finalized."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finalized_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeasonParams",
+      "docs": [
+        "Everything that could change a result, fixed before anyone trades."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ordinal",
+            "type": "i16"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "entry_closes_at",
+            "type": "i64"
+          },
+          {
+            "name": "starting_balance",
+            "type": "u64"
+          },
+          {
+            "name": "entry_cost",
+            "type": "u64"
+          },
+          {
+            "name": "house_bps",
+            "type": "u16"
+          },
+          {
+            "name": "house_threshold",
+            "type": "u64"
+          },
+          {
+            "name": "latency_ms",
+            "type": "u32"
+          },
+          {
+            "name": "slippage_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_price_impact_bps",
+            "type": "u16"
+          },
+          {
+            "name": "engine_version",
+            "type": "u32"
+          },
+          {
+            "name": "scoring_formula_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeasonStatus",
+      "docs": [
+        "Where a season is in its life.",
+        "",
+        "The order matters: a season only moves forward, and `Finalized` is",
+        "terminal. Nothing may be committed to a finalized season, or a record could",
+        "be altered after the results that depend on it were published."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "EntryOpen"
+          },
+          {
+            "name": "Running"
+          },
+          {
+            "name": "Closed"
+          },
+          {
+            "name": "Finalized"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TraderRecord",
+      "docs": [
+        "A trader's committed trade history for one season.",
+        "",
+        "`accumulator` is a hash chain, not a list. Each commit folds the new batch",
+        "into it:",
+        "",
+        "```text",
+        "accumulator = sha256(accumulator || batch_root || leaves || engine_version)",
+        "```",
+        "",
+        "That commits to every batch ever made, in order, in thirty-two bytes. A",
+        "list would grow without bound and cost rent forever; a single latest root",
+        "would let history be quietly replaced. The chain can only be extended,",
+        "because changing any earlier batch changes every value after it, and those",
+        "were already witnessed on chain at the time.",
+        "",
+        "The engine version is folded in rather than stored separately, so a batch",
+        "stays checkable against the rules that were in force when it was written —",
+        "even if the engine changed mid-season."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "season",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "accumulator",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "commit_count",
+            "type": "u32"
+          },
+          {
+            "name": "leaf_count",
+            "type": "u64"
+          },
+          {
+            "name": "first_committed_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_committed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

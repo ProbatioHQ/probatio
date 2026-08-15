@@ -31,7 +31,7 @@ function hex(bytes: Uint8Array): string {
  * transaction with an opaque error, on a cluster, after paying a fee.
  */
 const idl = JSON.parse(
-  readFileSync(new URL('../../../program/target/idl/probatio.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../program/idl/probatio.json', import.meta.url), 'utf8'),
 ) as {
   address: string;
   instructions: {
