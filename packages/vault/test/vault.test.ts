@@ -10,9 +10,12 @@ import {
   claimPrize,
   finalizeSeason,
   initSeason,
+  nextSeasonTransition,
   openEntries,
   recordEntry,
   refundEntry,
+  seasonParamsFrom,
+  secondsFromMs,
   startTrading,
   voidSeason,
   type SeasonParams,
@@ -188,6 +191,48 @@ describe('vault instruction encoders', () => {
     expect(() => new AuthorityGateway({ rpc, authoritySecret: new Uint8Array(32) })).toThrow(VaultError);
     const mismatched = new Uint8Array(64).fill(9);
     expect(() => new AuthorityGateway({ rpc, authoritySecret: mismatched })).toThrow(/does not match itself/);
+  });
+
+  it('converts milliseconds to the seconds the program clock uses', () => {
+    expect(secondsFromMs(1_700_000_500_000)).toBe(1_700_000_500n);
+    expect(secondsFromMs(1_699)).toBe(1n); // sub-second floors, not rounds
+    // A ms value fed to the program as-is would land ~50,000 years out.
+    expect(secondsFromMs(1_700_000_000_000)).toBeLessThan(2_000_000_000n);
+  });
+
+  it('assembles SeasonParams with seconds and the published hash', () => {
+    const p = seasonParamsFrom({
+      ordinal: 1,
+      keeper: AUTHORITY,
+      startsAtMs: 1_700_000_000_000,
+      endsAtMs: 1_700_600_000_000,
+      entryClosesAtMs: 1_700_300_000_000,
+      startingBalance: 10_000_000_000n,
+      entryCost: 50_000_000n,
+      houseBps: 1000,
+      houseThreshold: 0n,
+      latencyMs: 600,
+      slippageBps: 50,
+      maxPriceImpactBps: 5000,
+      engineVersion: 1,
+      scoringFormulaHashHex: '07'.repeat(32),
+    });
+    expect(p.startsAt).toBe(1_700_000_000n);
+    expect(p.entryCost).toBe(50_000_000n);
+    expect(p.scoringFormulaHash).toEqual(new Uint8Array(32).fill(7));
+    // And it encodes without error through the instruction.
+    expect(initSeason({ authority: AUTHORITY, params: p }).data.length).toBe(8 + 128);
+  });
+
+  it('decides the next lifecycle transition from status and the clock', () => {
+    const base = { entryOpensAtMs: 100, entryClosesAtMs: 200, nowMs: 150 };
+    expect(nextSeasonTransition({ ...base, onChain: false, status: 'pending' })).toBe('init');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'pending' })).toBe('open_entries');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'pending', nowMs: 50 })).toBe('none');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'entry_open' })).toBe('none');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'entry_open', nowMs: 250 })).toBe('start_trading');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'running' })).toBe('none');
+    expect(nextSeasonTransition({ ...base, onChain: true, status: 'finalized' })).toBe('none');
   });
 
   it('rejects an amount that does not fit its field', () => {

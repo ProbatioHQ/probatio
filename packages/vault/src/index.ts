@@ -162,6 +162,100 @@ export interface SeasonParams {
   readonly scoringFormulaHash: Uint8Array;
 }
 
+function hexToBytes32(hex: string, what: string): Uint8Array {
+  if (hex.length !== 64 || !/^[0-9a-f]+$/i.test(hex)) {
+    throw new VaultError(`${what} must be 32 bytes of hex, got "${hex}"`);
+  }
+  const bytes = new Uint8Array(32);
+  for (let i = 0; i < 32; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
+}
+
+/**
+ * Seconds since the epoch, which is the unit the program's clock speaks.
+ *
+ * The database keeps milliseconds; the program compares against
+ * `Clock::unix_timestamp`, which is seconds. Sending milliseconds would put
+ * entry deadlines and the season end thousands of years out — this is the seam
+ * where that is caught.
+ */
+export function secondsFromMs(ms: number): bigint {
+  if (!Number.isFinite(ms)) throw new VaultError(`not a timestamp: ${ms}`);
+  return BigInt(Math.floor(ms / 1000));
+}
+
+/**
+ * Assemble `SeasonParams` from the season's stored values and its ruleset.
+ *
+ * Timestamps arrive as milliseconds and leave as seconds. The scoring hash is
+ * the one the season already published, so the on-chain season matches what
+ * verifiers and finalization expect rather than whatever today's rules hash to.
+ */
+export function seasonParamsFrom(input: {
+  readonly ordinal: number;
+  readonly keeper: string;
+  readonly startsAtMs: number;
+  readonly endsAtMs: number;
+  readonly entryClosesAtMs: number;
+  readonly startingBalance: bigint;
+  readonly entryCost: bigint;
+  readonly houseBps: number;
+  readonly houseThreshold: bigint;
+  readonly latencyMs: number;
+  readonly slippageBps: number;
+  readonly maxPriceImpactBps: number;
+  readonly engineVersion: number;
+  readonly scoringFormulaHashHex: string;
+}): SeasonParams {
+  return {
+    ordinal: input.ordinal,
+    keeper: input.keeper,
+    startsAt: secondsFromMs(input.startsAtMs),
+    endsAt: secondsFromMs(input.endsAtMs),
+    entryClosesAt: secondsFromMs(input.entryClosesAtMs),
+    startingBalance: input.startingBalance,
+    entryCost: input.entryCost,
+    houseBps: input.houseBps,
+    houseThreshold: input.houseThreshold,
+    latencyMs: input.latencyMs,
+    slippageBps: input.slippageBps,
+    maxPriceImpactBps: input.maxPriceImpactBps,
+    engineVersion: input.engineVersion,
+    scoringFormulaHash: hexToBytes32(input.scoringFormulaHashHex, 'scoring formula hash'),
+  };
+}
+
+/** The next on-chain transition a season is due, or none. */
+export type SeasonTransition = 'init' | 'open_entries' | 'start_trading' | 'none';
+
+/**
+ * Which lifecycle step a season needs next, from its state and the clock.
+ *
+ * Off chain -> init. Pending past its entry-open time -> open entries. Entry
+ * open past its close time -> start trading. Everything else waits. Finalizing
+ * is decided elsewhere, against the season's end and its results.
+ */
+export function nextSeasonTransition(input: {
+  readonly onChain: boolean;
+  readonly status: string;
+  readonly entryOpensAtMs: number | null;
+  readonly entryClosesAtMs: number | null;
+  readonly nowMs: number;
+}): SeasonTransition {
+  if (!input.onChain) return 'init';
+  if (input.status === 'pending') {
+    return input.entryOpensAtMs !== null && input.nowMs >= input.entryOpensAtMs
+      ? 'open_entries'
+      : 'none';
+  }
+  if (input.status === 'entry_open') {
+    return input.entryClosesAtMs !== null && input.nowMs >= input.entryClosesAtMs
+      ? 'start_trading'
+      : 'none';
+  }
+  return 'none';
+}
+
 /** `init_season`: creates the Season and its vault. Signed and paid by the authority. */
 export function initSeason(input: { readonly authority: string; readonly params: SeasonParams; readonly programId?: string }): Instruction {
   const programId = input.programId ?? PROGRAM_ID;

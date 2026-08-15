@@ -61,6 +61,11 @@ export async function register(): Promise<void> {
   const { startKeeper } = await import('./lib/keeper');
   safely('keeper', startKeeper);
 
+  // Creates ranked seasons on chain and walks them through their lifecycle, so
+  // entries have a vault to pay into. Does nothing without an authority key.
+  const { startSeasonLifecycle } = await import('./lib/season-lifecycle');
+  safely('season lifecycle', startSeasonLifecycle);
+
   // Measures the engine against real fills and takes farmable tokens off the
   // board. Tied to the feed switch only in the sense that both need the chain;
   // it is the one check that runs without anybody deciding to look.

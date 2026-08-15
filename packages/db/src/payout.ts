@@ -26,6 +26,19 @@ export async function setSeasonOnchain(
   });
 }
 
+/** The on-chain address a season was created under, or null if it is not on chain yet. */
+export async function seasonOnchainPubkey(
+  db: Client,
+  seasonId: number,
+): Promise<string | null> {
+  const result = await db.execute({
+    sql: 'SELECT onchain_pubkey FROM seasons WHERE id = ?',
+    args: [seasonId],
+  });
+  const value = result.rows[0]?.['onchain_pubkey'];
+  return value === null || value === undefined ? null : String(value);
+}
+
 /** Advance a season's status to mirror an on-chain transition (open, start, close). */
 export async function setSeasonStatus(
   db: Client,

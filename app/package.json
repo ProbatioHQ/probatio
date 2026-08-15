@@ -34,7 +34,8 @@
     "@probatio/retention": "*",
     "@probatio/feed": "*",
     "@probatio/metadata": "*",
-    "@probatio/validation": "*"
+    "@probatio/validation": "*",
+    "@probatio/vault": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

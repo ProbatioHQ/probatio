@@ -197,6 +197,7 @@ export {
   markSeasonVoided,
   recordFinalization,
   recordOnChainEntry,
+  seasonOnchainPubkey,
   setSeasonOnchain,
   setSeasonStatus,
 } from './payout';
