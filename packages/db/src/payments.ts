@@ -113,6 +113,35 @@ export async function getPaymentIntent(
   return row ? toIntent(row as unknown as Record<string, unknown>) : null;
 }
 
+/** The wallet evidence recorded with an intent, to carry onto the entry it settles. */
+export interface IntentEvidence {
+  readonly funder: string | null;
+  readonly walletFirstSeenAt: number | null;
+  readonly walletSignatureCount: number | null;
+  readonly flags: readonly string[];
+}
+
+/** Read an intent's recorded evidence, or null when there is no such intent. */
+export async function intentEvidence(db: Client, reference: string): Promise<IntentEvidence | null> {
+  const result = await db.execute({
+    sql: `SELECT funder, wallet_first_seen_at, wallet_signature_count, evidence_flags
+            FROM payment_intents WHERE reference = ?`,
+    args: [reference],
+  });
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    funder: row['funder'] === null ? null : String(row['funder']),
+    walletFirstSeenAt: row['wallet_first_seen_at'] === null ? null : Number(row['wallet_first_seen_at']),
+    walletSignatureCount:
+      row['wallet_signature_count'] === null ? null : Number(row['wallet_signature_count']),
+    flags:
+      typeof row['evidence_flags'] === 'string'
+        ? (JSON.parse(row['evidence_flags']) as string[])
+        : [],
+  };
+}
+
 /** Intents that were never paid and have not expired, oldest first. */
 export async function openPaymentIntents(
   db: Client,

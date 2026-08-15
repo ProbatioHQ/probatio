@@ -7,32 +7,25 @@ import { PAYOUT_PATH, chargeRefusal, explainChargeRefusal } from '../src/chargin
  * It existed as a sentence in the launch sequence — never charge for entry and
  * then discover a refund cannot be paid — and a paid season was opened anyway,
  * because nothing consulted the sentence. These are what consult it now.
+ *
+ * Entry money goes to the season's vault, not a treasury, so the only thing
+ * that gates a paid season is whether the payout path is proven end to end.
  */
-
-const TREASURY = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM';
 
 describe('charging for entry', () => {
   it('never refuses a free season', () => {
     // Nothing was taken, so there is nothing to give back. Free play is the
     // product and must not be gated on a payout path it does not use.
-    expect(chargeRefusal({ entryCost: 0n, treasury: null })).toBeNull();
-    expect(chargeRefusal({ entryCost: 0n, treasury: TREASURY })).toBeNull();
+    expect(chargeRefusal({ entryCost: 0n })).toBeNull();
   });
 
   it('refuses a paid season while nothing can pay a winner', () => {
-    const refusal = chargeRefusal({ entryCost: 50_000_000n, treasury: TREASURY });
+    const refusal = chargeRefusal({ entryCost: 50_000_000n });
     expect(refusal).toBe(PAYOUT_PATH.wired ? null : 'cannot_pay_out');
   });
 
-  it('refuses a paid season with nowhere to send the money', () => {
-    // Only reachable once the payout path is wired; asserted through the same
-    // switch so it cannot rot into a branch nobody runs.
-    const refusal = chargeRefusal({ entryCost: 50_000_000n, treasury: null });
-    expect(refusal).not.toBeNull();
-  });
-
   it('explains every refusal it can return', () => {
-    for (const refusal of ['no_treasury', 'cannot_pay_out'] as const) {
+    for (const refusal of ['cannot_pay_out'] as const) {
       const explanation = explainChargeRefusal(refusal);
       expect(explanation.length).toBeGreaterThan(0);
       // Said to somebody about their own money. It has to name what happens to
@@ -48,6 +41,6 @@ describe('charging for entry', () => {
   });
 
   it('treats a negative cost as free rather than as a charge', () => {
-    expect(chargeRefusal({ entryCost: -1n, treasury: null })).toBeNull();
+    expect(chargeRefusal({ entryCost: -1n })).toBeNull();
   });
 });

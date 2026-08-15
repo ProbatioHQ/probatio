@@ -20,7 +20,6 @@ import { explainCondition } from '@probatio/seasons';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { currentUser } from '@/lib/session';
-import { treasuryAddress } from '@/lib/env';
 
 /**
  * The season, as anybody can see it.
@@ -62,10 +61,7 @@ export async function GET(request: Request): Promise<Response> {
   const status = statusAt(timing, now);
   const totals = await seasonTotals(client, season.id);
   const rules = rulesetFor(season.ordinal);
-  const entryRefusal = chargeRefusal({
-    entryCost: BigInt(season.entryCost),
-    treasury: treasuryAddress(),
-  });
+  const entryRefusal = chargeRefusal({ entryCost: BigInt(season.entryCost) });
 
   // The cut applies to what entrants paid, not to a sponsored prize — taking
   // a tenth of money somebody put up as the prize would advertise more than

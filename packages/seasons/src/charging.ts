@@ -45,40 +45,36 @@ export const PAYOUT_PATH = {
    */
   wired: false,
   missing: [
-    'entry money reaches the vault: the app transfers to a treasury wallet and never calls record_entry',
-    'an on-chain Entry exists: claim_prize and refund_entry both require one',
-    'the season is finalized: nothing calls finalize_season, and no code sets the finalized status',
-    'the results root is computed for a real season: resultsRoot is called only by its own test',
-    'the winner can obtain a proof: no route serves one',
+    'the finalization job is not wired: nothing calls finalize_season at a season end or records its root',
+    'the claim route is not built: a winner has no way to obtain their proof and submit claim_prize',
+    'the whole path has not been proven end to end on a cluster',
   ],
 } as const;
 
-export type ChargeRefusal = 'no_treasury' | 'cannot_pay_out';
+export type ChargeRefusal = 'cannot_pay_out';
 
 export interface ChargeInput {
   readonly entryCost: bigint;
-  /** Where entry money would go, or null when unconfigured. */
-  readonly treasury: string | null;
 }
 
 /**
  * Why this season may not charge, or null when it may.
  *
- * A free season is always allowed: there is nothing to give back.
+ * A free season is always allowed: there is nothing to give back. Entry money
+ * goes to the season's vault through `record_entry`, not to a treasury, so no
+ * treasury needs to be configured for a paid season to open — only the payout
+ * path has to be proven end to end, which is what `PAYOUT_PATH.wired` gates.
  */
 export function chargeRefusal(input: ChargeInput): ChargeRefusal | null {
   if (input.entryCost <= 0n) return null;
   if (!PAYOUT_PATH.wired) return 'cannot_pay_out';
-  if (input.treasury === null) return 'no_treasury';
   return null;
 }
 
 /** Said to the person who would have paid, in the terms that matter to them. */
 export function explainChargeRefusal(refusal: ChargeRefusal): string {
   switch (refusal) {
-    case 'no_treasury':
-      return 'Entry is not open on this server: this season charges for entry and no entry address is configured, so nothing can be taken.';
     case 'cannot_pay_out':
-      return 'Entry is free for now. A paid season is not open because prizes cannot be paid out yet, and taking an entry fee before it can be returned is not something this will do. Free play is open, and trades made in it are committed exactly the same way.';
+      return 'Entry is free for now. A paid season is not open because the payout path is not yet verified end to end, and taking an entry fee before it can be returned is not something this will do. Free play is open, and trades made in it are committed exactly the same way.';
   }
 }

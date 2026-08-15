@@ -126,6 +126,7 @@ export {
   entriesFromFunder,
   getPaymentIntent,
   hasEntered,
+  intentEvidence,
   openPaymentIntents,
   paymentsFor,
   recordIntentEvidence,
@@ -135,6 +136,7 @@ export {
 export type {
   EntryEvidence,
   EvidenceWrite,
+  IntentEvidence,
   PaymentIntentRow,
   PaymentIntentWrite,
   PaymentPurpose,

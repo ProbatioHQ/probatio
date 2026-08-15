@@ -1,7 +1,7 @@
 import bs58 from 'bs58';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { findProgramAddress, type DerivedAddress } from '@probatio/pools';
-import type { AccountMeta, Instruction } from '@probatio/payments';
+import { compileMessage, encodeMessage, type AccountMeta, type Instruction } from '@probatio/payments';
 
 /**
  * The season-vault instructions, encoded by hand.
@@ -39,6 +39,15 @@ const ENTRY_SEED = new TextEncoder().encode('entry');
 /** Anchor names an instruction by the first eight bytes of `sha256("global:<name>")`. */
 export function anchorDiscriminator(name: string): Uint8Array {
   return sha256(new TextEncoder().encode(`global:${name}`)).subarray(0, 8);
+}
+
+/** Anchor names an account type by the first eight bytes of `sha256("account:<Name>")`. */
+export function accountDiscriminator(name: string): Uint8Array {
+  return sha256(new TextEncoder().encode(`account:${name}`)).subarray(0, 8);
+}
+
+function hex8(bytes: Uint8Array): string {
+  return [...bytes.subarray(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 // --------------------------------------------------------------------------
@@ -432,5 +441,58 @@ export function refundEntry(input: { readonly payer: string; readonly trader: st
       system,
     ],
     data: anchorDiscriminator('refund_entry'),
+  };
+}
+
+/**
+ * The record_entry transaction, compiled for a trader's wallet to sign, base58.
+ *
+ * The trader is the fee payer and the only signer; the instruction pays the
+ * fee into the vault and creates their entry. The wallet decodes this, signs
+ * it, submits it, and reports the signature, which the server then checks
+ * against the entry the chain now holds.
+ */
+export function recordEntryMessage(input: {
+  readonly trader: string;
+  readonly ordinal: number;
+  readonly blockhash: string;
+  readonly programId?: string;
+}): string {
+  const instruction = recordEntry({
+    trader: input.trader,
+    ordinal: input.ordinal,
+    ...(input.programId !== undefined ? { programId: input.programId } : {}),
+  });
+  return bs58.encode(encodeMessage(compileMessage(input.trader, input.blockhash, [instruction])));
+}
+
+/** A decoded on-chain Entry, the proof a trader paid into a season's vault. */
+export interface OnChainEntry {
+  readonly season: string;
+  readonly trader: string;
+  readonly paid: bigint;
+  readonly claimed: boolean;
+}
+
+/**
+ * Decode an Entry account, so a confirmed entry can be checked against what was
+ * asked for.
+ *
+ * The discriminator is checked first: without it a different account at the
+ * same address decodes into plausible numbers rather than failing, and an entry
+ * would be credited that was never made.
+ */
+export function decodeEntry(data: Uint8Array): OnChainEntry {
+  // 8 discriminator, 32 season, 32 trader, 8 paid, 8 entered_at, 1 claimed, ...
+  if (data.length < 89) throw new VaultError(`entry account too short: ${data.length} bytes`);
+  if (hex8(data) !== hex8(accountDiscriminator('Entry'))) {
+    throw new VaultError('not an entry account');
+  }
+  const view = new DataView(data.buffer, data.byteOffset);
+  return {
+    season: bs58.encode(data.subarray(8, 40)),
+    trader: bs58.encode(data.subarray(40, 72)),
+    paid: view.getBigUint64(72, true),
+    claimed: data[88] !== 0,
   };
 }

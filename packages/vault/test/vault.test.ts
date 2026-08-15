@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import bs58 from 'bs58';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   AuthorityGateway,
   PROGRAM_ID,
   SYSTEM_PROGRAM_ID,
   VaultError,
+  accountDiscriminator,
   anchorDiscriminator,
+  decodeEntry,
   claimPrize,
   finalizeSeason,
   initSeason,
@@ -233,6 +236,23 @@ describe('vault instruction encoders', () => {
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'entry_open', nowMs: 250 })).toBe('start_trading');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'running' })).toBe('none');
     expect(nextSeasonTransition({ ...base, onChain: true, status: 'finalized' })).toBe('none');
+  });
+
+  it('decodes an entry account and rejects a foreign one', () => {
+    const data = new Uint8Array(98);
+    data.set(accountDiscriminator('Entry'), 0);
+    data.set(bs58.decode(AUTHORITY), 8); // season
+    data.set(bs58.decode(TRADER), 40); // trader
+    new DataView(data.buffer).setBigUint64(72, 50_000_000n, true);
+    data[88] = 0; // not claimed
+    const entry = decodeEntry(data);
+    expect(entry.season).toBe(AUTHORITY);
+    expect(entry.trader).toBe(TRADER);
+    expect(entry.paid).toBe(50_000_000n);
+    expect(entry.claimed).toBe(false);
+
+    const foreign = new Uint8Array(98); // zero discriminator
+    expect(() => decodeEntry(foreign)).toThrow(/not an entry/);
   });
 
   it('rejects an amount that does not fit its field', () => {

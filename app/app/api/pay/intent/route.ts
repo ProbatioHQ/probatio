@@ -1,34 +1,31 @@
 import { RpcClient } from '@probatio/pools';
-import {
-  buildPaymentMessageBase58,
-  createIntent,
-  DEFAULT_TTL_MS,
-} from '@probatio/payments';
+import { createIntent, DEFAULT_TTL_MS } from '@probatio/payments';
 import {
   createPaymentIntent,
   entriesFromFunder,
   hasEntered,
   openRankedSeason,
   recordIntentEvidence,
+  seasonOnchainPubkey,
 } from '@probatio/db';
 import { chargeRefusal, explainChargeRefusal } from '@probatio/seasons';
 import { DEFAULT_RULES, assess, explainRefusal, gatherEvidence } from '@probatio/sybil';
+import { recordEntryMessage, vaultAddress } from '@probatio/vault';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
-import { rpcEndpoint, treasuryAddress } from '@/lib/env';
+import { rpcEndpoint } from '@/lib/env';
 import { currentUser } from '@/lib/session';
 
 /**
- * Ask the user to pay.
+ * Ask the trader to pay their entry into the season vault.
  *
- * Builds the transaction the wallet will sign. Nothing here credits anything
- * and nothing here is trusted later — the returned message is a request, and
- * only the chain can answer it.
+ * The transaction the wallet is asked to sign is `record_entry`: it moves the
+ * fee from the trader into the season's on-chain vault and creates their entry.
+ * The money never passes through a treasury we hold, and it can be paid back or
+ * paid out only by the program, against a signed entry. Nothing here is trusted
+ * later — the returned message is a request, and only the chain can answer it.
  *
- * The amount comes from the season row rather than from configuration or from
- * the client. The price of entry is part of the season's recorded ruleset, and
- * a season whose entry cost could be changed by a request is not a season with
- * a ruleset.
+ * The amount is the season's recorded entry cost, not anything the client sends.
  */
 
 export async function POST(request: Request): Promise<Response> {
@@ -43,35 +40,27 @@ export async function POST(request: Request): Promise<Response> {
 
   const season = await openRankedSeason(client, now);
   if (!season) {
-    return Response.json(
-      { error: 'no season is accepting entries right now.' },
-      { status: 409 },
-    );
+    return Response.json({ error: 'no season is accepting entries right now.' }, { status: 409 });
   }
 
   /*
-   * Whether this season may charge at all, asked where the money is taken.
-   *
-   * /api/season answers the same question so the interface can avoid drawing a
-   * button that cannot work, but that is a courtesy and this is the guard. A
-   * check that only runs in the page it decorates is not a check.
-   *
-   * Asked after the season is loaded rather than before, because the answer
-   * depends on what the season costs: a free season has nothing to give back
-   * and is never refused.
+   * The payout gate, asked where the money is taken. Until the whole path is
+   * proven end to end, a paid season is refused here rather than taking a fee
+   * it cannot yet return. A free season is never refused.
    */
-  const treasury = treasuryAddress();
-  const refusal = chargeRefusal({ entryCost: BigInt(season.entryCost), treasury });
+  const refusal = chargeRefusal({ entryCost: BigInt(season.entryCost) });
   if (refusal) {
-    return Response.json(
-      { error: explainChargeRefusal(refusal), refusal },
-      { status: 503 },
-    );
+    return Response.json({ error: explainChargeRefusal(refusal), refusal }, { status: 503 });
   }
-  if (!treasury) {
-    // Unreachable while a refusal covers it, and kept so the narrowing below is
-    // the type system's rather than an assumption about another function.
-    return Response.json({ error: 'entry is not open on this server' }, { status: 503 });
+
+  // The season has to exist on chain: record_entry pays into its vault, and
+  // there is no vault until the lifecycle worker has created it.
+  const onchain = await seasonOnchainPubkey(client, season.id);
+  if (!onchain) {
+    return Response.json(
+      { error: 'entry is not open yet: the season is not on chain.' },
+      { status: 409 },
+    );
   }
 
   if (await hasEntered(client, season.id, user.pubkey)) {
@@ -83,9 +72,9 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // Read the wallet before asking for money. An entry that would be refused
-  // should be refused before it is paid for, not after — and the evidence is
-  // kept either way, because the attack worth defending against is not winning
-  // this pot, it is presenting a survivor wallet as a track record later.
+  // should be refused before it is paid for, and the evidence is kept either
+  // way: the attack worth defending against is presenting a survivor wallet as
+  // a track record later, not winning this one pot.
   let evidence;
   try {
     const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 20_000, minIntervalMs: 60 });
@@ -94,8 +83,6 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'could not reach the network. Try again.' }, { status: 502 });
   }
 
-  // Not counted for a shared funder: assess ignores the number, and on an
-  // exchange it is the one count in the request that grows with the season.
   const siblings =
     evidence.funder === null || evidence.funderIsShared
       ? 0
@@ -109,17 +96,8 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const intent = createIntent({
-    payer: user.pubkey,
-    recipient: treasury,
-    lamports: BigInt(season.entryCost),
-    purpose: 'season_entry',
-    seasonOrdinal: season.ordinal,
-    now,
-  });
-
-  // A blockhash expires in around a minute. Fetched last so the user has as
-  // much of that window as possible to approve the prompt.
+  // A blockhash expires in about a minute, so it is fetched last: the trader
+  // gets as much of that window as possible to approve the prompt.
   let blockhash: string;
   try {
     const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 10_000 });
@@ -128,6 +106,19 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'could not reach the network. Try again.' }, { status: 502 });
   }
 
+  // The vault is where the fee lands; it is the intent's recipient only as a
+  // record. Confirmation reads the entry the chain holds, not this address.
+  const vault = vaultAddress(onchain).address;
+  const intent = createIntent({
+    payer: user.pubkey,
+    recipient: vault,
+    lamports: BigInt(season.entryCost),
+    purpose: 'season_entry',
+    seasonOrdinal: season.ordinal,
+    now,
+  });
+  const message = recordEntryMessage({ trader: user.pubkey, ordinal: season.ordinal, blockhash });
+
   await createPaymentIntent(
     client,
     {
@@ -135,7 +126,7 @@ export async function POST(request: Request): Promise<Response> {
       userPubkey: user.pubkey,
       seasonId: season.id,
       purpose: 'season_entry',
-      recipient: treasury,
+      recipient: vault,
       amount: season.entryCost,
       expiresAt: intent.expiresAt,
     },
@@ -151,9 +142,9 @@ export async function POST(request: Request): Promise<Response> {
 
   return Response.json({
     reference: intent.reference,
-    message: buildPaymentMessageBase58(intent, blockhash),
+    message,
     lamports: season.entryCost,
-    recipient: treasury,
+    recipient: vault,
     season: { id: season.id, ordinal: season.ordinal, name: season.name },
     expiresAt: intent.expiresAt,
     ttlMs: DEFAULT_TTL_MS,
