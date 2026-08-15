@@ -257,6 +257,22 @@ describe('vault instruction encoders', () => {
     expect(() => decodeEntry(foreign)).toThrow(/not an entry/);
   });
 
+  it('compiles wallet-signable messages for entry, claim and refund', async () => {
+    const { recordEntryMessage, claimPrizeMessage, refundEntryMessage } = await import('../src/index');
+    const blockhash = 'GHtXQBsoZHVnNFa9YevAzFr17DJjgHXk3ycTKD5xJUqz';
+    const entry = recordEntryMessage({ trader: TRADER, ordinal: 1, blockhash });
+    const claim = claimPrizeMessage({
+      payer: TRADER, trader: TRADER, ordinal: 1, blockhash,
+      claim: { rank: 1, startingBalance: 10n, finalEquity: 15n, returnBps: 5000, tradeCount: 4, payoutLamports: 135_000_000n },
+      proof: [{ sibling: new Uint8Array(32).fill(1), siblingOnLeft: true }],
+    });
+    const refund = refundEntryMessage({ payer: TRADER, trader: TRADER, ordinal: 1, blockhash });
+    for (const message of [entry, claim, refund]) {
+      expect(typeof message).toBe('string');
+      expect(bs58.decode(message).length).toBeGreaterThan(32); // a real compiled message
+    }
+  });
+
   it('rejects an amount that does not fit its field', () => {
     expect(() => finalizeSeason({ authority: AUTHORITY, ordinal: 1, resultsRoot: new Uint8Array(31) })).toThrow();
     expect(() =>

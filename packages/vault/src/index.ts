@@ -472,6 +472,50 @@ export function recordEntryMessage(input: {
   return bs58.encode(encodeMessage(compileMessage(input.trader, input.blockhash, [instruction])));
 }
 
+/**
+ * The claim_prize transaction, compiled for a winner's wallet to sign, base58.
+ *
+ * The payer is the winner and the only signer; the program pays them from the
+ * vault against the proof. The result and proof come from the finalization the
+ * season already published, so nothing here is recomputed under them.
+ */
+export function claimPrizeMessage(input: {
+  readonly payer: string;
+  readonly trader: string;
+  readonly ordinal: number;
+  readonly claim: ResultClaim;
+  readonly proof: readonly ProofStep[];
+  readonly blockhash: string;
+  readonly programId?: string;
+}): string {
+  const instruction = claimPrize({
+    payer: input.payer,
+    trader: input.trader,
+    ordinal: input.ordinal,
+    claim: input.claim,
+    proof: input.proof,
+    ...(input.programId !== undefined ? { programId: input.programId } : {}),
+  });
+  return bs58.encode(encodeMessage(compileMessage(input.payer, input.blockhash, [instruction])));
+}
+
+/** The refund_entry transaction, compiled for a voided season's entrant to sign, base58. */
+export function refundEntryMessage(input: {
+  readonly payer: string;
+  readonly trader: string;
+  readonly ordinal: number;
+  readonly blockhash: string;
+  readonly programId?: string;
+}): string {
+  const instruction = refundEntry({
+    payer: input.payer,
+    trader: input.trader,
+    ordinal: input.ordinal,
+    ...(input.programId !== undefined ? { programId: input.programId } : {}),
+  });
+  return bs58.encode(encodeMessage(compileMessage(input.payer, input.blockhash, [instruction])));
+}
+
 /** A decoded on-chain Entry, the proof a trader paid into a season's vault. */
 export interface OnChainEntry {
   readonly season: string;
