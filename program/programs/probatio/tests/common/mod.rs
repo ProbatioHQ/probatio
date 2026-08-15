@@ -13,7 +13,7 @@ use {
 };
 
 pub use probatio::instructions::init_season::SeasonParams;
-pub use probatio::state::{Entry, Season, SeasonStatus, TraderRecord};
+pub use probatio::state::{Entry, Season, TraderRecord};
 
 pub const SEASON_SEED: &[u8] = b"season";
 pub const VAULT_SEED: &[u8] = b"vault";

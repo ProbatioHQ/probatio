@@ -74,8 +74,21 @@ jobs:
         with:
           workspaces: program
 
-      # litesvm runs the program in-process, so this needs no validator and no
-      # network — which is why it can be a required check rather than a nightly.
+      # The tests load the compiled program with `include_bytes!` of
+      # `target/deploy/probatio.so`, so the .so has to exist before `cargo
+      # test` runs. `cargo test` does not build it — only the SBF toolchain
+      # does — so install the Solana tools and build it first.
+      - name: Install Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build the program
+        working-directory: program
+        run: cargo build-sbf
+
+      # litesvm runs the program in-process, so this needs no validator — which
+      # is why it can be a required check rather than a nightly.
       - name: Program tests
         working-directory: program
         run: cargo test

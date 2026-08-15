@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AmbientTerminal } from '@/components/ambient-terminal';
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
  * in the furniture rather than buried, because a site that only surfaces its
  * claims and hides its caveats is making a different argument than it thinks.
  */
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
