@@ -22,11 +22,15 @@ const CYCLE_MS = 60_000;
 let started = false;
 
 function keeperSecret(): Uint8Array | null {
-  const path = process.env['KEEPER_KEYPAIR'];
-  if (!path) return null;
+  const configured = process.env['KEEPER_KEYPAIR'];
+  if (!configured) return null;
 
   try {
-    return Uint8Array.from(JSON.parse(readFileSync(path, 'utf8')) as number[]);
+    // Accept the key either inline as a JSON array, for hosts with no
+    // persistent file to point at (Railway, Fly), or as a path to a keypair
+    // file. A value that begins with `[` is the array itself.
+    const json = configured.trim().startsWith('[') ? configured : readFileSync(configured, 'utf8');
+    return Uint8Array.from(JSON.parse(json) as number[]);
   } catch (error) {
     // A configured key that cannot be read is a misconfiguration, not an
     // absence, and silently falling back to committing nothing would look
