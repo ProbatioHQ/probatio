@@ -147,6 +147,25 @@ main {
   color: var(--text);
 }
 
+/* The right cluster: social links, then the wallet. */
+.site-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.icon-link:hover {
+  color: var(--text);
+}
+
 .site-footer {
   border-top: 1px solid var(--line);
   padding: 28px 0;
@@ -856,12 +875,19 @@ body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link):not(.site-header) 
 
 /* ============================================================ transitions */
 
+/* Navigation is quick, so a click lands almost at once. */
 .page {
+  animation: page-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The wrapper mounts once, on arrival, so only the first load gets the slower,
+   settling fade; navigations remount only the inner .page and stay quick. */
+.page-root {
   animation: page-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .page.leaving {
-  animation: page-out 190ms ease both;
+  animation: page-out 110ms ease both;
 }
 
 /*

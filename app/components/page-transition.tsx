@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * nothing left to fade.
  */
 
-const EXIT_MS = 190;
+const EXIT_MS = 110;
 
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -67,9 +67,14 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
     };
   }, [onClick]);
 
+  // The outer wrapper mounts once, on arrival, and runs the slow settling fade.
+  // The inner element is keyed by path, so it remounts on every navigation and
+  // runs the quick one — a click lands almost at once, the site still fades in.
   return (
-    <div key={pathname} className={leaving ? 'page leaving' : 'page'}>
-      {children}
+    <div className="page-root">
+      <div key={pathname} className={leaving ? 'page leaving' : 'page'}>
+        {children}
+      </div>
     </div>
   );
 }
