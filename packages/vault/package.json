@@ -1,0 +1,16 @@
+{
+  "name": "@probatio/vault",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Encoders for the season-vault instructions: entry, finalize, claim, refund, and the season lifecycle.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@probatio/payments": "*",
+    "@probatio/pools": "*",
+    "@noble/hashes": "^1.6.0",
+    "bs58": "^6.0.0"
+  }
+}

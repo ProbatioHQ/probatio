@@ -447,6 +447,82 @@
       "args": []
     },
     {
+      "name": "refund_entry",
+      "docs": [
+        "Give an entry fee back, after the season was voided."
+      ],
+      "discriminator": [
+        214,
+        5,
+        136,
+        23,
+        253,
+        7,
+        230,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone may pay the transaction. The lamports go to the trader named in",
+            "the entry regardless of who submits it, so a refund does not depend on",
+            "the trader still having gas — or on us being willing to send it."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "season",
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "entry",
+          "writable": true
+        },
+        {
+          "name": "trader",
+          "docs": [
+            "they paid in — so this cannot be pointed at anybody else."
+          ],
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "season"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "set_keeper",
       "docs": [
         "Replace the keeper key."
@@ -495,6 +571,36 @@
         170,
         217,
         68
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "season"
+          ]
+        },
+        {
+          "name": "season",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "void_season",
+      "docs": [
+        "Declare a season void, so its entries can be refunded."
+      ],
+      "discriminator": [
+        150,
+        75,
+        163,
+        245,
+        216,
+        247,
+        96,
+        205
       ],
       "accounts": [
         {
@@ -668,6 +774,21 @@
       "code": 6022,
       "name": "EntryWindowStillOpen",
       "msg": "the entry window has not closed yet"
+    },
+    {
+      "code": 6023,
+      "name": "SeasonNotVoided",
+      "msg": "this season has not been voided"
+    },
+    {
+      "code": 6024,
+      "name": "SeasonAlreadyVoided",
+      "msg": "this season has already been voided"
+    },
+    {
+      "code": 6025,
+      "name": "NothingToRefund",
+      "msg": "this entry paid nothing, so there is nothing to refund"
     }
   ],
   "types": [
@@ -900,6 +1021,13 @@
             "type": "i64"
           },
           {
+            "name": "voided_at",
+            "docs": [
+              "When the season was declared void. Zero unless it was."
+            ],
+            "type": "i64"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
@@ -1008,6 +1136,9 @@
           },
           {
             "name": "Finalized"
+          },
+          {
+            "name": "Voided"
           }
         ]
       }
