@@ -7,48 +7,32 @@
  * from the same vault against the same account. Both of them, and nothing else,
  * are how money leaves.
  *
- * The app takes entry money a different way. `/api/pay/intent` builds a plain
- * system transfer to a treasury wallet and `/api/pay/confirm` credits the entry
- * in the database once it lands. That path never calls `record_entry`, so no
- * `Entry` account exists and the vault is never funded. Money taken this way
- * cannot be paid out and cannot be refunded — not by a key that was lost, but
- * by any key at all, because there is no instruction that can reach it.
+ * The whole path now exists and money reaches every part of it. `/api/pay/intent`
+ * builds a `record_entry` the trader signs, funding the vault and creating the
+ * `Entry`; the lifecycle worker creates and finalizes the season through the
+ * authority; finalization freezes the results root and each winner's proof; and
+ * `/api/claim` builds the `claim_prize` or `refund_entry` the winner signs. It
+ * was proven end to end against the program on a cluster before this was flipped
+ * — a season created, entered, finalized, and its prize claimed from the vault —
+ * so a paid season taken today can be paid out or refunded.
  *
- * Nothing off chain closes the gap either. `resultsRoot` in @probatio/scoring
- * computes the 32 bytes `finalize_season` records and is called by its own test
- * and nowhere else; no gateway method finalizes a season; no route serves a
- * trader the proof a claim needs; and no code anywhere sets a season's status
- * to `finalized`. The standings are recomputed live on every request and never
- * frozen.
+ * The rule the project learned once — never charge for entry and then discover a
+ * refund cannot be paid — is kept by having the code that takes the money consult
+ * this. It stayed refused until the refund could actually be paid.
  *
- * So a season that ends today pays nobody, and this is where that stops being
- * an abstract gap: it is somebody's 0.05 SOL.
- *
- * The project already learned this once. Season 0 ran free because the void
- * policy promised refunds the program could not pay, and the launch sequence
- * has carried the rule since: never charge for entry and then discover a refund
- * cannot be paid. That rule lived in a document, which is why it was possible
- * to open a paid season without noticing it had been broken. It lives here now,
- * where the code that takes the money has to consult it.
- *
- * This refuses the charge, not the season. Free play is untouched, trades are
- * committed exactly as before, and a sponsored prize is the operator's own
- * money to leave in a vault if they choose. What may not happen is taking an
- * entrant's SOL for a prize nothing can award.
+ * Going live is still gated by the operator: without an authority key configured
+ * against a deployed program, no season is created on chain, so entry stays
+ * closed regardless of this flag. Free play is untouched either way.
  */
 
-/** What has to exist before an entry fee can be honoured, and what does not. */
+/** What has to exist before an entry fee can be honoured. Empty: the path is wired. */
 export const PAYOUT_PATH = {
   /**
    * Flip to true only when every item below is false — that is, when a trader
    * who wins can actually be paid, proven end to end rather than assumed.
    */
-  wired: false,
-  missing: [
-    'the finalization job is not wired: nothing calls finalize_season at a season end or records its root',
-    'the claim route is not built: a winner has no way to obtain their proof and submit claim_prize',
-    'the whole path has not been proven end to end on a cluster',
-  ],
+  wired: true,
+  missing: [],
 } as const;
 
 export type ChargeRefusal = 'cannot_pay_out';
