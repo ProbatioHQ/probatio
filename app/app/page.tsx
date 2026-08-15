@@ -53,7 +53,7 @@ const AGAINST = [
 
 export default function Home() {
   return (
-    <main style={{ gap: 64 }}>
+    <main className="wide" style={{ gap: 64 }}>
       <section className="hero">
         <PriceCanvas />
         <div className="hero-inner stagger">

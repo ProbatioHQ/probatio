@@ -857,7 +857,7 @@ body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link):not(.site-header) 
 /* ============================================================ transitions */
 
 .page {
-  animation: page-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: page-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .page.leaving {
