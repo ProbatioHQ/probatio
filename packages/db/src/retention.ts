@@ -16,25 +16,19 @@ import type { Client } from '@libsql/client';
  */
 
 /**
- * How long each timeframe's candles are worth keeping, in seconds.
+ * How many candles to keep per token per timeframe.
  *
- * A chart shows the most recent few hundred candles of one timeframe, so the
- * window only has to hold comfortably more than that. A one-second candle is
- * useless an hour later; an hourly one is still part of a month's chart. The
- * short end is where all the rows are, so that is where the window is tightest.
+ * Kept by count, not by age. pump.fun's own chart serves at most a thousand
+ * candles of any interval, from launch, so keeping a little more than that per
+ * timeframe holds a chart's whole history — matching pump.fun at every timeframe
+ * — while still bounding the table. And it bounds it the way that matters: the
+ * growth that once filled the disk was the short timeframes writing a fresh row
+ * every few seconds with no cap, and a per-timeframe row cap is exactly that cap,
+ * tightest where the rows are. Ageing them out instead would delete a sparse old
+ * token's early candles — few in number but reaching back months — which are the
+ * whole point of a full chart.
  */
-const CANDLE_WINDOW_SECONDS: Record<string, number> = {
-  s1: 60 * 60, // one hour
-  s5: 6 * 60 * 60, // six hours
-  s15: 12 * 60 * 60, // half a day
-  m1: 3 * 24 * 60 * 60, // three days
-  m5: 14 * 24 * 60 * 60, // two weeks
-  m15: 60 * 24 * 60 * 60, // two months
-  h1: 365 * 24 * 60 * 60, // a year
-};
-
-/** Timeframes without an explicit window keep this long. */
-const DEFAULT_WINDOW_SECONDS = 3 * 24 * 60 * 60;
+export const CANDLE_KEEP = 1_200;
 
 /** Pool snapshots older than this are dropped, except the newest per mint. */
 const POOL_SNAPSHOT_WINDOW_SECONDS = 7 * 24 * 60 * 60;
@@ -56,30 +50,28 @@ export interface RetentionResult {
 }
 
 /**
- * Drop candles no chart would draw any more.
+ * Drop candles beyond the most recent `CANDLE_KEEP` of each timeframe.
  *
- * Done one timeframe at a time because each keeps its history for a different
- * length: batching them under a single cutoff would either throw away an hour
- * of hourly candles or keep a day of one-second ones. `open_time` is unix
- * seconds, the same clock the candles are written on.
+ * Kept per token and per timeframe independently — a token's daily series and
+ * its one-second series each keep their own most-recent `CANDLE_KEEP`, so a
+ * chart's whole history survives on every timeframe while the row count stays
+ * bounded. One statement, ranking every candle within its (mint, timeframe)
+ * newest-first and deleting past the cap.
  */
-export async function pruneCandles(db: Client, now: number): Promise<number> {
-  const nowSeconds = Math.floor(now / 1_000);
-  let deleted = 0;
-
-  const timeframes = await db.execute('SELECT DISTINCT timeframe FROM candles');
-  for (const row of timeframes.rows) {
-    const timeframe = String(row['timeframe']);
-    const window = CANDLE_WINDOW_SECONDS[timeframe] ?? DEFAULT_WINDOW_SECONDS;
-    const cutoff = nowSeconds - window;
-    const result = await db.execute({
-      sql: 'DELETE FROM candles WHERE timeframe = ? AND open_time < ?',
-      args: [timeframe, cutoff],
-    });
-    deleted += Number(result.rowsAffected ?? 0);
-  }
-
-  return deleted;
+export async function pruneCandles(db: Client): Promise<number> {
+  const result = await db.execute({
+    sql: `DELETE FROM candles WHERE (mint, timeframe, open_time) IN (
+            SELECT mint, timeframe, open_time FROM (
+              SELECT mint, timeframe, open_time,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY mint, timeframe ORDER BY open_time DESC
+                     ) AS rn
+              FROM candles
+            ) WHERE rn > ?
+          )`,
+    args: [CANDLE_KEEP],
+  });
+  return Number(result.rowsAffected ?? 0);
 }
 
 /**
@@ -126,7 +118,7 @@ export async function pruneLaunches(db: Client, now: number): Promise<number> {
 /** Run every retention pass there is. Safe to call as often as you like. */
 export async function runRetention(db: Client, now: number): Promise<RetentionResult> {
   return {
-    candlesDeleted: await pruneCandles(db, now),
+    candlesDeleted: await pruneCandles(db),
     poolSnapshotsDeleted: await prunePoolSnapshots(db, now),
     launchesDeleted: await pruneLaunches(db, now),
   };

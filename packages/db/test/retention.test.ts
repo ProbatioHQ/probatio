@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../src/testing';
-import { pruneCandles, pruneLaunches, prunePoolSnapshots, runRetention } from '../src/retention';
+import {
+  CANDLE_KEEP,
+  pruneCandles,
+  pruneLaunches,
+  prunePoolSnapshots,
+  runRetention,
+} from '../src/retention';
 
 const MINT = 'So11111111111111111111111111111111111111112';
 const HOUR = 3_600;
@@ -30,33 +36,47 @@ async function candleCount(timeframe: string): Promise<number> {
 }
 
 describe('candle retention', () => {
-  it('drops one-second candles older than an hour but keeps recent ones', async () => {
-    // `now` in seconds, matched to how the candles are written.
+  it('keeps the most recent CANDLE_KEEP of a timeframe and drops the rest', async () => {
     const now = 1_000 * DAY;
-    await writeCandle('s1', now - 30); // half a minute ago: kept
-    await writeCandle('s1', now - 2 * HOUR); // two hours ago: dropped
+    // A few more than the cap; the oldest few should be dropped.
+    const over = 3;
+    for (let i = 0; i < CANDLE_KEEP + over; i += 1) {
+      await writeCandle('s1', now - i);
+    }
 
-    await pruneCandles(test.db, now * 1_000);
+    const dropped = await pruneCandles(test.db);
 
-    expect(await candleCount('s1')).toBe(1);
+    expect(dropped).toBe(over);
+    expect(await candleCount('s1')).toBe(CANDLE_KEEP);
   });
 
-  it('keeps hourly candles that a one-second window would have dropped', async () => {
+  it('keeps a sparse old timeframe in full, however far back it reaches', async () => {
     const now = 1_000 * DAY;
-    await writeCandle('h1', now - 30 * DAY); // a month of hourly history is still a chart
-    await writeCandle('s1', now - 30 * DAY); // the same age at one second is long gone
+    // Far fewer than the cap, but months old: a full chart, all kept.
+    await writeCandle('d1', now - 100 * DAY);
+    await writeCandle('d1', now - 50 * DAY);
+    await writeCandle('d1', now - 1 * DAY);
 
-    await pruneCandles(test.db, now * 1_000);
+    await pruneCandles(test.db);
 
+    expect(await candleCount('d1')).toBe(3);
+  });
+
+  it('counts each timeframe on its own, not pooled together', async () => {
+    const now = 1_000 * DAY;
+    // The cap is per timeframe, so filling one does not evict another's.
+    for (let i = 0; i < CANDLE_KEEP + 5; i += 1) await writeCandle('s1', now - i);
+    await writeCandle('h1', now - 10 * DAY);
+
+    await pruneCandles(test.db);
+
+    expect(await candleCount('s1')).toBe(CANDLE_KEEP);
     expect(await candleCount('h1')).toBe(1);
-    expect(await candleCount('s1')).toBe(0);
   });
 
   it('reports how many rows it dropped', async () => {
     const now = 1_000 * DAY;
-    await writeCandle('s1', now - 2 * HOUR);
-    await writeCandle('s1', now - 3 * HOUR);
-    await writeCandle('s1', now - 10); // kept
+    for (let i = 0; i < CANDLE_KEEP + 2; i += 1) await writeCandle('s1', now - i);
 
     const result = await runRetention(test.db, now * 1_000);
     expect(result.candlesDeleted).toBe(2);

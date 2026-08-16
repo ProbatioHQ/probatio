@@ -129,6 +129,7 @@ describe('migrations', () => {
       '026_fill_history_gaps.sql',
       '027_daily_history.sql',
       '028_pumpfun_history.sql',
+      '029_keep_full_history.sql',
     ]);
   });
 
