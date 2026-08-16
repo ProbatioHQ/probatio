@@ -131,14 +131,16 @@ export async function spliceGeckoHistory(client: Client, mint: string): Promise<
         : await fetchOhlcv(pool, source.unit, source.aggregate);
     if (gecko.length === 0) continue;
 
-    const mine = await readCandles(client, mint, source.timeframe, 2000);
-    // Only fill older than the walk's own oldest real candle, so the index's
-    // history sits behind the walk's rather than over it.
-    const oldestReal = mine.filter((c) => c.trades > 0).map((c) => c.openTime);
-    const floor = oldestReal.length > 0 ? Math.min(...oldestReal) : Infinity;
+    const mine = await readCandles(client, mint, source.timeframe, 5000);
+    // Fill any bucket the walk did not produce, not merely everything older than
+    // its oldest. The walk's history is not contiguous — a lone bonding-curve
+    // candle can sit at launch with a gap of days between it and where the pool
+    // walk reached — so "older than the oldest" would leave that gap empty. A
+    // per-bucket check fills every hole the walk left and rewrites none of it.
+    const have = new Set(mine.map((c) => c.openTime));
 
     const writes = gecko
-      .filter((g) => g.t < floor)
+      .filter((g) => !have.has(g.t))
       .map((g) => ({
         openTime: g.t,
         open: priceOf(g.o),

@@ -126,6 +126,7 @@ describe('migrations', () => {
       '023_rewalk_full_history.sql',
       '024_rewalk_to_launch.sql',
       '025_index_history.sql',
+      '026_fill_history_gaps.sql',
     ]);
   });
 
