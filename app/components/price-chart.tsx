@@ -197,6 +197,13 @@ export function PriceChart({
             setError(body.error);
             return;
           }
+          // A response with neither an error nor candles is a broken one — a
+          // proxy page during a redeploy, a truncated body — not an empty chart.
+          // Reading its `candles.length` used to throw and take the render down.
+          if (!Array.isArray(body.candles)) {
+            if (!hasData.current) setError('Could not load the chart.');
+            return;
+          }
           setError(null);
           hasData.current = true;
           setData(body);
