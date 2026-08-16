@@ -103,38 +103,33 @@ export function TokenView({
   /**
    * Whichever chart has data.
    *
-   * TradingView when the pair is indexed, because it is what a trader already
-   * knows how to use. The native chart when it is not — which is every token
-   * for its first few minutes, and those are the ones this site is most about.
-   * Getting this the wrong way round means an empty frame on exactly the
-   * tokens people came to look at.
+   * The native chart is the default now that it carries a token's whole history
+   * from the chain, every timeframe from seconds to a month, and the token's
+   * logo. It used to default to the DEX Screener TradingView embed for indexed
+   * tokens, but that embed loads a stranger's page into an iframe, which drags
+   * its own analytics, service worker, and cross-origin errors into the console
+   * on exactly the tokens people came to look at. TradingView stays a click
+   * away for anyone who prefers it; it just no longer loads unasked.
    */
   const [indexed, setIndexed] = useState(dexIndexed);
-  const [source, setSource] = useState<'tradingview' | 'native'>(
-    dexIndexed ? 'tradingview' : 'native',
-  );
-  /** True once the reader has chosen for themselves; we stop choosing for them. */
-  const [chosen, setChosen] = useState(false);
+  const [source, setSource] = useState<'tradingview' | 'native'>('native');
 
   // A token minutes old gets indexed while somebody is looking at it. Noticing
-  // beats making them reload to find out.
+  // enables the TradingView button, but does not switch onto it: the native
+  // chart is the default, and pulling the embed in unasked is what put another
+  // site's console errors on the page.
   useEffect(() => {
     if (indexed) return;
     const timer = setInterval(() => {
       void fetch(`/api/chart-source?mint=${encodeURIComponent(mint)}`)
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { indexed?: boolean } | null) => {
-          if (!body?.indexed) return;
-          setIndexed(true);
-          // Only switches if they have not picked a chart themselves. Pulling
-          // the chart out from under someone reading it is worse than leaving
-          // them on the one they chose.
-          if (!chosen) setSource('tradingview');
+          if (body?.indexed) setIndexed(true);
         })
         .catch(() => undefined);
     }, 30_000);
     return () => clearInterval(timer);
-  }, [indexed, mint, chosen]);
+  }, [indexed, mint]);
   const [unit, setUnit] = useState<PriceUnit>('market-cap');
 
   return (
@@ -154,10 +149,7 @@ export function TokenView({
                     ? undefined
                     : 'DEX Screener has not indexed this token yet. It usually takes a few minutes after launch'
                 }
-                onClick={() => {
-                  setChosen(true);
-                  setSource('tradingview');
-                }}
+                onClick={() => setSource('tradingview')}
               >
                 TRADINGVIEW
               </button>
@@ -165,10 +157,7 @@ export function TokenView({
                 type="button"
                 className={source === 'native' ? 'on' : undefined}
                 aria-pressed={source === 'native'}
-                onClick={() => {
-                  setChosen(true);
-                  setSource('native');
-                }}
+                onClick={() => setSource('native')}
               >
                 NATIVE
               </button>
@@ -271,10 +260,7 @@ export function TokenView({
                     <button
                       type="button"
                       className="linklike"
-                      onClick={() => {
-                        setChosen(true);
-                        setSource('tradingview');
-                      }}
+                      onClick={() => setSource('tradingview')}
                     >
                       Switch to TradingView
                     </button>
