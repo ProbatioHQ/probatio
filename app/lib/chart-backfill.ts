@@ -49,7 +49,7 @@ const MAX_TRANSACTIONS = Number(
 // by page and written as it goes, so the recent chart is there in seconds and
 // the deep past fills in behind it over the next few minutes.
 const POOL_MAX_TRANSACTIONS = Number(
-  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '15000' : '400'),
+  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '25000' : '400'),
 );
 /** How many trade reads run at once during a walk. */
 const WALK_CONCURRENCY = DEDICATED ? 12 : 2;

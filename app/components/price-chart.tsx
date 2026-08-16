@@ -756,10 +756,13 @@ export function PriceChart({
   const change =
     last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
 
+  // Icon as a component, rendered inline as <Icon /> below — the same way the
+  // fx button that does show its icon renders one, rather than as a prebuilt
+  // element handed through an array.
   const tools = [
-    { id: 'cursor' as const, label: 'Cursor', node: <CursorIcon /> },
-    { id: 'trend' as const, label: 'Trend line', node: <TrendIcon /> },
-    { id: 'hline' as const, label: 'Horizontal line', node: <HLineIcon /> },
+    { id: 'cursor' as const, label: 'Cursor', Icon: CursorIcon },
+    { id: 'trend' as const, label: 'Trend line', Icon: TrendIcon },
+    { id: 'hline' as const, label: 'Horizontal line', Icon: HLineIcon },
   ];
 
   return (
@@ -857,17 +860,17 @@ export function PriceChart({
       <div className="chart-body">
         {/* The drawing tools down the left, as a trading terminal arranges them. */}
         <div className="chart-toolbar" role="group" aria-label="Drawing tools">
-          {tools.map((entry) => (
+          {tools.map(({ id, label, Icon }) => (
             <button
-              key={entry.id}
+              key={id}
               type="button"
-              className={tool === entry.id ? 'tool-btn on' : 'tool-btn'}
-              aria-pressed={tool === entry.id}
-              title={entry.label}
-              aria-label={entry.label}
-              onClick={() => setTool(entry.id)}
+              className={tool === id ? 'tool-btn on' : 'tool-btn'}
+              aria-pressed={tool === id}
+              title={label}
+              aria-label={label}
+              onClick={() => setTool(id)}
             >
-              {entry.node}
+              <Icon />
             </button>
           ))}
           {lineCount > 0 && (
