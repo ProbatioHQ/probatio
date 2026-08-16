@@ -40,13 +40,19 @@ import { hasDedicatedRpc, rpcEndpoint } from './env';
  */
 const DEDICATED = hasDedicatedRpc();
 const MAX_TRANSACTIONS = Number(
-  process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '2000' : '400'),
+  process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '4000' : '400'),
 );
+// Deep enough to reach the launch of even a heavily traded token, not just the
+// last day or two. A token doing thousands of swaps buries a week of history
+// under the recent ones, so a shallow walk drew one early candle and then a
+// flat line across the gap — the whole middle of its life missing. Walked page
+// by page and written as it goes, so the recent chart is there in seconds and
+// the deep past fills in behind it over the next few minutes.
 const POOL_MAX_TRANSACTIONS = Number(
-  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '2000' : '200'),
+  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '15000' : '400'),
 );
 /** How many trade reads run at once during a walk. */
-const WALK_CONCURRENCY = DEDICATED ? 8 : 2;
+const WALK_CONCURRENCY = DEDICATED ? 12 : 2;
 /** The smallest gap between reads, and how many times a throttled one retries. */
 const READ_INTERVAL_MS = DEDICATED ? 20 : 160;
 const READ_RETRIES = DEDICATED ? 4 : 7;
