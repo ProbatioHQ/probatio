@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../src/testing';
-import { pruneCandles, prunePoolSnapshots, runRetention } from '../src/retention';
+import { pruneCandles, pruneLaunches, prunePoolSnapshots, runRetention } from '../src/retention';
 
 const MINT = 'So11111111111111111111111111111111111111112';
 const HOUR = 3_600;
@@ -60,6 +60,64 @@ describe('candle retention', () => {
 
     const result = await runRetention(test.db, now * 1_000);
     expect(result.candlesDeleted).toBe(2);
+  });
+});
+
+describe('launch retention', () => {
+  async function writeLaunch(mint: string, launchedAt: number): Promise<void> {
+    await test.db.execute({
+      sql: `INSERT INTO launches
+              (mint, bonding_curve, creator, name, symbol, uri, launched_at, first_seen_at)
+            VALUES (?, 'curve', 'creator', 'Name', 'SYM', 'uri', ?, ?)`,
+      args: [mint, launchedAt, launchedAt],
+    });
+  }
+
+  // A real unix-seconds clock: launches carry a CHECK that they are after 2020.
+  const NOW = 1_800_000_000;
+
+  it('drops old launches but keeps recent ones', async () => {
+    await writeLaunch('old', NOW - 30 * DAY);
+    await writeLaunch('new', NOW - 1 * DAY);
+
+    const dropped = await pruneLaunches(test.db, NOW * 1_000);
+
+    expect(dropped).toBe(1);
+    const left = await test.db.execute('SELECT mint FROM launches');
+    expect(left.rows.map((r) => String(r['mint']))).toEqual(['new']);
+  });
+
+  it('keeps an old launch while a player still holds the token', async () => {
+    await writeLaunch('held', NOW - 30 * DAY);
+
+    // The minimum a held position needs to exist: a user, a season, an account.
+    const user = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+    await test.db.execute({ sql: 'INSERT INTO users (pubkey, created_at) VALUES (?, 1)', args: [user] });
+    const season = await test.db.execute({
+      sql: `INSERT INTO seasons (ordinal, name, ranked, status, starting_balance, entry_cost,
+              house_bps, house_threshold, latency_ms, max_price_impact_bps, engine_version,
+              scoring_formula_hash, created_at)
+            VALUES (1, 'S', 0, 'running', '10', '0', 0, '0', 0, 0, 1, ?, 1) RETURNING id`,
+      args: ['a'.repeat(64)],
+    });
+    const seasonId = Number(season.rows[0]!['id']);
+    const account = await test.db.execute({
+      sql: `INSERT INTO accounts (season_id, user_pubkey, sol_balance, created_at, updated_at)
+            VALUES (?, ?, '10', 1, 1) RETURNING id`,
+      args: [seasonId, user],
+    });
+    const accountId = Number(account.rows[0]!['id']);
+    await test.db.execute({
+      sql: `INSERT INTO positions (account_id, mint, token_amount, cost_basis, realized_pnl, opened_at, updated_at)
+            VALUES (?, 'held', '5', '5', '0', 1, 1)`,
+      args: [accountId],
+    });
+
+    const dropped = await pruneLaunches(test.db, NOW * 1_000);
+
+    expect(dropped).toBe(0);
+    const left = await test.db.execute('SELECT mint FROM launches');
+    expect(left.rows.map((r) => String(r['mint']))).toEqual(['held']);
   });
 });
 

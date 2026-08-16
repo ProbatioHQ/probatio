@@ -174,7 +174,16 @@ export class AccountSubscription {
     };
 
     socket.onmessage = (event) => {
-      this.#handle(event.data);
+      // A throw inside a websocket listener is an uncaught exception, which the
+      // process guard turns into a hard exit — one bad account update would take
+      // the whole server down and keep it down as it reconnects and replays.
+      // Contained to a logged miss instead.
+      try {
+        this.#handle(event.data);
+      } catch (error) {
+        this.#options.onStatus?.('error');
+        console.error('[accounts] dropped an update its handler could not take', error);
+      }
     };
 
     socket.onerror = () => {

@@ -39,9 +39,20 @@ const DEFAULT_WINDOW_SECONDS = 3 * 24 * 60 * 60;
 /** Pool snapshots older than this are dropped, except the newest per mint. */
 const POOL_SNAPSHOT_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
+/**
+ * Launches older than this are dropped, unless a token is still held.
+ *
+ * The feed only ever asks for the most recent launches, so an old row is dead
+ * weight there. The one thing that must survive is a token somebody owns: its
+ * name and symbol are read from this table to label the position, so a held
+ * mint is kept however old it is.
+ */
+const LAUNCH_WINDOW_SECONDS = 14 * 24 * 60 * 60;
+
 export interface RetentionResult {
   readonly candlesDeleted: number;
   readonly poolSnapshotsDeleted: number;
+  readonly launchesDeleted: number;
 }
 
 /**
@@ -90,11 +101,31 @@ export async function prunePoolSnapshots(db: Client, now: number): Promise<numbe
   return Number(result.rowsAffected ?? 0);
 }
 
+/**
+ * Drop launches too old for the feed, keeping any token still held.
+ *
+ * The pump.fun firehose writes a row per token created, tens of thousands a
+ * day, and nothing else deleted them — the same shape of growth that filled the
+ * disk with candles. A held token is spared whatever its age, because its row
+ * is what names the position on screen.
+ */
+export async function pruneLaunches(db: Client, now: number): Promise<number> {
+  const cutoff = Math.floor(now / 1_000) - LAUNCH_WINDOW_SECONDS;
+  const result = await db.execute({
+    sql: `DELETE FROM launches
+          WHERE launched_at < ?
+            AND NOT EXISTS (SELECT 1 FROM positions WHERE positions.mint = launches.mint)`,
+    args: [cutoff],
+  });
+  return Number(result.rowsAffected ?? 0);
+}
+
 /** Run every retention pass there is. Safe to call as often as you like. */
 export async function runRetention(db: Client, now: number): Promise<RetentionResult> {
   return {
     candlesDeleted: await pruneCandles(db, now),
     poolSnapshotsDeleted: await prunePoolSnapshots(db, now),
+    launchesDeleted: await pruneLaunches(db, now),
   };
 }
 

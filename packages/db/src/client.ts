@@ -153,4 +153,18 @@ function serializeWrites(client: Client): Client {
  */
 export async function enforceIntegrity(client: Client): Promise<void> {
   await client.execute('PRAGMA foreign_keys = ON');
+
+  // Write-ahead logging lets readers run alongside the single writer, so a
+  // leaderboard read does not queue behind a trade. It is a property of the
+  // file and persists, but is set explicitly rather than left to the driver's
+  // default, because the whole read story depends on it. libsql ignores it for
+  // an in-memory database, which is what tests use.
+  await client.execute('PRAGMA journal_mode = WAL');
+
+  // A bare write that lands while a transaction holds the writer lock fails
+  // instantly without this, and 500s the request that issued it. With it the
+  // write waits its short turn instead. It reaches this shared connection even
+  // though it never reaches the separate connection a transaction is given —
+  // which is why the write queue in openDatabase exists as well, not instead.
+  await client.execute('PRAGMA busy_timeout = 5000');
 }

@@ -1,4 +1,4 @@
-import { PoolReader, RpcClient, PUMPFUN_TOKEN_DECIMALS } from '@probatio/pools';
+import { PUMPFUN_TOKEN_DECIMALS } from '@probatio/pools';
 import { DEFAULT_RULES, simulateFill, totalFeeBps } from '@probatio/sim';
 import { applyFill, emptyPosition, TradingError, type AccountState } from '@probatio/trading';
 import { hashLeaf, toHex } from '@probatio/commit';
@@ -13,7 +13,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { noteActivity } from '@/lib/activity';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
-import { rpcEndpoint } from '@/lib/env';
+import { resolveMint } from '@/lib/rpc';
 
 /**
  * Execute a trade.
@@ -103,15 +103,14 @@ export async function POST(request: Request): Promise<Response> {
 
   const { account, seasonId } = await activeSeason(client, user.pubkey, now);
 
-  const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 15_000 });
-  const reader = new PoolReader(rpc);
-
   // Reading the chain is not optional here. A fill quoted against a cached
   // pool is a fabricated fill, so when the chain cannot be read the trade is
   // refused rather than estimated. This is the one thing that never degrades.
+  // The read goes through the shared client so a crowd on one token neither
+  // opens sockets without bound nor reads the same account many times over.
   let atClickResolution;
   try {
-    atClickResolution = await reader.resolve(mint);
+    atClickResolution = await resolveMint(mint);
   } catch {
     return Response.json(
       {
@@ -135,7 +134,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let atFillResolution;
   try {
-    atFillResolution = await reader.resolve(mint);
+    atFillResolution = await resolveMint(mint);
   } catch {
     // The click was priced and the fill could not be. Refusing is the only
     // honest outcome: filling at the click price would hand the trader the

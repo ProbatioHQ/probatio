@@ -49,6 +49,17 @@ export interface RpcOptions {
   readonly maxRetries?: number;
   /** Base delay for backoff, doubled each attempt. */
   readonly retryBaseMs?: number;
+  /**
+   * Most requests allowed in flight at once. Zero or unset means no ceiling.
+   *
+   * Pacing spaces requests out in time; this bounds how many can be mid-flight
+   * together. It matters when one shared client is fed by a crowd rather than a
+   * handful of workers: without it, a spike of trades opens an unbounded number
+   * of concurrent sockets against one endpoint, which exhausts file descriptors
+   * and drags down every other outbound call, workers and health probe included.
+   * With it the spike queues instead.
+   */
+  readonly maxConcurrent?: number;
   /** Injected in tests so backoff does not actually sleep. */
   readonly sleepImpl?: (ms: number) => Promise<void>;
 }
@@ -130,11 +141,39 @@ export class RpcClient {
    */
   #nextSlotAt = 0;
 
+  /** In-flight requests, and callers waiting for a slot, for `maxConcurrent`. */
+  #inFlight = 0;
+  #waiting: Array<() => void> = [];
+
   constructor(options: RpcOptions) {
     if (!options.endpoint) {
       throw new RpcError('an RPC endpoint is required');
     }
     this.#options = options;
+  }
+
+  /** Wait for an in-flight slot when a ceiling is set, then hold it. */
+  async #acquire(): Promise<void> {
+    const limit = this.#options.maxConcurrent ?? 0;
+    if (limit <= 0) return;
+    if (this.#inFlight < limit) {
+      this.#inFlight += 1;
+      return;
+    }
+    // No free slot: wait to be handed one. The slot is passed over on release
+    // without the count changing, so nothing can slip in between.
+    await new Promise<void>((resolve) => this.#waiting.push(resolve));
+  }
+
+  /** Release a slot, handing it straight to the next caller waiting for one. */
+  #release(): void {
+    if ((this.#options.maxConcurrent ?? 0) <= 0) return;
+    const next = this.#waiting.shift();
+    if (next) {
+      next(); // Hand the held slot over; the count stays as it is.
+      return;
+    }
+    this.#inFlight -= 1;
   }
 
   private get commitment(): string {
@@ -153,6 +192,15 @@ export class RpcClient {
    * worse for everyone.
    */
   private async call<T>(method: string, params: unknown[]): Promise<T> {
+    await this.#acquire();
+    try {
+      return await this.#dispatch<T>(method, params);
+    } finally {
+      this.#release();
+    }
+  }
+
+  async #dispatch<T>(method: string, params: unknown[]): Promise<T> {
     const doFetch = this.#options.fetchImpl ?? fetch;
     const sleep = this.#options.sleepImpl ?? defaultSleep;
     const maxRetries = this.#options.maxRetries ?? DEFAULT_MAX_RETRIES;

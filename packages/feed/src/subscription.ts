@@ -109,7 +109,17 @@ export class LogSubscription {
     };
 
     socket.onmessage = (event) => {
-      this.#handle(event.data);
+      // A throw here is a throw inside a websocket event listener, which Node
+      // reports as an uncaught exception and the process guard turns into a
+      // hard exit. On the on-chain firehose that is one malformed message away
+      // from taking the whole server down — and back down again the moment it
+      // reconnects and replays. Contained to a logged miss instead.
+      try {
+        this.#handle(event.data);
+      } catch (error) {
+        this.#options.onStatus?.('error');
+        console.error('[feed] dropped a message its handler could not take', error);
+      }
     };
 
     socket.onerror = () => {

@@ -31,6 +31,24 @@ export interface ActiveSeason {
   readonly rankedSeasonId: number | null;
 }
 
+/**
+ * The free-play season id, resolved once per process.
+ *
+ * Free play is created on first use and never changes id for the life of the
+ * process, but `ensureFreePlaySeason` is a write every time it is called — it
+ * takes the writer lock even to find the row already there. On the trade hot
+ * path that put an un-queued write on every single trade, racing the trade's
+ * own transaction for the lock. Resolved once and remembered, the common trade
+ * stops writing here at all. A restart re-resolves it, which is when the id
+ * could ever legitimately differ.
+ */
+let freePlaySeasonId: number | undefined;
+
+async function freePlayId(client: Client, now: number): Promise<number> {
+  freePlaySeasonId ??= await ensureFreePlaySeason(client, now);
+  return freePlaySeasonId;
+}
+
 export async function activeSeason(
   client: Client,
   pubkey: string,
@@ -67,20 +85,20 @@ export async function activeSeason(
     if (entered) {
       // Entered, but the season is over. They fall back to free play for new
       // trades while their ranked record stays exactly as they left it.
-      const freePlayId = await ensureFreePlaySeason(client, now);
+      const freeId = await freePlayId(client, now);
       return {
-        account: await ensureAccount(client, freePlayId, pubkey, now),
-        seasonId: freePlayId,
+        account: await ensureAccount(client, freeId, pubkey, now),
+        seasonId: freeId,
         ranked: false,
         rankedSeasonId: ranked.id,
       };
     }
   }
 
-  const freePlayId = await ensureFreePlaySeason(client, now);
+  const freeId = await freePlayId(client, now);
   return {
-    account: await ensureAccount(client, freePlayId, pubkey, now),
-    seasonId: freePlayId,
+    account: await ensureAccount(client, freeId, pubkey, now),
+    seasonId: freeId,
     ranked: false,
     rankedSeasonId: null,
   };

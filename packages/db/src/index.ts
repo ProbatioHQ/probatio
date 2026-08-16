@@ -57,7 +57,7 @@ export {
 } from './candles';
 export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';
 
-export { compact, pruneCandles, prunePoolSnapshots, runRetention } from './retention';
+export { compact, pruneCandles, pruneLaunches, prunePoolSnapshots, runRetention } from './retention';
 export type { RetentionResult } from './retention';
 
 export {

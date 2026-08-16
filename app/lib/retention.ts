@@ -29,10 +29,10 @@ async function sweep(): Promise<void> {
   const now = Date.now();
 
   const result = await runRetention(client, now);
-  if (result.candlesDeleted > 0 || result.poolSnapshotsDeleted > 0) {
+  if (result.candlesDeleted > 0 || result.poolSnapshotsDeleted > 0 || result.launchesDeleted > 0) {
     console.log(
       `[retention] dropped ${result.candlesDeleted} candles, ` +
-        `${result.poolSnapshotsDeleted} pool snapshots`,
+        `${result.poolSnapshotsDeleted} pool snapshots, ${result.launchesDeleted} launches`,
     );
   }
 
