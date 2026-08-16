@@ -7,9 +7,9 @@ import {
   type Observation,
   type Timeframe,
 } from '@probatio/candles';
-import { getBackfill, recordBackfill, writeCandles } from '@probatio/db';
+import { getBackfill, recordBackfill, writeCandles, type Client } from '@probatio/db';
 import { PoolReader, RpcClient, bondingCurveAddress, pumpSwapReserveOffset } from '@probatio/pools';
-import { collectPoolSwaps } from '@probatio/validation';
+import { collectPoolSwaps, type PoolSwap } from '@probatio/validation';
 import { db } from './db';
 import { hasDedicatedRpc, rpcEndpoint } from './env';
 
@@ -116,41 +116,88 @@ export function backfillInFlight(mint: string): boolean {
  * value; it drifts slowly, so the oldest points are a hair off, which does not
  * show at chart scale.
  */
-async function poolObservations(
+async function writeObservationCandles(
+  client: Client,
+  mint: string,
+  observations: readonly Observation[],
+): Promise<void> {
+  if (observations.length === 0) return;
+  for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
+    await writeCandles(client, mint, timeframe, buildCandles(observations, timeframe));
+  }
+}
+
+interface PoolBackfill {
+  count: number;
+  oldest: number | null;
+  newest: number | null;
+}
+
+/**
+ * Write a graduated token's pool history to candles, page by page.
+ *
+ * Written as each page of swaps arrives — newest first — rather than after the
+ * whole walk, so the recent chart draws in a second or two and the deeper past
+ * fills in behind it. Candle writes merge, so a later page's older buckets sit
+ * beside the earlier page's recent ones without either overwriting the other.
+ */
+async function poolBackfill(
   rpc: RpcClient,
   reader: PoolReader,
   mint: string,
-): Promise<Observation[]> {
+  client: Client,
+): Promise<PoolBackfill> {
   const pools = await reader.findPumpSwapPools(mint);
   const pool = await reader.deepestPool(pools);
-  if (!pool) return [];
+  if (!pool) return { count: 0, oldest: null, newest: null };
 
   const config = await reader.globalConfig();
   const [account] = await rpc.getAccounts([pool.address]);
   const offset = account ? pumpSwapReserveOffset(account.data) : 0n;
 
-  const swaps = await collectPoolSwaps(
+  const toObservations = (swaps: readonly PoolSwap[]): Observation[] => {
+    const out: Observation[] = [];
+    for (const swap of swaps) {
+      if (swap.blockTime === null || swap.tokenAfter <= 0n) continue;
+      const sol = swap.solAfter + offset;
+      if (sol <= 0n) continue;
+      const delta =
+        swap.solAfter > swap.solBefore ? swap.solAfter - swap.solBefore : swap.solBefore - swap.solAfter;
+      out.push({
+        timestamp: swap.blockTime,
+        price: priceFromReserves(sol, swap.tokenAfter),
+        volumeLamports: delta,
+      });
+    }
+    return out;
+  };
+
+  let count = 0;
+  let oldest: number | null = null;
+  let newest: number | null = null;
+
+  await collectPoolSwaps(
     rpc,
     pool.address,
     pool.pool,
-    { maxTransactions: POOL_MAX_TRANSACTIONS, concurrency: WALK_CONCURRENCY },
+    {
+      maxTransactions: POOL_MAX_TRANSACTIONS,
+      concurrency: WALK_CONCURRENCY,
+      onBatch: async (pageSwaps) => {
+        const observations = toObservations(pageSwaps);
+        if (observations.length === 0) return;
+        count += observations.length;
+        for (const observation of observations) {
+          if (oldest === null || observation.timestamp < oldest) oldest = observation.timestamp;
+          if (newest === null || observation.timestamp > newest) newest = observation.timestamp;
+        }
+        await writeObservationCandles(client, mint, observations);
+      },
+    },
     config?.protocolFeeRecipients ?? [],
   );
 
-  const observations: Observation[] = [];
-  for (const swap of swaps) {
-    if (swap.blockTime === null || swap.tokenAfter <= 0n) continue;
-    const sol = swap.solAfter + offset;
-    if (sol <= 0n) continue;
-    const delta =
-      swap.solAfter > swap.solBefore ? swap.solAfter - swap.solBefore : swap.solBefore - swap.solAfter;
-    observations.push({
-      timestamp: swap.blockTime,
-      price: priceFromReserves(sol, swap.tokenAfter),
-      volumeLamports: delta,
-    });
-  }
-  return observations;
+  return { count, oldest, newest };
 }
 
 /**
@@ -207,50 +254,55 @@ export function backfillChart(mint: string): void {
        * it. Only if the pool read comes back empty, which on a throttled node it
        * can, does the curve chart stand in so there is something to see.
        */
-      let observations = result.observations;
-      let poolCount = 0;
+      let pool: PoolBackfill = { count: 0, oldest: null, newest: null };
+      let graduated = false;
       try {
         const reader = new PoolReader(rpc);
         const resolution = await reader.resolve(mint);
         if (resolution.venue.kind === 'pumpswap') {
-          const fromPool = await poolObservations(rpc, reader, mint);
-          poolCount = fromPool.length;
-          if (fromPool.length > 0) {
-            observations = [...fromPool].sort((a, b) => a.timestamp - b.timestamp);
-          }
+          graduated = true;
+          // Writes candles page by page as it walks, so there is nothing to
+          // collect and write here.
+          pool = await poolBackfill(rpc, reader, mint, client);
         }
       } catch (error) {
         console.error('[chart] pool history failed for', mint, error);
       }
 
-      const timestamps = observations.map((observation) => observation.timestamp);
+      // The pool history is the chart for a graduated token; the curve stands in
+      // only when the pool read came back with nothing, which a throttled node
+      // can do. Recorded even when empty, so a token with no trades is not
+      // re-walked on every page view.
+      const usedPool = graduated && pool.count > 0;
+      if (usedPool) {
+        await recordBackfill(
+          client,
+          { mint, oldestTimestamp: pool.oldest, newestTimestamp: pool.newest, observations: pool.count, truncated: result.truncated },
+          Date.now(),
+        );
+        markSettled(mint);
+        console.log(`[chart] ${mint} backfilled ${pool.count} pool observations`);
+        return;
+      }
 
-      // Written even when empty. A token that genuinely has no trades yet must
-      // still be marked as looked at, or every page view re-walks the chain to
-      // rediscover that there is nothing there.
+      const curve = result.observations;
+      const timestamps = curve.map((observation) => observation.timestamp);
       await recordBackfill(
         client,
         {
           mint,
           oldestTimestamp: timestamps.length > 0 ? Math.min(...timestamps) : null,
           newestTimestamp: timestamps.length > 0 ? Math.max(...timestamps) : null,
-          observations: observations.length,
+          observations: curve.length,
           truncated: result.truncated,
         },
         Date.now(),
       );
 
       markSettled(mint);
-      if (observations.length === 0) return;
-
-      for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
-        await writeCandles(client, mint, timeframe, buildCandles(observations, timeframe));
-      }
-
-      console.log(
-        `[chart] ${mint} backfilled ${observations.length} observations ` +
-          `(${poolCount > 0 ? `${poolCount} pool` : `${result.observations.length} curve`})`,
-      );
+      if (curve.length === 0) return;
+      await writeObservationCandles(client, mint, curve);
+      console.log(`[chart] ${mint} backfilled ${curve.length} curve observations`);
     } catch (error) {
       // Left unrecorded on failure, so the next visitor tries again rather
       // than inheriting a permanent blank.

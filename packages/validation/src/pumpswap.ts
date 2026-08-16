@@ -49,6 +49,13 @@ export interface CollectPoolOptions {
   readonly maxTransactions?: number;
   readonly concurrency?: number;
   readonly onProgress?: (scanned: number, swaps: number) => void;
+  /**
+   * Called with each page's swaps as the walk goes, newest first. Lets a caller
+   * turn history into a chart as it arrives rather than waiting for the whole
+   * walk, so the recent past draws in seconds and the deeper past fills in
+   * behind it. Awaited, so a slow consumer paces the walk rather than racing it.
+   */
+  readonly onBatch?: (pageSwaps: readonly PoolSwap[]) => void | Promise<void>;
 }
 
 const SIGNATURE_PAGE = 100;
@@ -247,13 +254,18 @@ export async function collectPoolSwaps(
       rpc.getTransaction(entry.signature, 'confirmed'),
     );
 
+    const pageSwaps: PoolSwap[] = [];
     for (const transaction of transactions) {
       if (!transaction) continue;
       const swap = asPoolSwap(transaction, pool, protocolFeeRecipients);
-      if (swap) collected.push(swap);
+      if (swap) {
+        collected.push(swap);
+        pageSwaps.push(swap);
+      }
     }
 
     options.onProgress?.(scanned, collected.length);
+    if (pageSwaps.length > 0) await options.onBatch?.(pageSwaps);
     if (page.length < SIGNATURE_PAGE) break;
   }
 

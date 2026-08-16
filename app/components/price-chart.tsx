@@ -96,7 +96,7 @@ const INDICATORS: readonly { id: string; name: string }[] = [
 /* Small line-drawn icons for the toolbar and the indicators button. Stroked
    with currentColor so they take the button's own colour and its on-state. */
 const icon = (paths: ReactNode) => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {paths}
   </svg>
 );

@@ -3557,15 +3557,18 @@ body:has(main.wide) .site-footer .shell {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-faint);
+  border: 1px solid var(--line);
+  background: var(--ink-sunken);
+  color: var(--text-dim);
   cursor: pointer;
   transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
 }
+.tool-btn svg {
+  display: block;
+}
 .tool-btn:hover:not(.on) {
   color: var(--text);
-  background: var(--ink-sunken);
+  border-color: var(--line-bright);
 }
 .tool-btn.on {
   color: var(--accent);
