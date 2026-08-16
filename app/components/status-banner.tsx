@@ -25,6 +25,16 @@ interface Health {
   capabilities: Capability[];
 }
 
+/** Our health shape, not a proxy's error body that happens to be JSON. */
+export function isHealth(body: unknown): body is Health {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    typeof (body as { status?: unknown }).status === 'string' &&
+    Array.isArray((body as { capabilities?: unknown }).capabilities)
+  );
+}
+
 export function StatusBanner() {
   const [health, setHealth] = useState<Health | null>(null);
 
@@ -34,8 +44,11 @@ export function StatusBanner() {
     const check = async (): Promise<void> => {
       try {
         const response = await fetch('/api/health');
-        const body = (await response.json()) as Health;
-        if (!cancelled) setHealth(body);
+        const body = (await response.json()) as unknown;
+        // Only our own health shape counts. A proxy's 502 body during a deploy
+        // is JSON too, with a `status` but no `capabilities`, and taking it at
+        // face value put `undefined.length` in the render on every page.
+        if (!cancelled) setHealth(isHealth(body) ? body : null);
       } catch {
         // A status check that cannot reach the server says nothing rather than
         // claiming an outage it has not established.
@@ -51,7 +64,8 @@ export function StatusBanner() {
     };
   }, []);
 
-  if (!health || health.status === 'ok' || health.capabilities.length === 0) return null;
+  if (!health || health.status === 'ok' || !Array.isArray(health.capabilities)) return null;
+  if (health.capabilities.length === 0) return null;
 
   const stopped = health.capabilities.filter((entry) => entry.level === 'unavailable');
   const worst = stopped[0] ?? health.capabilities[0]!;
