@@ -13,6 +13,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { knownImages, resolveLaunchImages } from '@/lib/token-images';
 import { solUsd } from '@/lib/sol-price';
 import { resolveTokenName } from '@/lib/token-name';
+import { searchExternalTokens } from '@/lib/token-search';
 
 /**
  * The launch feed, in three lanes, and search over it.
@@ -129,26 +130,54 @@ export async function GET(request: Request): Promise<Response> {
       });
     }
 
-    const mints = found.map((launch) => launch.mint);
-    const images = await knownImages(mints);
-    resolveLaunchImages(mints);
+    // A name reaches past the feed: an outside index turns the word into mints
+    // the feed never saw, which is the whole reason search sits above the feed.
+    // Discovery only — the fill still reads chain, never this. A token already
+    // in the feed is kept from there, where its curve is fresher, and its
+    // duplicate from the index is dropped. Skipped for an address query, which
+    // is a mint, not a name.
+    const localMints = new Set(found.map((launch) => launch.mint));
+    const external = MINT_PATTERN.test(query)
+      ? []
+      : (await searchExternalTokens(query, limit)).filter((token) => !localMints.has(token.mint));
+
+    const images = await knownImages([...localMints, ...external.map((token) => token.mint)]);
+    resolveLaunchImages([...localMints]);
 
     const searchCounts = await creatorLaunchCounts(
       client,
       found.map((launch) => launch.creator),
     );
 
-    return Response.json({
-      query,
-      solUsd: await solUsd(),
-      results: found.map((launch) =>
+    const results = [
+      ...found.map((launch) =>
         shape(
           { ...launch, curve: null },
           images.get(launch.mint) ?? null,
           searchCounts.get(launch.creator) ?? 1,
         ),
       ),
-    });
+      ...external.map((token) =>
+        shape(
+          {
+            mint: token.mint,
+            name: token.name,
+            symbol: token.symbol || token.name,
+            creator: '',
+            bondingCurve: '',
+            uri: '',
+            launchedAt: 0,
+            slot: null,
+            firstSeenAt: 0,
+            curve: null,
+          },
+          images.get(token.mint) ?? token.image,
+          1,
+        ),
+      ),
+    ].slice(0, limit);
+
+    return Response.json({ query, solUsd: await solUsd(), results });
   }
 
   const [fresh, bonding, bonded] = await Promise.all([
