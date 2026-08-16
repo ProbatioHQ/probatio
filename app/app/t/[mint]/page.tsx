@@ -16,8 +16,8 @@ export async function generateMetadata({
   const { mint } = await params;
   if (!MINT_PATTERN.test(mint)) return { title: 'Not found, Probatio' };
 
-  const token = await tokenName(mint);
-  return { title: token.known ? `${token.symbol ?? token.name}, Probatio` : 'Probatio' };
+  const token = await tokenName(mint).catch(() => null);
+  return { title: token?.known ? `${token.symbol ?? token.name}, Probatio` : 'Probatio' };
 }
 
 /**
@@ -40,13 +40,19 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   // background, so the page never waits on a stranger's image host.
   resolveLaunchImages([mint]);
 
+  // Each of these reads the chain, an outside index, or the database, and none
+  // of them is worth failing the whole page over. One that throws falls back to
+  // its empty answer rather than taking the trading surface down with it — the
+  // page is where somebody came to trade, and a missing name or picture is no
+  // reason to deny them that. A page that crashed here surfaced as a server
+  // render error with only a digest, impossible to read from the outside.
   const [token, launch, images, dexIndexed] = await Promise.all([
-    tokenName(mint),
-    launchByMint(client, mint),
-    knownImages([mint]),
+    tokenName(mint).catch(() => ({ name: shortMint(mint), symbol: null, known: false }) as const),
+    launchByMint(client, mint).catch(() => null),
+    knownImages([mint]).catch(() => new Map<string, string>()),
     // Asked here rather than in the browser, so the page opens on the chart
     // that actually has data instead of flipping once it finds out.
-    isDexIndexed(mint),
+    isDexIndexed(mint).catch(() => false),
   ]);
   const image = images.get(mint) ?? null;
 
