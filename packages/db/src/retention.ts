@@ -91,7 +91,10 @@ export async function pruneCandles(db: Client, now: number): Promise<number> {
  * into candles.
  */
 export async function prunePoolSnapshots(db: Client, now: number): Promise<number> {
-  const cutoff = Math.floor(now / 1_000) - POOL_SNAPSHOT_WINDOW_SECONDS;
+  // observed_at is written in milliseconds (Date.now()), not the unix seconds
+  // that candles and launches use, so the cutoff is milliseconds too. Getting
+  // this wrong makes the comparison never true and the prune a silent no-op.
+  const cutoff = now - POOL_SNAPSHOT_WINDOW_SECONDS * 1_000;
   const result = await db.execute({
     sql: `DELETE FROM pool_snapshots
           WHERE observed_at < ?

@@ -132,11 +132,15 @@ describe('pool snapshot retention', () => {
   }
 
   it('drops old snapshots but keeps the newest for each mint', async () => {
-    const now = 1_000 * DAY;
-    await writeSnapshot(1, now - 30 * DAY); // old, not newest: dropped
-    await writeSnapshot(2, now - 20 * DAY); // old, but newest for the mint: kept
+    // observed_at is written in milliseconds in production (Date.now()), so the
+    // test writes and prunes in milliseconds — the units have to match or the
+    // prune is a no-op the way it was before this was caught.
+    const nowMs = 1_800_000_000_000;
+    const dayMs = DAY * 1_000;
+    await writeSnapshot(1, nowMs - 30 * dayMs); // old, not newest: dropped
+    await writeSnapshot(2, nowMs - 20 * dayMs); // old, but newest for the mint: kept
 
-    const dropped = await prunePoolSnapshots(test.db, now * 1_000);
+    const dropped = await prunePoolSnapshots(test.db, nowMs);
 
     expect(dropped).toBe(1);
     const left = await test.db.execute('SELECT slot FROM pool_snapshots');

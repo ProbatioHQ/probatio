@@ -1,7 +1,7 @@
 import 'server-only';
 import { createClient } from '@libsql/client';
 import { runRetention } from '@probatio/db';
-import { copyFileSync, existsSync, rmSync, statfsSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { databaseUrl } from './env';
@@ -57,10 +57,14 @@ export async function reclaimIfTight(): Promise<void> {
   if (!path) return; // A remote database is not our disk to manage.
 
   const staging = join(tmpdir(), 'probatio-reclaim.db');
+  // Marks the moment the live file is being replaced. On the container disk, so
+  // it can be written even when the volume that holds the database is full.
+  const marker = join(tmpdir(), 'probatio-reclaim.swapping');
 
-  // A reclaim interrupted mid-swap leaves the live file gone and the compacted
-  // copy still on the container disk. Put it back rather than starting empty.
-  if (!existsSync(path)) {
+  // A swap that was interrupted leaves this mark set: the live file may be
+  // missing or half-written, and the staged copy is the last whole database.
+  // Restore it and clear the mark before anything opens the live file.
+  if (existsSync(marker)) {
     if (existsSync(staging)) {
       try {
         copyFileSync(staging, path);
@@ -69,8 +73,16 @@ export async function reclaimIfTight(): Promise<void> {
         console.error('[reclaim] could not restore the staged database', error);
       }
     }
+    try {
+      rmSync(marker, { force: true });
+    } catch {
+      // The mark is on the throwaway disk; a stuck one is cleared next boot.
+    }
     return;
   }
+
+  // No live file and no interrupted swap: a fresh install, nothing to reclaim.
+  if (!existsSync(path)) return;
 
   const free = freeBytes(dirname(path));
   if (free === null || free > TIGHT_BYTES) return;
@@ -102,10 +114,18 @@ export async function reclaimIfTight(): Promise<void> {
     }
 
     // 3. Swap the small copy in. The volume has no room for both, so the big
-    //    one goes first; the copy stays in staging so step one above can
-    //    recover if the process dies between these two lines.
+    //    one goes first. The mark is set before the removal and cleared after
+    //    the copy, so a death anywhere in between is caught at the next boot,
+    //    which restores the whole staged copy rather than opening a half-file.
+    writeFileSync(marker, '');
     remove(path);
     copyFileSync(staging, path);
+    try {
+      rmSync(marker, { force: true });
+    } catch {
+      // Left set, the next boot restores from the staged copy needlessly but
+      // harmlessly; not worth failing the reclaim over.
+    }
     console.log(`[reclaim] database is now ${Math.round(statSync(path).size / 1e6)}MB`);
   } catch (error) {
     // Better a database still tight than one left half-swapped. If the live

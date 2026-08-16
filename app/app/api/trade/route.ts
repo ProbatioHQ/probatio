@@ -13,7 +13,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { noteActivity } from '@/lib/activity';
 import { activeSeason } from '@/lib/season';
 import { currentUser } from '@/lib/session';
-import { resolveMint } from '@/lib/rpc';
+import { resolveFill, resolveMint } from '@/lib/rpc';
 
 /**
  * Execute a trade.
@@ -134,7 +134,9 @@ export async function POST(request: Request): Promise<Response> {
 
   let atFillResolution;
   try {
-    atFillResolution = await resolveMint(mint);
+    // Fresh and unshared: the fill must reflect a read taken after the delay,
+    // not one that was already in flight before it (see resolveFill).
+    atFillResolution = await resolveFill(mint);
   } catch {
     // The click was priced and the fill could not be. Refusing is the only
     // honest outcome: filling at the click price would hand the trader the
