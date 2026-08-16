@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { knownImages, resolveLaunchImages } from '@/lib/token-images';
 import { solUsd } from '@/lib/sol-price';
+import { resolveTokenName } from '@/lib/token-name';
 
 /**
  * The launch feed, in three lanes, and search over it.
@@ -27,6 +28,9 @@ import { solUsd } from '@/lib/sol-price';
  */
 
 const MAX_LIMIT = 100;
+
+/** A base58 mint address, the thing someone pastes to reach a token directly. */
+const MINT_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 /**
  * The floor for "about to bond".
  *
@@ -90,6 +94,41 @@ export async function GET(request: Request): Promise<Response> {
   // belong to.
   if (query) {
     const found = await searchLaunches(client, query, limit);
+
+    // A pasted address the feed never caught still resolves. The token page
+    // reads any mint from chain, so search must reach it too rather than stop
+    // at what the feed happened to see — that is the whole point of search over
+    // and above the feed. Only when the local search found nothing and the
+    // query is an address, so a name search still costs one query, not a chain
+    // read, and a token already in the feed is served from the feed.
+    if (found.length === 0 && MINT_PATTERN.test(query)) {
+      const named = await resolveTokenName(query);
+      resolveLaunchImages([query]);
+      const image = (await knownImages([query])).get(query) ?? null;
+      return Response.json({
+        query,
+        solUsd: await solUsd(),
+        results: [
+          shape(
+            {
+              mint: query,
+              name: named.name,
+              symbol: named.symbol ?? named.name,
+              creator: '',
+              bondingCurve: '',
+              uri: '',
+              launchedAt: 0,
+              slot: null,
+              firstSeenAt: 0,
+              curve: null,
+            },
+            image,
+            1,
+          ),
+        ],
+      });
+    }
+
     const mints = found.map((launch) => launch.mint);
     const images = await knownImages(mints);
     resolveLaunchImages(mints);

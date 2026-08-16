@@ -154,6 +154,9 @@ function marketCapLabel(lamports: string, solUsd: number | null): string {
 }
 
 function age(launchedAt: number, now: number): string {
+  // A searched token that was never in the feed has no known launch time. Show
+  // nothing rather than counting from the epoch and claiming it is decades old.
+  if (launchedAt <= 0) return '';
   const seconds = Math.max(0, Math.floor(now / 1000) - launchedAt);
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`;

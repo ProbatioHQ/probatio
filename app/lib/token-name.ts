@@ -29,12 +29,11 @@ export function shortMint(mint: string): string {
 }
 
 /**
- * Memoized per request. The token page reads the name twice, once in
- * generateMetadata and once in the body, and without this each render did the
- * launch lookup, the metadata-cache lookup, and up to an eight-second on-chain
- * read twice for one page view. `cache` collapses the two calls into one.
+ * Resolve a token's name, cheapest source first: the launch we recorded, then
+ * the metadata cache, then the chain. Plain and uncached, so it is safe to call
+ * anywhere — a route handler as well as a render.
  */
-export const tokenName = cache(async (mint: string): Promise<TokenName> => {
+export async function resolveTokenName(mint: string): Promise<TokenName> {
   const client = await db();
 
   const launch = await launchByMint(client, mint);
@@ -63,4 +62,12 @@ export const tokenName = cache(async (mint: string): Promise<TokenName> => {
   }
 
   return { name: shortMint(mint), symbol: null, known: false };
-});
+}
+
+/**
+ * Memoized per request. The token page reads the name twice, once in
+ * generateMetadata and once in the body, and without this each render did the
+ * launch lookup, the metadata-cache lookup, and up to an eight-second on-chain
+ * read twice for one page view. `cache` collapses the two calls into one.
+ */
+export const tokenName = cache(resolveTokenName);
