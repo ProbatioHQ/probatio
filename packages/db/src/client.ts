@@ -1,6 +1,30 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { createClient, type Client, type Config } from '@libsql/client';
 
 export type { Client } from '@libsql/client';
+
+/**
+ * Make sure a local file database can be opened.
+ *
+ * libSQL will not create missing parent directories, so a `file:/data/x.db`
+ * on a host where `/data` does not yet exist (a fresh container, or a volume
+ * whose mount path the app has never written to) fails to open and takes the
+ * whole database down. Creating the directory up front turns that into a
+ * working database instead of a boot failure. Only files are touched; a remote
+ * URL or `:memory:` has no directory and is left alone.
+ */
+function ensureFileDirectory(url: string): void {
+  if (!url.startsWith('file:')) return;
+  const path = url.slice('file:'.length).replace(/^\/+/, '/');
+  const dir = dirname(path);
+  if (dir === '.' || dir === '/' || dir === '') return;
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    // Opening the database next will surface the real, actionable error.
+  }
+}
 
 /**
  * Open a database connection.
@@ -16,6 +40,8 @@ export function openDatabase(config?: Partial<Config>): Client {
       'No database URL. Set DATABASE_URL, or pass { url: ":memory:" } for an ephemeral one.',
     );
   }
+
+  ensureFileDirectory(url);
 
   const authToken = config?.authToken ?? process.env['DATABASE_AUTH_TOKEN'];
 
