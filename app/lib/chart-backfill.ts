@@ -12,6 +12,7 @@ import { PoolReader, RpcClient, bondingCurveAddress, pumpSwapReserveOffset } fro
 import { collectPoolSwaps, type PoolSwap } from '@probatio/validation';
 import { db } from './db';
 import { hasDedicatedRpc, rpcEndpoint } from './env';
+import { spliceGeckoHistory } from './gecko-history';
 
 /**
  * History for a chart somebody is looking at.
@@ -42,14 +43,14 @@ const DEDICATED = hasDedicatedRpc();
 const MAX_TRANSACTIONS = Number(
   process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '4000' : '400'),
 );
-// Deep enough to reach the launch of even a heavily traded token, not just the
-// last day or two. A token doing thousands of swaps buries a week of history
-// under the recent ones, so a shallow walk drew one early candle and then a
-// flat line across the gap — the whole middle of its life missing. Walked page
-// by page and written as it goes, so the recent chart is there in seconds and
-// the deep past fills in behind it over the next few minutes.
+// Enough recent pool history to draw the last day or two accurately and to give
+// the index splice a solid overlap to fix its scale against — not the whole life
+// of a token doing thousands of swaps a day, which would be tens of thousands of
+// reads to walk. The deep past comes from the index (see spliceGeckoHistory),
+// which already has it from launch; the walk covers the recent end at the live
+// price's own scale, and the two meet where the walk's oldest candle sits.
 const POOL_MAX_TRANSACTIONS = Number(
-  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '25000' : '400'),
+  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '5000' : '400'),
 );
 /** How many trade reads run at once during a walk. */
 const WALK_CONCURRENCY = DEDICATED ? 12 : 2;
@@ -276,6 +277,16 @@ export function backfillChart(mint: string): void {
         console.error('[chart] pool history failed for', mint, error);
       }
 
+      // The deep past the walk could not reach, filled from the index and
+      // scaled onto the same axis. Best-effort and display-only; leaves the
+      // chart as the walk drew it if the index has nothing to add.
+      let geckoAdded = 0;
+      try {
+        geckoAdded = await spliceGeckoHistory(client, mint);
+      } catch (error) {
+        console.error('[chart] index history failed for', mint, error);
+      }
+
       // Record the combined span, so the token is not walked again.
       const times: number[] = curve.map((observation) => observation.timestamp);
       if (pool.oldest !== null) times.push(pool.oldest);
@@ -292,7 +303,9 @@ export function backfillChart(mint: string): void {
         Date.now(),
       );
       markSettled(mint);
-      console.log(`[chart] ${mint} backfilled ${curve.length} curve + ${pool.count} pool observations`);
+      console.log(
+        `[chart] ${mint} backfilled ${curve.length} curve + ${pool.count} pool + ${geckoAdded} index observations`,
+      );
     } catch (error) {
       // Left unrecorded on failure, so the next visitor tries again rather
       // than inheriting a permanent blank.

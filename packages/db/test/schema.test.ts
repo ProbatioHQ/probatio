@@ -125,6 +125,7 @@ describe('migrations', () => {
       '022_reset_chart_history.sql',
       '023_rewalk_full_history.sql',
       '024_rewalk_to_launch.sql',
+      '025_index_history.sql',
     ]);
   });
 
