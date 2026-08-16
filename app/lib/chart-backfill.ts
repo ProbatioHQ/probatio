@@ -13,6 +13,7 @@ import { collectPoolSwaps, type PoolSwap } from '@probatio/validation';
 import { db } from './db';
 import { hasDedicatedRpc, rpcEndpoint } from './env';
 import { spliceGeckoHistory } from './gecko-history';
+import { splicePumpfunHistory } from './pumpfun-history';
 
 /**
  * History for a chart somebody is looking at.
@@ -263,15 +264,26 @@ export function backfillChart(mint: string): void {
        * follows refines the recent end at the live scale and adds the sub-minute
        * detail the index does not carry; the two meet at the live price.
        */
-      let geckoAdded = 0;
+      let historyAdded = 0;
       if (resolution?.venue.kind === 'pumpswap' && resolution.pool) {
+        const anchor = Number(
+          priceFromReserves(resolution.pool.solReserve, resolution.pool.tokenReserve),
+        );
+        const anchorPrice = anchor > 0 ? anchor : undefined;
+        // pump.fun's own candle service first, for a chart that matches theirs at
+        // every timeframe from launch. A general index is the fallback for a
+        // token pump.fun cannot serve.
         try {
-          const anchor = Number(
-            priceFromReserves(resolution.pool.solReserve, resolution.pool.tokenReserve),
-          );
-          geckoAdded = await spliceGeckoHistory(client, mint, anchor > 0 ? anchor : undefined);
+          historyAdded = await splicePumpfunHistory(client, mint, anchorPrice);
         } catch (error) {
-          console.error('[chart] index history failed for', mint, error);
+          console.error('[chart] pump.fun history failed for', mint, error);
+        }
+        if (historyAdded === 0) {
+          try {
+            historyAdded = await spliceGeckoHistory(client, mint, anchorPrice);
+          } catch (error) {
+            console.error('[chart] index history failed for', mint, error);
+          }
         }
       }
 
@@ -315,7 +327,7 @@ export function backfillChart(mint: string): void {
       );
       markSettled(mint);
       console.log(
-        `[chart] ${mint} backfilled ${curve.length} curve + ${pool.count} pool + ${geckoAdded} index observations`,
+        `[chart] ${mint} backfilled ${curve.length} curve + ${pool.count} pool + ${historyAdded} history observations`,
       );
     } catch (error) {
       // Left unrecorded on failure, so the next visitor tries again rather

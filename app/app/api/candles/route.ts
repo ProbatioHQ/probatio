@@ -72,25 +72,26 @@ export async function GET(request: Request): Promise<Response> {
   let candles: StoredCandle[];
   if (stored) {
     candles = await readCandles(client, mint, timeframe, limit);
-  } else if (derivedSeconds! >= DAY) {
-    // Day, week, month: built from the stored daily series, which the index
-    // fills back to launch (hourly does not reach that far for an old, quiet
-    // token). A token that has no daily yet falls back to rolling up the hourly.
-    const perBucket = Math.round(derivedSeconds! / DAY);
-    const daily = await readCandles(client, mint, 'd1', Math.min(limit * perBucket, MAX_DAILY));
-    if (daily.length > 0) {
-      candles = rollupCandles(daily, derivedSeconds!).slice(-limit);
-    } else {
-      const hours = Math.round(derivedSeconds! / HOUR);
-      const hourly = await readCandles(client, mint, 'h1', Math.min(limit * hours, MAX_HOURLY));
-      candles = rollupCandles(hourly, derivedSeconds!).slice(-limit);
-    }
   } else {
-    // Four- and twelve-hour: built from the hourly candle. Read enough hours to
-    // cover the coarse buckets asked for, then roll them up and keep `limit`.
-    const perBucket = Math.round(derivedSeconds! / HOUR);
-    const hourly = await readCandles(client, mint, 'h1', Math.min(limit * perBucket, MAX_HOURLY));
-    candles = rollupCandles(hourly, derivedSeconds!).slice(-limit);
+    /*
+     * The coarse timeframes. pump.fun's own candles fill h4, h12 and d1 as their
+     * own stored series, back to launch, so those are read directly; week and
+     * month roll up from the stored daily. A token pump.fun could not serve has
+     * none of these, so it falls back to rolling up the hourly. Returns the full
+     * span rather than just `limit`, so the whole life shows on one screen.
+     */
+    const readTf = derivedSeconds! >= DAY ? 'd1' : timeframe;
+    const source = await readCandles(client, mint, readTf, readTf === 'd1' ? MAX_DAILY : MAX_CANDLES);
+    if (source.length > 0) {
+      candles =
+        readTf === timeframe
+          ? source.slice(-MAX_CANDLES)
+          : rollupCandles(source, derivedSeconds!).slice(-MAX_CANDLES);
+    } else {
+      const perBucket = Math.round(derivedSeconds! / HOUR);
+      const hourly = await readCandles(client, mint, 'h1', Math.min(MAX_CANDLES * perBucket, MAX_HOURLY));
+      candles = rollupCandles(hourly, derivedSeconds!).slice(-MAX_CANDLES);
+    }
   }
 
   /*
