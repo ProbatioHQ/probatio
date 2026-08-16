@@ -1,13 +1,15 @@
 import 'server-only';
 import {
   getManyTokenMetadata,
+  getTokenMetadata,
   launchByMint,
   recordOffchainFailure,
   recordOffchainMetadata,
   upsertOnchainMetadata,
 } from '@probatio/db';
-import { fetchOffchainMetadata } from '@probatio/metadata';
+import { MetadataReader, fetchOffchainMetadata } from '@probatio/metadata';
 import { db } from './db';
+import { sharedRpc } from './rpc';
 
 /**
  * Token pictures.
@@ -56,27 +58,42 @@ async function resolveOne(mint: string, now: number): Promise<void> {
   try {
     const client = await db();
 
-    // The launch row is where the URI came from. Seeding the metadata cache
-    // from it means the picture can be resolved without an RPC round trip for
-    // something we already watched happen.
+    // Where the metadata URI comes from, cheapest first: the launch we recorded,
+    // then the token metadata we cached, then the chain. A searched token was
+    // never in the feed, so without the last two its picture could never resolve
+    // and its page showed a placeholder — which is exactly what was reported.
     const launch = await launchByMint(client, mint);
-    if (!launch?.uri) return;
+    let uri = launch?.uri ?? null;
+    let name = launch?.name ?? null;
+    let symbol = launch?.symbol ?? null;
+
+    if (!uri) {
+      const cached = await getTokenMetadata(client, mint);
+      uri = cached?.uri ?? null;
+      name ??= cached?.name ?? null;
+      symbol ??= cached?.symbol ?? null;
+    }
+    if (!uri) {
+      try {
+        const info = await new MetadataReader(sharedRpc()).read(mint);
+        uri = info.uri ?? null;
+        name = info.name ?? name;
+        symbol = info.symbol ?? symbol;
+      } catch {
+        // An unreachable node is a missing picture, not a failure to record.
+      }
+    }
+
+    if (!uri) return;
 
     await upsertOnchainMetadata(
       client,
-      {
-        mint,
-        name: launch.name || null,
-        symbol: launch.symbol || null,
-        uri: launch.uri,
-        updateAuthority: null,
-        decimals: null,
-      },
+      { mint, name: name || null, symbol: symbol || null, uri, updateAuthority: null, decimals: null },
       now,
     );
 
     try {
-      const document = await fetchOffchainMetadata(launch.uri, { timeoutMs: TIMEOUT_MS });
+      const document = await fetchOffchainMetadata(uri, { timeoutMs: TIMEOUT_MS });
       await recordOffchainMetadata(
         client,
         mint,
@@ -137,6 +154,48 @@ export function resolveLaunchImages(mints: readonly string[]): void {
       }
     });
     await Promise.all(workers);
+  })().catch(() => undefined);
+}
+
+/**
+ * Remember pictures a search already found.
+ *
+ * The outside search index hands back an image URL with each hit, so clicking a
+ * result should open a page that already has the picture rather than one that
+ * resolves it from chain first. Recorded here, in the background, skipping any
+ * mint that already has an image. Best effort: a picture is never worth failing
+ * a search over.
+ */
+export function cacheImages(
+  entries: readonly { mint: string; name: string; symbol: string; image: string | null }[],
+): void {
+  void (async () => {
+    const withImage = entries.filter((entry) => entry.image);
+    if (withImage.length === 0) return;
+    const client = await db();
+    const now = Date.now();
+    const known = await getManyTokenMetadata(
+      client,
+      withImage.map((entry) => entry.mint),
+    );
+    for (const entry of withImage) {
+      if (known.get(entry.mint)?.imageUrl) continue;
+      try {
+        await upsertOnchainMetadata(
+          client,
+          { mint: entry.mint, name: entry.name || null, symbol: entry.symbol || null, uri: null, updateAuthority: null, decimals: null },
+          now,
+        );
+        await recordOffchainMetadata(
+          client,
+          entry.mint,
+          { name: entry.name || null, symbol: entry.symbol || null, description: null, imageUrl: entry.image },
+          now,
+        );
+      } catch {
+        // A cached picture is never worth failing over.
+      }
+    }
   })().catch(() => undefined);
 }
 

@@ -65,6 +65,11 @@ export const TIMEFRAME_LABELS: Record<string, string> = {
   m5: '5m',
   m15: '15m',
   h1: '1h',
+  h4: '4h',
+  h12: '12h',
+  d1: '1d',
+  w1: '1w',
+  mo1: '1M',
 };
 
 /** Moving averages, in candles. The two most-watched lengths. */

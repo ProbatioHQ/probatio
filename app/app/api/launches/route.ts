@@ -10,7 +10,7 @@ import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
-import { knownImages, resolveLaunchImages } from '@/lib/token-images';
+import { cacheImages, knownImages, resolveLaunchImages } from '@/lib/token-images';
 import { solUsd } from '@/lib/sol-price';
 import { resolveTokenName } from '@/lib/token-name';
 import { searchExternalTokens } from '@/lib/token-search';
@@ -140,6 +140,10 @@ export async function GET(request: Request): Promise<Response> {
     const external = MINT_PATTERN.test(query)
       ? []
       : (await searchExternalTokens(query, limit)).filter((token) => !localMints.has(token.mint));
+
+    // Keep the pictures the index found, so opening a result shows its logo at
+    // once instead of resolving it from chain first.
+    cacheImages(external);
 
     const images = await knownImages([...localMints, ...external.map((token) => token.mint)]);
     resolveLaunchImages([...localMints]);

@@ -17,7 +17,7 @@ import type { PriceUnit } from '@/lib/price-display';
  * balance that is already wrong.
  */
 
-const TIMEFRAMES = ['s15', 'm1', 'm5', 'm15', 'h1'] as const;
+const TIMEFRAMES = ['s15', 'm1', 'm5', 'm15', 'h1', 'h4', 'h12', 'd1', 'w1', 'mo1'] as const;
 
 /** Bucket sizes, in seconds, matching TIMEFRAMES. */
 const BUCKET_SECONDS: Record<string, number> = {
@@ -26,6 +26,11 @@ const BUCKET_SECONDS: Record<string, number> = {
   m5: 300,
   m15: 900,
   h1: 3_600,
+  h4: 14_400,
+  h12: 43_200,
+  d1: 86_400,
+  w1: 604_800,
+  mo1: 2_592_000,
 };
 
 /**

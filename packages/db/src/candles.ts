@@ -106,6 +106,64 @@ export async function readCandles(
   return result.rows.map((row) => toStored(row as unknown as Record<string, unknown>));
 }
 
+/**
+ * Combine finer candles into coarser ones.
+ *
+ * The short timeframes are stored; the long ones, four hours and up, are built
+ * from the hourly candle on read rather than written on every poll — five more
+ * writes per token per tick, for buckets that barely move, is a cost the write
+ * path does not need to carry. Input must be oldest-first, the way `readCandles`
+ * returns it, so a bucket's open is its first candle and its close its last.
+ */
+export function rollupCandles(
+  candles: readonly StoredCandle[],
+  targetSeconds: number,
+): StoredCandle[] {
+  const buckets = new Map<
+    number,
+    { openTime: number; open: string; high: bigint; low: bigint; close: string; volume: bigint; trades: number }
+  >();
+
+  for (const candle of candles) {
+    const start = Math.floor(candle.openTime / targetSeconds) * targetSeconds;
+    const high = BigInt(candle.high);
+    const low = BigInt(candle.low);
+    const volume = BigInt(candle.volume);
+
+    const existing = buckets.get(start);
+    if (!existing) {
+      buckets.set(start, {
+        openTime: start,
+        open: candle.open,
+        high,
+        low,
+        close: candle.close,
+        volume,
+        trades: candle.trades,
+      });
+      continue;
+    }
+
+    if (high > existing.high) existing.high = high;
+    if (low < existing.low) existing.low = low;
+    existing.close = candle.close;
+    existing.volume += volume;
+    existing.trades += candle.trades;
+  }
+
+  return [...buckets.values()]
+    .sort((a, b) => a.openTime - b.openTime)
+    .map((bucket) => ({
+      openTime: bucket.openTime,
+      open: bucket.open,
+      high: bucket.high.toString(),
+      low: bucket.low.toString(),
+      close: bucket.close,
+      volume: bucket.volume.toString(),
+      trades: bucket.trades,
+    }));
+}
+
 export interface BackfillRecord {
   readonly mint: string;
   readonly oldestTimestamp: number | null;

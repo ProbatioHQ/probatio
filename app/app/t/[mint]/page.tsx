@@ -5,7 +5,7 @@ import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
 import { db } from '@/lib/db';
 import { isDexIndexed } from '@/lib/dex-pairs';
-import { knownImages } from '@/lib/token-images';
+import { knownImages, resolveLaunchImages } from '@/lib/token-images';
 import { shortMint, tokenName } from '@/lib/token-name';
 
 export async function generateMetadata({
@@ -34,6 +34,11 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   if (!MINT_PATTERN.test(mint)) notFound();
 
   const client = await db();
+
+  // Make sure this token's picture gets resolved, even one the feed never saw:
+  // the resolver now falls back to the chain when there is no launch row. In the
+  // background, so the page never waits on a stranger's image host.
+  resolveLaunchImages([mint]);
 
   const [token, launch, images, dexIndexed] = await Promise.all([
     tokenName(mint),

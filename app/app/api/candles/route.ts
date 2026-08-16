@@ -1,4 +1,4 @@
-import { readCandles } from '@probatio/db';
+import { readCandles, rollupCandles, type StoredCandle } from '@probatio/db';
 import { TIMEFRAMES, timeframeSeconds, type Timeframe } from '@probatio/candles';
 import { PUMPFUN_TOKEN_DECIMALS, PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { backfillChart, backfillInFlight } from '@/lib/chart-backfill';
@@ -20,30 +20,61 @@ import { rateLimit } from '@/lib/rate-limit';
 const MAX_CANDLES = 1_000;
 const MINT_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
+const HOUR = 3_600;
+/**
+ * The long timeframes, in seconds, each a whole number of hours.
+ *
+ * Built from the stored hourly candle rather than written on every poll: an old
+ * token needs a day or a week per candle to show its whole life on one screen,
+ * and those buckets move too slowly to be worth a write every few seconds.
+ */
+const DERIVED_SECONDS: Record<string, number> = {
+  h4: 4 * HOUR,
+  h12: 12 * HOUR,
+  d1: 24 * HOUR,
+  w1: 7 * 24 * HOUR,
+  mo1: 30 * 24 * HOUR,
+};
+
+/** The most hourly candles read to build a coarse one: about a year of them. */
+const MAX_HOURLY = 10_000;
+
 export async function GET(request: Request): Promise<Response> {
   const throttled = await rateLimit(request, 'read');
   if (throttled.response) return throttled.response;
 
   const url = new URL(request.url);
   const mint = url.searchParams.get('mint');
-  const timeframe = (url.searchParams.get('timeframe') ?? 'm1') as Timeframe;
+  const timeframe = url.searchParams.get('timeframe') ?? 'm1';
   const limitParam = Number(url.searchParams.get('limit') ?? '300');
 
   if (!mint || !MINT_PATTERN.test(mint)) {
     return Response.json({ error: 'a valid mint address is required' }, { status: 400 });
   }
-  if (!(timeframe in TIMEFRAMES)) {
-    return Response.json(
-      { error: `unknown timeframe, expected one of ${Object.keys(TIMEFRAMES).join(', ')}` },
-      { status: 400 },
-    );
+
+  const stored = timeframe in TIMEFRAMES;
+  const derivedSeconds = DERIVED_SECONDS[timeframe];
+  if (!stored && derivedSeconds === undefined) {
+    const known = [...Object.keys(TIMEFRAMES), ...Object.keys(DERIVED_SECONDS)].join(', ');
+    return Response.json({ error: `unknown timeframe, expected one of ${known}` }, { status: 400 });
   }
+  const seconds = stored ? timeframeSeconds(timeframe as Timeframe) : derivedSeconds!;
 
   const limit = Number.isFinite(limitParam)
     ? Math.min(Math.max(Math.trunc(limitParam), 1), MAX_CANDLES)
     : 300;
 
-  const candles = await readCandles(await db(), mint, timeframe, limit);
+  const client = await db();
+  let candles: StoredCandle[];
+  if (stored) {
+    candles = await readCandles(client, mint, timeframe, limit);
+  } else {
+    // Built from the hourly candle: read enough hours to cover the coarse
+    // buckets asked for, then roll them up and keep the most recent `limit`.
+    const perBucket = Math.round(derivedSeconds! / HOUR);
+    const hourly = await readCandles(client, mint, 'h1', Math.min(limit * perBucket, MAX_HOURLY));
+    candles = rollupCandles(hourly, derivedSeconds!).slice(-limit);
+  }
 
   /*
    * Ask for this token's history. Kicked off in the background: the walk takes
@@ -87,7 +118,7 @@ export async function GET(request: Request): Promise<Response> {
         volume: candle.volume,
         trades: candle.trades,
       })),
-      timeframeSeconds(timeframe),
+      seconds,
     ),
   });
 }

@@ -53,6 +53,7 @@ export {
   priceRange,
   readCandles,
   recordBackfill,
+  rollupCandles,
   writeCandles,
 } from './candles';
 export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';
