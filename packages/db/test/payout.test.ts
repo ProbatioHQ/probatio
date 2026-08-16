@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../src/testing';
 import {
   claimData,
+  entryPayoutSignature,
   markEntryClaimed,
   markEntryRefunded,
+  markSeasonFinalized,
   markSeasonVoided,
   recordFinalization,
   recordOnChainEntry,
+  recordPayout,
   setSeasonOnchain,
 } from '../src/payout';
 
@@ -130,6 +133,26 @@ describe('payout db', () => {
     const data = await claimData(test.db, { seasonId, trader: TRADER });
     expect(data!.voided).toBe(true);
     expect(data!.refundedAt).toBe(301);
+  });
+
+  it('pays a winner once and will not pay them twice', async () => {
+    const seasonId = await makeSeason();
+    await recordOnChainEntry(test.db, {
+      seasonId, userPubkey: TRADER, onchainEntryPubkey: SEASON_ADDR,
+      entryTxSignature: 'sig1', paid: 50_000_000n, evidence: EVIDENCE, now: 10,
+    });
+    expect(await entryPayoutSignature(test.db, { seasonId, trader: TRADER })).toBeNull();
+
+    await recordPayout(test.db, { seasonId, trader: TRADER, payout: 135_000_000n, txSignature: 'pay1', now: 100 });
+    expect(await entryPayoutSignature(test.db, { seasonId, trader: TRADER })).toBe('pay1');
+
+    // A second payout is refused: the guard keeps the first signature.
+    await recordPayout(test.db, { seasonId, trader: TRADER, payout: 999n, txSignature: 'pay2', now: 200 });
+    expect(await entryPayoutSignature(test.db, { seasonId, trader: TRADER })).toBe('pay1');
+
+    await markSeasonFinalized(test.db, { seasonId, now: 300 });
+    const data = await claimData(test.db, { seasonId, trader: TRADER });
+    expect(data!.payoutLamports).toBe(135_000_000n);
   });
 
   it('has no claim for a trader who never entered', async () => {

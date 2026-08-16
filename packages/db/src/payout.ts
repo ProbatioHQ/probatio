@@ -50,6 +50,48 @@ export async function setSeasonStatus(
   });
 }
 
+/** The payout transaction already sent to a trader, or null if they are unpaid. */
+export async function entryPayoutSignature(
+  db: Client,
+  input: { readonly seasonId: number; readonly trader: string },
+): Promise<string | null> {
+  const result = await db.execute({
+    sql: 'SELECT payout_tx_signature FROM entries WHERE season_id = ? AND user_pubkey = ?',
+    args: [input.seasonId, input.trader],
+  });
+  const value = result.rows[0]?.['payout_tx_signature'];
+  return value === null || value === undefined ? null : String(value);
+}
+
+/** Record that a winner was paid: the amount, the transaction, and when. */
+export async function recordPayout(
+  db: Client,
+  input: {
+    readonly seasonId: number;
+    readonly trader: string;
+    readonly payout: bigint;
+    readonly txSignature: string;
+    readonly now: number;
+  },
+): Promise<void> {
+  await db.execute({
+    sql: `UPDATE entries SET payout = ?, payout_tx_signature = ?, claimed_at = ?
+            WHERE season_id = ? AND user_pubkey = ? AND payout_tx_signature IS NULL`,
+    args: [encodeAmount(input.payout), input.txSignature, input.now, input.seasonId, input.trader],
+  });
+}
+
+/** Mark a season finalized once its winners have been paid. */
+export async function markSeasonFinalized(
+  db: Client,
+  input: { readonly seasonId: number; readonly now: number },
+): Promise<void> {
+  await db.execute({
+    sql: `UPDATE seasons SET status = 'finalized', finalized_at = ? WHERE id = ?`,
+    args: [input.now, input.seasonId],
+  });
+}
+
 /** Mark a season voided so its entries can be refunded. */
 export async function markSeasonVoided(
   db: Client,

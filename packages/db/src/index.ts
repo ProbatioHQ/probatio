@@ -194,11 +194,14 @@ export type {
 
 export {
   claimData,
+  entryPayoutSignature,
   markEntryClaimed,
   markEntryRefunded,
+  markSeasonFinalized,
   markSeasonVoided,
   recordFinalization,
   recordOnChainEntry,
+  recordPayout,
   seasonOnchainPubkey,
   setSeasonOnchain,
   setSeasonStatus,
