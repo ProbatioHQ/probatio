@@ -203,13 +203,19 @@ export function WalletButton() {
     const read = (): void => {
       void fetch('/api/positions')
         .then((response) => (response.ok ? response.json() : null))
-        .then((data: { equity?: { equity: string } } | null) => {
-          if (!cancelled && data?.equity) setBalance(data.equity.equity);
+        .then((data: { balance?: string } | null) => {
+          // The cash balance, not equity: it is what a buy spends and a sell
+          // returns, so it moves exactly when the trader acts — which is the
+          // number they are checking against. Equity (cash plus the value of
+          // what is held) barely moves on a buy, since the spend becomes a
+          // holding, and that reads as "it didn't take my SOL". The holding's
+          // worth lives with the position on the trade panel, where it belongs.
+          if (!cancelled && data?.balance) setBalance(data.balance);
         })
         .catch(() => undefined);
     };
     read();
-    // Equity moves with the market even when the trader does nothing.
+    // Refreshed on a timer so a fill from another tab still shows here.
     const timer = setInterval(read, 15_000);
     return () => {
       cancelled = true;
@@ -266,7 +272,7 @@ export function WalletButton() {
             {/* Labelled, and the label is not decoration. "10.00" beside a
                 symbol nobody reads as SOL looks like ten thousand of
                 something. The unit has to be a word. */}
-            <span className="bal-k">equity</span>
+            <span className="bal-k">balance</span>
             <span className="bal-v">
               {(Number(BigInt(balance)) / 1e9).toFixed(2)}
               <span className="unit">SOL</span>
