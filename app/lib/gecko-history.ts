@@ -1,5 +1,5 @@
 import 'server-only';
-import { readCandles, writeCandles, type Client } from '@probatio/db';
+import { readCandles, writeCandles, type Client, type StoredCandle } from '@probatio/db';
 
 /**
  * Deep chart history from an index, for the part of a token's life that reading
@@ -94,32 +94,61 @@ const TF_SOURCE: ReadonlyArray<{ timeframe: string; unit: 'hour' | 'minute'; agg
 /** The fewest overlapping candles that make the scale trustworthy. */
 const MIN_OVERLAP = 12;
 
-/**
- * Fill a chart's deep past from the index, scaled onto the walk's axis.
- *
- * Runs after the on-chain walk, and only fills buckets the walk did not reach —
- * it never rewrites a candle the walk produced. Best-effort: a missing pool, a
- * throttled index, or too little overlap to fix the scale all just leave the
- * chart as the walk drew it. Returns how many candles it added.
- */
-export async function spliceGeckoHistory(client: Client, mint: string): Promise<number> {
-  const pool = await deepestPool(mint);
-  if (pool === null) return 0;
+/** The store's price scale over the index's, from the live price if given. */
+function scaleFromAnchor(geckoH1: GeckoCandle[], anchorPrice: number): number | null {
+  // The most recent index candle is "now", and the live price is "now" on the
+  // store's scale, so their ratio maps the whole index history onto that scale.
+  let latest: GeckoCandle | null = null;
+  for (const g of geckoH1) {
+    if (g.c > 0 && (latest === null || g.t > latest.t)) latest = g;
+  }
+  if (latest === null) return null;
+  const scale = anchorPrice / latest.c;
+  return Number.isFinite(scale) && scale > 0 ? scale : null;
+}
 
-  // The scale that maps the index's price onto the store's, learned from where
-  // the walk and the index overlap on the hourly series.
-  const geckoH1 = await fetchOhlcv(pool, 'hour', 1);
-  if (geckoH1.length === 0) return 0;
-  const mineH1 = await readCandles(client, mint, 'h1', 1000);
-  const mineByTime = new Map(mineH1.filter((c) => c.trades > 0).map((c) => [c.openTime, Number(c.close)]));
+/** The same scale, from where the walk and the index overlap. */
+function scaleFromOverlap(mineH1: readonly StoredCandle[], geckoH1: GeckoCandle[]): number | null {
+  const mineByTime = new Map(
+    mineH1.filter((c) => c.trades > 0).map((c) => [c.openTime, Number(c.close)]),
+  );
   const ratios: number[] = [];
   for (const g of geckoH1) {
     const mine = mineByTime.get(g.t);
     if (mine !== undefined && g.c > 0) ratios.push(mine / g.c);
   }
-  if (ratios.length < MIN_OVERLAP) return 0;
+  if (ratios.length < MIN_OVERLAP) return null;
   const scale = median(ratios);
-  if (!Number.isFinite(scale) || scale <= 0) return 0;
+  return Number.isFinite(scale) && scale > 0 ? scale : null;
+}
+
+/**
+ * Fill a chart's history from the index, scaled onto the store's axis.
+ *
+ * Given a live price (the current pool price on the store's scale), it anchors
+ * to that and can run before the walk — the whole chart is on screen in seconds
+ * rather than after the minutes a walk takes. Without one it falls back to the
+ * walk/index overlap, so it still works when called afterwards. Either way it
+ * only fills buckets the store does not already have, and rewrites none of them.
+ * Best-effort: a missing pool or throttled index just leaves the chart as-is.
+ * Returns how many candles it added.
+ */
+export async function spliceGeckoHistory(
+  client: Client,
+  mint: string,
+  anchorPrice?: number,
+): Promise<number> {
+  const pool = await deepestPool(mint);
+  if (pool === null) return 0;
+
+  const geckoH1 = await fetchOhlcv(pool, 'hour', 1);
+  if (geckoH1.length === 0) return 0;
+
+  const scale =
+    anchorPrice !== undefined && anchorPrice > 0
+      ? scaleFromAnchor(geckoH1, anchorPrice)
+      : scaleFromOverlap(await readCandles(client, mint, 'h1', 1000), geckoH1);
+  if (scale === null) return 0;
 
   const priceOf = (value: number): bigint => BigInt(Math.max(1, Math.round(value * scale)));
 

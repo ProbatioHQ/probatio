@@ -246,45 +246,56 @@ export function backfillChart(mint: string): void {
         maxRetries: READ_RETRIES,
       });
 
+      // Resolve the pool once: its current reserves are the live price the index
+      // history anchors to, and the walk reuses the same resolution.
+      const reader = new PoolReader(rpc);
+      let resolution: Awaited<ReturnType<typeof reader.resolve>> | null = null;
+      try {
+        resolution = await reader.resolve(mint);
+      } catch (error) {
+        console.error('[chart] resolve failed for', mint, error);
+      }
+
+      /*
+       * Index history FIRST, anchored to the live price, so the whole chart is
+       * on screen in a few seconds instead of after the minutes the walk takes.
+       * Display-only: it never touches a fill or the trade record. The walk that
+       * follows refines the recent end at the live scale and adds the sub-minute
+       * detail the index does not carry; the two meet at the live price.
+       */
+      let geckoAdded = 0;
+      if (resolution?.venue.kind === 'pumpswap' && resolution.pool) {
+        try {
+          const anchor = Number(
+            priceFromReserves(resolution.pool.solReserve, resolution.pool.tokenReserve),
+          );
+          geckoAdded = await spliceGeckoHistory(client, mint, anchor > 0 ? anchor : undefined);
+        } catch (error) {
+          console.error('[chart] index history failed for', mint, error);
+        }
+      }
+
       const result = await backfillFromCurve(rpc, mint, bondingCurveAddress(mint), {
         maxTransactions: MAX_TRANSACTIONS,
         concurrency: WALK_CONCURRENCY,
       });
 
       /*
-       * The whole history, from launch: the trades up the bonding curve before
-       * graduation, then the trades on the pool after it.
-       *
-       * These used to be treated as either/or — a graduated token showed only
-       * its pool — which hid everything before it graduated, which for a token
-       * days old is most of its life. They sit on one price scale (the pool's
-       * reserve offset lines the two up), so writing both draws the real chart:
-       * the climb up the curve, graduation, and the market that followed.
+       * The on-chain history: the trades up the bonding curve before graduation,
+       * then the trades on the pool after it, on one price scale (the pool's
+       * reserve offset lines the two up). This refines what the index laid down.
        */
       const curve = result.observations;
-      // The curve history first: a token's life before it graduated.
       await writeObservationCandles(client, mint, curve);
 
       let pool: PoolBackfill = { count: 0, oldest: null, newest: null };
-      try {
-        const reader = new PoolReader(rpc);
-        const resolution = await reader.resolve(mint);
-        if (resolution.venue.kind === 'pumpswap') {
+      if (resolution?.venue.kind === 'pumpswap') {
+        try {
           // Writes candles page by page as it walks; nothing to collect here.
           pool = await poolBackfill(rpc, reader, mint, client);
+        } catch (error) {
+          console.error('[chart] pool history failed for', mint, error);
         }
-      } catch (error) {
-        console.error('[chart] pool history failed for', mint, error);
-      }
-
-      // The deep past the walk could not reach, filled from the index and
-      // scaled onto the same axis. Best-effort and display-only; leaves the
-      // chart as the walk drew it if the index has nothing to add.
-      let geckoAdded = 0;
-      try {
-        geckoAdded = await spliceGeckoHistory(client, mint);
-      } catch (error) {
-        console.error('[chart] index history failed for', mint, error);
       }
 
       // Record the combined span, so the token is not walked again.
