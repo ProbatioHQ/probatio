@@ -123,6 +123,7 @@ describe('migrations', () => {
       '020_snapshot_deliverable_tokens.sql',
       '021_payout_engine.sql',
       '022_reset_chart_history.sql',
+      '023_rewalk_full_history.sql',
     ]);
   });
 
