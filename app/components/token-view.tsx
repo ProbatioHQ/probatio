@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { DexChart } from '@/components/dex-chart';
-import { PriceChart, TIMEFRAME_LABELS } from '@/components/price-chart';
+import { PriceChart } from '@/components/price-chart';
 import { useWallet } from '@/components/wallet';
 import { Positions } from '@/components/positions';
 import { TradePanel } from '@/components/trade-panel';
@@ -162,48 +162,9 @@ export function TokenView({
                 NATIVE
               </button>
             </div>
-
-            {/* TradingView carries its own timeframe and unit controls, so
-                showing ours beside them would be two sets of switches for one
-                chart, disagreeing. */}
-            {source === 'native' && (
-            <>
-            <div role="group" aria-label="Timeframe" className="segmented">
-              {TIMEFRAMES.map((frame) => (
-                <button
-                  key={frame}
-                  type="button"
-                  className={frame === timeframe ? 'on' : undefined}
-                  aria-pressed={frame === timeframe}
-                  onClick={() => {
-                    setTimeframeChosen(true);
-                    setTimeframe(frame);
-                  }}
-                >
-                  {TIMEFRAME_LABELS[frame] ?? frame}
-                </button>
-              ))}
-            </div>
-            <div role="group" aria-label="Unit" className="segmented">
-              <button
-                type="button"
-                className={unit === 'market-cap' ? 'on' : undefined}
-                aria-pressed={unit === 'market-cap'}
-                onClick={() => setUnit('market-cap')}
-              >
-                MCAP
-              </button>
-              <button
-                type="button"
-                className={unit === 'per-token' ? 'on' : undefined}
-                aria-pressed={unit === 'per-token'}
-                onClick={() => setUnit('per-token')}
-              >
-                PRICE
-              </button>
-            </div>
-            </>
-            )}
+            {/* Timeframe, unit, and indicators live in the chart's own left rail
+                now, the way a trading terminal keeps them, so they are not
+                repeated here. TradingView carries its own. */}
           </div>
           <span className="lights">
             <i />
@@ -229,7 +190,13 @@ export function TokenView({
               <PriceChart
                 mint={mint}
                 timeframe={timeframe}
+                timeframes={TIMEFRAMES}
+                onTimeframe={(frame) => {
+                  setTimeframeChosen(true);
+                  setTimeframe(frame);
+                }}
                 unit={unit}
+                onUnit={setUnit}
                 height={560}
                 onHistory={({ candles, spanSeconds, backfilling }) => {
                   // The reader's own pick wins and ends the fitting for good.

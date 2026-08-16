@@ -16,6 +16,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { minMoveFor, precisionFor, toDisplay, type PriceUnit } from '@/lib/price-display';
+import { bollinger, ema, macd, rsi, sma, vwap, type Bar } from '@/lib/indicators';
 
 /**
  * The price chart.
@@ -73,35 +74,40 @@ export const TIMEFRAME_LABELS: Record<string, string> = {
 };
 
 /** Moving averages, in candles. The two most-watched lengths. */
-const MA_PERIODS = [9, 21] as const;
-const MA_COLOURS: Record<number, string> = { 9: '#f0b429', 21: '#5b8def' };
+const SMA_PERIODS = [9, 21, 50] as const;
+const EMA_PERIODS = [9, 21] as const;
+const SMA_COLOURS: Record<number, string> = { 9: '#f0b429', 21: '#5b8def', 50: '#a855f7' };
+const EMA_COLOURS: Record<number, string> = { 9: '#22d3ee', 21: '#f472b6' };
+const BB_EDGE = 'rgba(91,141,239,0.65)';
+const BB_MID = 'rgba(148,163,184,0.55)';
+const VWAP_COLOUR = '#e0b0ff';
 
-/** A simple moving average over closes, aligned to the candle it closes on. */
-function movingAverage(points: readonly CandlestickData[], period: number): LineData[] {
-  if (points.length < period) return [];
-
-  const out: LineData[] = [];
-  let sum = 0;
-
-  for (let index = 0; index < points.length; index += 1) {
-    sum += points[index]!.close;
-    if (index >= period) sum -= points[index - period]!.close;
-    if (index >= period - 1) {
-      out.push({ time: points[index]!.time, value: sum / period });
-    }
-  }
-  return out;
-}
+/** The indicators, in the order they appear in the rail. */
+const INDICATORS: readonly { id: string; label: string }[] = [
+  { id: 'sma', label: 'SMA' },
+  { id: 'ema', label: 'EMA' },
+  { id: 'bollinger', label: 'BB' },
+  { id: 'vwap', label: 'VWAP' },
+  { id: 'volume', label: 'VOL' },
+  { id: 'rsi', label: 'RSI' },
+  { id: 'macd', label: 'MACD' },
+];
 
 export function PriceChart({
   mint,
   timeframe = 'm1',
+  timeframes,
+  onTimeframe,
   onHistory,
   unit = 'market-cap',
+  onUnit,
   height = 560,
 }: {
   mint: string;
   timeframe?: string;
+  /** The timeframes the left rail offers. Omitted, the rail hides them. */
+  timeframes?: readonly string[];
+  onTimeframe?: (timeframe: string) => void;
   /**
    * What the loaded history looks like: how many candles, over what span.
    *
@@ -111,13 +117,23 @@ export function PriceChart({
    */
   onHistory?: (info: { candles: number; spanSeconds: number; backfilling: boolean }) => void;
   unit?: PriceUnit;
+  onUnit?: (unit: PriceUnit) => void;
   height?: number;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volume = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const averages = useRef(new Map<number, ISeriesApi<'Line'>>());
+  /** Overlay line series on the price pane, keyed by their indicator line. */
+  const overlays = useRef(new Map<string, ISeriesApi<'Line'>>());
+  /** The RSI line, on its own pane, when RSI is on. */
+  const rsiRef = useRef<ISeriesApi<'Line'> | null>(null);
+  /** The MACD line, signal, and histogram, on their own pane, when MACD is on. */
+  const macdRef = useRef<{
+    line: ISeriesApi<'Line'>;
+    signal: ISeriesApi<'Line'>;
+    hist: ISeriesApi<'Histogram'>;
+  } | null>(null);
   const priceLines = useRef<IPriceLine[]>([]);
   const fitted = useRef(false);
   /*
@@ -131,8 +147,15 @@ export function PriceChart({
 
   const [data, setData] = useState<CandleResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showVolume, setShowVolume] = useState(true);
-  const [showMa, setShowMa] = useState(true);
+  const [enabled, setEnabled] = useState<Set<string>>(() => new Set(['sma', 'volume']));
+  const toggle = useCallback((id: string) => {
+    setEnabled((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const [drawing, setDrawing] = useState(false);
   const [lineCount, setLineCount] = useState(0);
   /*
@@ -337,6 +360,130 @@ export function PriceChart({
     });
   }, [data, points]);
 
+  // The candles reduced to what every indicator reads, in display units so an
+  // indicator sits on the same axis as the price it is drawn over.
+  const bars = useMemo<Bar[]>(
+    () =>
+      points.map((point, index) => ({
+        time: point.time as number,
+        high: point.high,
+        low: point.low,
+        close: point.close,
+        volume: volumes[index]?.value ?? 0,
+      })),
+    [points, volumes],
+  );
+
+  /** Feed every indicator series that currently exists its latest values. */
+  const applyIndicators = useCallback(() => {
+    const line = (input: readonly { time: number; value: number }[]) =>
+      input.map((p) => ({ time: p.time as UTCTimestamp, value: p.value }));
+
+    for (const period of SMA_PERIODS) overlays.current.get(`sma${period}`)?.setData(line(sma(bars, period)));
+    for (const period of EMA_PERIODS) overlays.current.get(`ema${period}`)?.setData(line(ema(bars, period)));
+    if (overlays.current.has('bbU')) {
+      const band = bollinger(bars, 20, 2);
+      overlays.current.get('bbU')?.setData(line(band.upper));
+      overlays.current.get('bbM')?.setData(line(band.middle));
+      overlays.current.get('bbL')?.setData(line(band.lower));
+    }
+    overlays.current.get('vwap')?.setData(line(vwap(bars)));
+
+    rsiRef.current?.setData(line(rsi(bars, 14)));
+
+    if (macdRef.current) {
+      const value = macd(bars, 12, 26, 9);
+      macdRef.current.line.setData(line(value.macd));
+      macdRef.current.signal.setData(line(value.signal));
+      macdRef.current.hist.setData(
+        value.histogram.map((p) => ({
+          time: p.time as UTCTimestamp,
+          value: p.value,
+          color: p.value >= 0 ? 'rgba(63,224,138,0.5)' : 'rgba(255,95,86,0.5)',
+        })),
+      );
+    }
+  }, [bars]);
+
+  // Build exactly the indicator series the enabled set asks for, and no others.
+  // Rebuilt whole on a toggle rather than reconciled piece by piece: the set is
+  // tiny, toggles are rare, and a clean rebuild cannot leave a stray pane or
+  // series behind the way incremental add-and-remove can.
+  useEffect(() => {
+    const instance = chart.current;
+    if (!instance) return;
+
+    for (const line of overlays.current.values()) instance.removeSeries(line);
+    overlays.current.clear();
+    if (rsiRef.current) {
+      instance.removeSeries(rsiRef.current);
+      rsiRef.current = null;
+    }
+    if (macdRef.current) {
+      instance.removeSeries(macdRef.current.line);
+      instance.removeSeries(macdRef.current.signal);
+      instance.removeSeries(macdRef.current.hist);
+      macdRef.current = null;
+    }
+    try {
+      while (instance.panes().length > 1) instance.removePane(instance.panes().length - 1);
+    } catch {
+      // Panes the library already collapsed with their series; nothing to do.
+    }
+
+    const addOverlay = (key: string, color: string, width = 1): void => {
+      overlays.current.set(
+        key,
+        instance.addSeries(LineSeries, {
+          color,
+          lineWidth: width as 1 | 2,
+          lastValueVisible: false,
+          priceLineVisible: false,
+          crosshairMarkerVisible: false,
+        }),
+      );
+    };
+
+    if (enabled.has('sma')) for (const period of SMA_PERIODS) addOverlay(`sma${period}`, SMA_COLOURS[period]!);
+    if (enabled.has('ema')) for (const period of EMA_PERIODS) addOverlay(`ema${period}`, EMA_COLOURS[period]!);
+    if (enabled.has('bollinger')) {
+      addOverlay('bbU', BB_EDGE);
+      addOverlay('bbM', BB_MID);
+      addOverlay('bbL', BB_EDGE);
+    }
+    if (enabled.has('vwap')) addOverlay('vwap', VWAP_COLOUR, 2);
+
+    let pane = 1;
+    if (enabled.has('rsi')) {
+      rsiRef.current = instance.addSeries(
+        LineSeries,
+        { color: '#e0b0ff', lineWidth: 1, priceLineVisible: false, crosshairMarkerVisible: false },
+        pane,
+      );
+      instance.panes()[pane]?.setStretchFactor(1);
+      pane += 1;
+    }
+    if (enabled.has('macd')) {
+      const hist = instance.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane);
+      const macdLine = instance.addSeries(
+        LineSeries,
+        { color: '#5b8def', lineWidth: 1, priceLineVisible: false, crosshairMarkerVisible: false },
+        pane,
+      );
+      const signal = instance.addSeries(
+        LineSeries,
+        { color: '#f0b429', lineWidth: 1, priceLineVisible: false, crosshairMarkerVisible: false },
+        pane,
+      );
+      macdRef.current = { line: macdLine, signal, hist };
+      instance.panes()[pane]?.setStretchFactor(1);
+      pane += 1;
+    }
+
+    volume.current?.setData(enabled.has('volume') ? volumes : []);
+    applyIndicators();
+  }, [enabled, volumes, applyIndicators]);
+
   useEffect(() => {
     const node = container.current;
     if (!node) return;
@@ -398,18 +545,9 @@ export function PriceChart({
     series.current = candles;
     volume.current = bars;
 
-    for (const period of MA_PERIODS) {
-      averages.current.set(
-        period,
-        instance.addSeries(LineSeries, {
-          color: MA_COLOURS[period],
-          lineWidth: 1,
-          lastValueVisible: false,
-          priceLineVisible: false,
-          crosshairMarkerVisible: false,
-        }),
-      );
-    }
+    // The price pane keeps the lion's share of the height; the oscillator panes
+    // that RSI and MACD add sit under it, each a fraction of the size.
+    instance.panes()[0]?.setStretchFactor(4);
 
     // A click while drawing leaves a horizontal line at that price. It is the
     // one drawing tool that earns its place on a chart this size — a level you
@@ -448,7 +586,9 @@ export function PriceChart({
       chart.current = null;
       series.current = null;
       volume.current = null;
-      averages.current.clear();
+      overlays.current.clear();
+      rsiRef.current = null;
+      macdRef.current = null;
       priceLines.current = [];
     };
   }, [height]);
@@ -466,11 +606,8 @@ export function PriceChart({
 
     series.current.setData(points);
     lastBar.current = points[points.length - 1] ?? null;
-    volume.current?.setData(showVolume ? volumes : []);
-
-    for (const period of MA_PERIODS) {
-      averages.current.get(period)?.setData(showMa ? movingAverage(points, period) : []);
-    }
+    volume.current?.setData(enabled.has('volume') ? volumes : []);
+    applyIndicators();
 
     // Only on the first draw. Refitting on every poll would yank the view back
     // to the whole range each time somebody zoomed in to look at something.
@@ -495,7 +632,7 @@ export function PriceChart({
       }
       fitted.current = true;
     }
-  }, [points, volumes, showVolume, showMa]);
+  }, [points, volumes, enabled, applyIndicators]);
 
   // A new token or timeframe is a new chart, so it earns a fresh fit.
   useEffect(() => {
@@ -525,39 +662,6 @@ export function PriceChart({
           <span className="caret" />
         </span>
 
-        <div className="chart-tools">
-          <button
-            type="button"
-            className={showMa ? 'chip on' : 'chip'}
-            onClick={() => setShowMa((was) => !was)}
-            aria-pressed={showMa}
-          >
-            MA 9/21
-          </button>
-          <button
-            type="button"
-            className={showVolume ? 'chip on' : 'chip'}
-            onClick={() => setShowVolume((was) => !was)}
-            aria-pressed={showVolume}
-          >
-            Volume
-          </button>
-          <button
-            type="button"
-            className={drawing ? 'chip on' : 'chip'}
-            onClick={() => setDrawing((was) => !was)}
-            aria-pressed={drawing}
-            title="Click the chart to mark a price level"
-          >
-            Level
-          </button>
-          {lineCount > 0 && (
-            <button type="button" className="chip" onClick={clearLines}>
-              Clear {lineCount}
-            </button>
-          )}
-        </div>
-
         {change !== null && (
           <span className={change >= 0 ? 'gain mono chart-change' : 'loss mono chart-change'}>
             {change >= 0 ? '+' : ''}
@@ -585,8 +689,82 @@ export function PriceChart({
         )}
       </div>
 
-      <div className={drawing ? 'chart-canvas drawing' : 'chart-canvas'} style={{ height }}>
-        <div ref={container} style={{ width: '100%', height }} />
+      <div className="chart-body">
+        <div className="chart-rail">
+          {timeframes && timeframes.length > 0 && (
+            <div role="group" aria-label="Timeframe" className="rail-group">
+              {timeframes.map((frame) => (
+                <button
+                  key={frame}
+                  type="button"
+                  className={frame === timeframe ? 'rail-btn on' : 'rail-btn'}
+                  aria-pressed={frame === timeframe}
+                  onClick={() => onTimeframe?.(frame)}
+                >
+                  {TIMEFRAME_LABELS[frame] ?? frame}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {onUnit && (
+            <div role="group" aria-label="Unit" className="rail-group">
+              <button
+                type="button"
+                className={unit === 'market-cap' ? 'rail-btn on' : 'rail-btn'}
+                aria-pressed={unit === 'market-cap'}
+                onClick={() => onUnit('market-cap')}
+              >
+                MCAP
+              </button>
+              <button
+                type="button"
+                className={unit === 'per-token' ? 'rail-btn on' : 'rail-btn'}
+                aria-pressed={unit === 'per-token'}
+                onClick={() => onUnit('per-token')}
+              >
+                PRICE
+              </button>
+            </div>
+          )}
+
+          <div role="group" aria-label="Indicators" className="rail-group">
+            {INDICATORS.map((indicator) => (
+              <button
+                key={indicator.id}
+                type="button"
+                className={enabled.has(indicator.id) ? 'rail-btn on' : 'rail-btn'}
+                aria-pressed={enabled.has(indicator.id)}
+                onClick={() => toggle(indicator.id)}
+              >
+                {indicator.label}
+              </button>
+            ))}
+          </div>
+
+          <div role="group" aria-label="Drawing" className="rail-group">
+            <button
+              type="button"
+              className={drawing ? 'rail-btn on' : 'rail-btn'}
+              onClick={() => setDrawing((was) => !was)}
+              aria-pressed={drawing}
+              title="Click the chart to mark a price level"
+            >
+              LEVEL
+            </button>
+            {lineCount > 0 && (
+              <button type="button" className="rail-btn" onClick={clearLines}>
+                CLR {lineCount}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div
+          className={drawing ? 'chart-canvas drawing' : 'chart-canvas'}
+          style={{ height }}
+        >
+          <div ref={container} style={{ width: '100%', height }} />
         {/* Centred in the plot area rather than under it. An empty box with a
             caption below reads as a chart that failed to load. */}
         {(error || (data && points.length === 0)) && (
@@ -600,6 +778,7 @@ export function PriceChart({
                 : 'No trades on this token yet. The chart fills in as it trades.')}
           </p>
         )}
+        </div>
       </div>
 
       {drawing && (

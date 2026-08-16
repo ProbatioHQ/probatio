@@ -548,7 +548,7 @@ hr {
    * Named exclusions rather than a narrower selector, so a new inline control
    * has to say it is one.
    */
-  button:not(.wallet-connect):not(.wallet-pill):not(.chip):not(.preset):not(.side):not(.segmented button):not(.linklike):not(.toggle) {
+  button:not(.wallet-connect):not(.wallet-pill):not(.chip):not(.preset):not(.side):not(.segmented button):not(.linklike):not(.toggle):not(.rail-btn) {
     width: 100%;
     align-self: stretch;
   }
@@ -3372,6 +3372,84 @@ body:has(main.wide) .site-footer .shell {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
+}
+
+/* The chart and its left rail, the way a trading terminal arranges them. */
+.chart-body {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.chart-body .chart-canvas { flex: 1; min-width: 0; }
+
+.chart-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 58px;
+  flex: none;
+}
+
+/* Grouped by kind — timeframes, unit, indicators, tools — with a hairline
+   between so the rail reads as sections rather than one long column. */
+.rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--line);
+}
+.rail-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.rail-btn {
+  padding: 5px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--ink-sunken);
+  color: var(--text-faint);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.rail-btn:hover:not(.on) {
+  color: var(--text-dim);
+  border-color: var(--line-bright);
+}
+.rail-btn.on {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+/* On a narrow screen the rail lies flat above the chart, not beside it. */
+@media (max-width: 720px) {
+  .chart-body {
+    flex-direction: column;
+  }
+  .chart-rail {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .rail-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-bottom: none;
+    padding-bottom: 0;
+    border-right: 1px solid var(--line);
+    padding-right: 8px;
+  }
+  .rail-group:last-child {
+    border-right: none;
+    padding-right: 0;
+  }
 }
 
 /* While placing a level, the cursor says so. */
