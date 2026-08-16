@@ -10,7 +10,6 @@ import {
   type CandlestickData,
   type HistogramData,
   type IChartApi,
-  type IPriceLine,
   type ISeriesApi,
   type LineData,
   type UTCTimestamp,
@@ -146,7 +145,6 @@ export function PriceChart({
     signal: ISeriesApi<'Line'>;
     hist: ISeriesApi<'Histogram'>;
   } | null>(null);
-  const priceLines = useRef<IPriceLine[]>([]);
   const fitted = useRef(false);
   /*
    * Whether a chart has ever drawn for this mint/timeframe. Held in a ref, not
@@ -168,9 +166,6 @@ export function PriceChart({
       return next;
     });
   }, []);
-  const [tool, setTool] = useState<'cursor' | 'hline' | 'trend'>('cursor');
-  const [trendArmed, setTrendArmed] = useState(false);
-  const [lineCount, setLineCount] = useState(0);
   const [showIndicators, setShowIndicators] = useState(false);
   /*
    * Whether the live price stream has dropped. The candle poll still refreshes
@@ -178,23 +173,6 @@ export function PriceChart({
    * down, and a frozen "live" price a trader might act on should say so.
    */
   const [livePaused, setLivePaused] = useState(false);
-  /*
-   * The active tool, read by the chart's click handler, which is registered
-   * once when the chart is created. Written in an effect rather than during
-   * render: a ref mutated in the render body is a side effect in a function
-   * React may run twice or discard.
-   */
-  /** The first point of a trend line, held while its second is placed. */
-  const pendingTrend = useRef<{ time: UTCTimestamp; value: number } | null>(null);
-  /** Every trend line drawn, so they clear together with the price lines. */
-  const trendLines = useRef<ISeriesApi<'Line'>[]>([]);
-  const toolRef = useRef(tool);
-  useEffect(() => {
-    toolRef.current = tool;
-    // Switching tools abandons a half-drawn trend line.
-    pendingTrend.current = null;
-    setTrendArmed(false);
-  }, [tool]);
 
   // Close the indicators picker when a click lands outside it.
   const indicatorsWrap = useRef<HTMLDivElement>(null);
@@ -583,58 +561,6 @@ export function PriceChart({
     // that RSI and MACD add sit under it, each a fraction of the size.
     instance.panes()[0]?.setStretchFactor(4);
 
-    // Drawing, according to the tool the left rail has selected. The horizontal
-    // line marks a level at the clicked price; the trend line takes two clicks
-    // and draws the straight line between them. The cursor tool draws nothing.
-    const onClick = (param: { point?: { x: number; y: number }; time?: unknown }): void => {
-      const active = toolRef.current;
-      if (active === 'cursor' || !param.point || !series.current || !chart.current) return;
-
-      const price = series.current.coordinateToPrice(param.point.y);
-      if (price === null) return;
-
-      if (active === 'hline') {
-        priceLines.current.push(
-          series.current.createPriceLine({
-            price: price as number,
-            color: '#f0b429',
-            lineWidth: 1,
-            lineStyle: 2,
-            axisLabelVisible: true,
-            title: '',
-          }),
-        );
-        setLineCount(priceLines.current.length + trendLines.current.length);
-        return;
-      }
-
-      // Trend line: the time at the clicked x, and the price at the clicked y.
-      const time = chart.current.timeScale().coordinateToTime(param.point.x);
-      if (time === null) return;
-      const point = { time: time as UTCTimestamp, value: price as number };
-
-      if (!pendingTrend.current) {
-        pendingTrend.current = point;
-        setTrendArmed(true);
-        return;
-      }
-
-      const [a, b] = [pendingTrend.current, point].sort((p, q) => (p.time as number) - (q.time as number));
-      pendingTrend.current = null;
-      setTrendArmed(false);
-      const line = chart.current.addSeries(LineSeries, {
-        color: '#f0b429',
-        lineWidth: 2,
-        lastValueVisible: false,
-        priceLineVisible: false,
-        crosshairMarkerVisible: false,
-      });
-      line.setData([a!, b!]);
-      trendLines.current.push(line);
-      setLineCount(priceLines.current.length + trendLines.current.length);
-    };
-    instance.subscribeClick(onClick);
-
     // The library does not observe its own container, so a resized window
     // leaves the canvas at its old width until something forces a redraw.
     const observer = new ResizeObserver((entries) => {
@@ -645,7 +571,6 @@ export function PriceChart({
 
     return () => {
       observer.disconnect();
-      instance.unsubscribeClick(onClick);
       instance.remove();
       chart.current = null;
       series.current = null;
@@ -653,9 +578,6 @@ export function PriceChart({
       overlays.current.clear();
       rsiRef.current = null;
       macdRef.current = null;
-      priceLines.current = [];
-      trendLines.current = [];
-      pendingTrend.current = null;
     };
   }, [height]);
 
@@ -704,25 +626,10 @@ export function PriceChart({
     fitted.current = false;
   }, [mint, timeframe]);
 
-  const clearLines = useCallback(() => {
-    for (const line of priceLines.current) series.current?.removePriceLine(line);
-    for (const line of trendLines.current) chart.current?.removeSeries(line);
-    priceLines.current = [];
-    trendLines.current = [];
-    pendingTrend.current = null;
-    setLineCount(0);
-  }, []);
-
   const last = points.at(-1);
   const first = points.at(0);
   const change =
     last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
-
-  const tools = [
-    { id: 'cursor' as const, label: 'Cursor' },
-    { id: 'trend' as const, label: 'Trend line' },
-    { id: 'hline' as const, label: 'Horizontal line' },
-  ];
 
   return (
     <div className="chart">
@@ -752,7 +659,7 @@ export function PriceChart({
               aria-expanded={showIndicators}
               onClick={() => setShowIndicators((was) => !was)}
             >
-              <span className="ico ico-fx" aria-hidden="true" /> Indicators
+              Indicators
             </button>
             {showIndicators && (
               <div className="chart-menu" role="menu">
@@ -817,35 +724,7 @@ export function PriceChart({
       </div>
 
       <div className="chart-body">
-        {/* The drawing tools down the left, as a trading terminal arranges them. */}
-        <div className="chart-toolbar" role="group" aria-label="Drawing tools">
-          {tools.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              className={tool === id ? 'tool-btn on' : 'tool-btn'}
-              aria-pressed={tool === id}
-              title={label}
-              aria-label={label}
-              onClick={() => setTool(id)}
-            >
-              <span className={`ico ico-${id}`} aria-hidden="true" />
-            </button>
-          ))}
-          {lineCount > 0 && (
-            <button
-              type="button"
-              className="tool-btn"
-              title={`Clear ${lineCount} drawing${lineCount > 1 ? 's' : ''}`}
-              aria-label="Clear drawings"
-              onClick={clearLines}
-            >
-              <span className="ico ico-clear" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-
-        <div className={tool === 'cursor' ? 'chart-canvas' : 'chart-canvas drawing'} style={{ height }}>
+        <div className="chart-canvas" style={{ height }}>
           <div ref={container} style={{ width: '100%', height }} />
           {/* Centred in the plot area rather than under it. An empty box with a
               caption below reads as a chart that failed to load. */}
@@ -858,11 +737,6 @@ export function PriceChart({
                 (data?.backfilling
                   ? 'Reading this token’s history from the chain…'
                   : 'No trades on this token yet. The chart fills in as it trades.')}
-            </p>
-          )}
-          {tool === 'trend' && (
-            <p className="chart-hint-float dim">
-              {trendArmed ? 'Click the end point' : 'Click two points to draw a trend line'}
             </p>
           )}
         </div>
