@@ -96,7 +96,7 @@ const INDICATORS: readonly { id: string; name: string }[] = [
 /* Small line-drawn icons for the toolbar and the indicators button. Stroked
    with currentColor so they take the button's own colour and its on-state. */
 const icon = (paths: ReactNode) => (
-  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {paths}
   </svg>
 );
@@ -684,9 +684,18 @@ export function PriceChart({
       // is the normal state of a token thirty seconds old.
       const comfortable = Math.min(Math.floor(width / 12), Math.max(points.length + 8, 40));
 
-      if (points.length > 0 && points.length < comfortable) {
-        // Data from the left, room to the right. The chart is filling forward,
-        // and that is what it should look like.
+      // A token that has traded across hours has a real history, however few
+      // candles a coarse timeframe compresses it into. Fill the view with it,
+      // rather than pinning a handful to the left with a wall of empty space —
+      // which is what made a two-day token on the daily read as "no history".
+      const firstTime = points[0]?.time as number | undefined;
+      const lastTime = points[points.length - 1]?.time as number | undefined;
+      const spanSeconds = firstTime !== undefined && lastTime !== undefined ? lastTime - firstTime : 0;
+      const filling = spanSeconds < 2 * 3_600;
+
+      if (filling && points.length > 0 && points.length < comfortable) {
+        // A genuinely new token, filling forward from a cold start: data from
+        // the left, room to the right, which is what that should look like.
         scale?.setVisibleLogicalRange({ from: -0.5, to: comfortable });
       } else {
         scale?.fitContent();
