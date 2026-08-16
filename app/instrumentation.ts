@@ -66,6 +66,11 @@ export async function register(): Promise<void> {
   const { startSeasonPayout } = await import('./lib/season-payout');
   safely('season payout', startSeasonPayout);
 
+  // Drops chart candles too old to draw and reclaims the space, so the one
+  // table that grows on a timer cannot fill the disk and take the database down.
+  const { startRetention } = await import('./lib/retention');
+  safely('retention', startRetention);
+
   // Measures the engine against real fills and takes farmable tokens off the
   // board. Tied to the feed switch only in the sense that both need the chain;
   // it is the one check that runs without anybody deciding to look.
