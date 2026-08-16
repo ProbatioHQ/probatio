@@ -149,6 +149,13 @@ export async function GET(request: Request): Promise<Response> {
       found.map((launch) => launch.creator),
     );
 
+    // The index reports market cap in dollars; the rest of the feed carries it
+    // in lamports and converts to dollars for display with this same rate, so
+    // the dollars are turned back into lamports here to travel the one path.
+    const sol = await solUsd();
+    const capLamports = (usd: number | null): string | null =>
+      usd !== null && sol && sol > 0 ? Math.round((usd / sol) * 1e9).toString() : null;
+
     const results = [
       ...found.map((launch) =>
         shape(
@@ -157,8 +164,8 @@ export async function GET(request: Request): Promise<Response> {
           searchCounts.get(launch.creator) ?? 1,
         ),
       ),
-      ...external.map((token) =>
-        shape(
+      ...external.map((token) => ({
+        ...shape(
           {
             mint: token.mint,
             name: token.name,
@@ -174,10 +181,11 @@ export async function GET(request: Request): Promise<Response> {
           images.get(token.mint) ?? token.image,
           1,
         ),
-      ),
+        marketCap: capLamports(token.marketCapUsd),
+      })),
     ].slice(0, limit);
 
-    return Response.json({ query, solUsd: await solUsd(), results });
+    return Response.json({ query, solUsd: sol, results });
   }
 
   const [fresh, bonding, bonded] = await Promise.all([

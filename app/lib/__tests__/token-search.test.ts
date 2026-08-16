@@ -19,11 +19,33 @@ describe('parseTokens', () => {
 
   it('reads a token off a pair', () => {
     const tokens = parseTokens(
-      { pairs: [pair({ baseToken: { address: 'a', name: 'Axon', symbol: 'AXON' } })] },
+      {
+        pairs: [
+          pair({ baseToken: { address: 'a', name: 'Axon', symbol: 'AXON' }, marketCap: 9736 }),
+        ],
+      },
       'axon',
       20,
     );
-    expect(tokens).toEqual([{ mint: 'a', name: 'Axon', symbol: 'AXON', image: null }]);
+    expect(tokens).toEqual([
+      { mint: 'a', name: 'Axon', symbol: 'AXON', image: null, marketCapUsd: 9736 },
+    ]);
+  });
+
+  it('falls back to fdv for market cap, and null when neither is a number', () => {
+    const withFdv = parseTokens(
+      { pairs: [pair({ baseToken: { address: 'a', name: 'A', symbol: 'A' }, fdv: 500 })] },
+      '',
+      20,
+    );
+    expect(withFdv[0]!.marketCapUsd).toBe(500);
+
+    const withNothing = parseTokens(
+      { pairs: [pair({ baseToken: { address: 'b', name: 'B', symbol: 'B' } })] },
+      '',
+      20,
+    );
+    expect(withNothing[0]!.marketCapUsd).toBeNull();
   });
 
   it('keeps name and symbol matches but not address-substring noise', () => {

@@ -18,6 +18,8 @@ export interface FoundToken {
   readonly name: string;
   readonly symbol: string;
   readonly image: string | null;
+  /** Market cap in US dollars, as the index reports it. Display only. */
+  readonly marketCapUsd: number | null;
 }
 
 const SEARCH_URL = 'https://api.dexscreener.com/latest/dex/search';
@@ -33,6 +35,12 @@ interface DexPair {
   dexId?: unknown;
   baseToken?: { address?: unknown; name?: unknown; symbol?: unknown };
   info?: { imageUrl?: unknown };
+  marketCap?: unknown;
+  fdv?: unknown;
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 /**
@@ -76,6 +84,7 @@ export function parseTokens(body: unknown, query: string, limit: number): FoundT
       name,
       symbol,
       image: typeof pair.info?.imageUrl === 'string' ? pair.info.imageUrl : null,
+      marketCapUsd: finiteNumber(pair.marketCap) ?? finiteNumber(pair.fdv),
     };
     (typeof pair.dexId === 'string' && PUMP_DEXES.has(pair.dexId) ? pump : other).push(token);
   }
