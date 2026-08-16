@@ -38,6 +38,9 @@ const DERIVED_SECONDS: Record<string, number> = {
 
 /** The most hourly candles read to build a coarse one: about a year of them. */
 const MAX_HOURLY = 10_000;
+/** The most daily candles read for a day/week/month view: years of them. */
+const MAX_DAILY = 1_000;
+const DAY = 24 * HOUR;
 
 export async function GET(request: Request): Promise<Response> {
   const throttled = await rateLimit(request, 'read');
@@ -69,9 +72,22 @@ export async function GET(request: Request): Promise<Response> {
   let candles: StoredCandle[];
   if (stored) {
     candles = await readCandles(client, mint, timeframe, limit);
+  } else if (derivedSeconds! >= DAY) {
+    // Day, week, month: built from the stored daily series, which the index
+    // fills back to launch (hourly does not reach that far for an old, quiet
+    // token). A token that has no daily yet falls back to rolling up the hourly.
+    const perBucket = Math.round(derivedSeconds! / DAY);
+    const daily = await readCandles(client, mint, 'd1', Math.min(limit * perBucket, MAX_DAILY));
+    if (daily.length > 0) {
+      candles = rollupCandles(daily, derivedSeconds!).slice(-limit);
+    } else {
+      const hours = Math.round(derivedSeconds! / HOUR);
+      const hourly = await readCandles(client, mint, 'h1', Math.min(limit * hours, MAX_HOURLY));
+      candles = rollupCandles(hourly, derivedSeconds!).slice(-limit);
+    }
   } else {
-    // Built from the hourly candle: read enough hours to cover the coarse
-    // buckets asked for, then roll them up and keep the most recent `limit`.
+    // Four- and twelve-hour: built from the hourly candle. Read enough hours to
+    // cover the coarse buckets asked for, then roll them up and keep `limit`.
     const perBucket = Math.round(derivedSeconds! / HOUR);
     const hourly = await readCandles(client, mint, 'h1', Math.min(limit * perBucket, MAX_HOURLY));
     candles = rollupCandles(hourly, derivedSeconds!).slice(-limit);

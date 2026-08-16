@@ -12,6 +12,15 @@ import { readCandles, writeCandles, type Client, type StoredCandle } from '@prob
  * already indexes every pool's OHLCV from creation, in one free, keyless call,
  * which is how a pump.fun-style chart shows a full history cheaply.
  *
+ * Two things make the full history awkward, and this handles both. First, an
+ * old token's launch is only in the *daily* series — it traded too little early
+ * on for the index to keep hourly candles that far back — so the daily series is
+ * pulled and stored as its own `d1` timeframe, which the day/week/month views
+ * read. Second, a graduated token's early history lives on its *bonding-curve*
+ * pool (created at launch, drained to zero now), not the deep pool a chart
+ * follows today, so every pool is queried and merged, the deep one winning where
+ * they overlap.
+ *
  * This is display only. Trades still fill against live on-chain reserves and the
  * verifiable trade record is derived from chain alone; nothing here touches
  * either. It fills the visual past of a chart with what an index already knows,
@@ -29,6 +38,12 @@ interface GeckoCandle {
   readonly v: number;
 }
 
+interface GeckoPool {
+  readonly addr: string;
+  readonly liq: number;
+  readonly createdAt: string;
+}
+
 async function fetchJson(url: string): Promise<unknown | null> {
   try {
     const res = await fetch(url, {
@@ -42,26 +57,34 @@ async function fetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-/** The pool with the most liquidity, which is the one a chart should follow. */
-async function deepestPool(mint: string): Promise<string | null> {
+/** Every pool the index knows for this token, with its liquidity and age. */
+async function listPools(mint: string): Promise<GeckoPool[]> {
   const body = (await fetchJson(`${BASE}/tokens/${mint}/pools`)) as
-    | { data?: Array<{ id?: unknown; attributes?: { reserve_in_usd?: unknown } }> }
+    | {
+        data?: Array<{
+          id?: unknown;
+          attributes?: { reserve_in_usd?: unknown; pool_created_at?: unknown };
+        }>;
+      }
     | null;
   const pools = body?.data;
-  if (!Array.isArray(pools) || pools.length === 0) return null;
-  let best: { addr: string; liq: number } | null = null;
+  if (!Array.isArray(pools)) return [];
+  const out: GeckoPool[] = [];
   for (const p of pools) {
     const addr = String(p?.id ?? '').replace(/^solana_/, '');
-    const liq = Number(p?.attributes?.reserve_in_usd ?? 0);
     if (!addr) continue;
-    if (best === null || liq > best.liq) best = { addr, liq };
+    out.push({
+      addr,
+      liq: Number(p?.attributes?.reserve_in_usd ?? 0),
+      createdAt: String(p?.attributes?.pool_created_at ?? ''),
+    });
   }
-  return best?.addr ?? null;
+  return out;
 }
 
 async function fetchOhlcv(
   pool: string,
-  unit: 'hour' | 'minute',
+  unit: 'hour' | 'minute' | 'day',
   aggregate: number,
 ): Promise<GeckoCandle[]> {
   const query = new URLSearchParams({ aggregate: String(aggregate), limit: '1000' });
@@ -82,24 +105,35 @@ function median(values: number[]): number {
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
-// GeckoTerminal reports a price; the candle store holds it on an internal scale
-// (a fixed-point price in the pool's quote). The ratio between the two is
-// constant enough across the overlap that its median lines the index's history
-// up with the walk's — the sparse-edge candles that disagree are outvoted.
-const TF_SOURCE: ReadonlyArray<{ timeframe: string; unit: 'hour' | 'minute'; aggregate: number }> = [
-  { timeframe: 'h1', unit: 'hour', aggregate: 1 },
-  { timeframe: 'm15', unit: 'minute', aggregate: 15 },
+/*
+ * Which timeframes to pull, and from where.
+ *
+ * `d1` carries the deep past (the only series that reaches an old token's launch)
+ * and `h1` the recent detail, both merged across every pool so a graduated
+ * token's bonding-curve history is included. `m15` is recent detail only, so it
+ * is taken from the deep pool alone — no other pool has fifteen-minute candles
+ * from far enough back to matter, and querying them all would just spend calls.
+ */
+const TF_SOURCE: ReadonlyArray<{
+  timeframe: string;
+  unit: 'hour' | 'minute' | 'day';
+  aggregate: number;
+  allPools: boolean;
+}> = [
+  { timeframe: 'h1', unit: 'hour', aggregate: 1, allPools: true },
+  { timeframe: 'd1', unit: 'day', aggregate: 1, allPools: true },
+  { timeframe: 'm15', unit: 'minute', aggregate: 15, allPools: false },
 ];
 
 /** The fewest overlapping candles that make the scale trustworthy. */
 const MIN_OVERLAP = 12;
 
 /** The store's price scale over the index's, from the live price if given. */
-function scaleFromAnchor(geckoH1: GeckoCandle[], anchorPrice: number): number | null {
+function scaleFromAnchor(deepH1: GeckoCandle[], anchorPrice: number): number | null {
   // The most recent index candle is "now", and the live price is "now" on the
   // store's scale, so their ratio maps the whole index history onto that scale.
   let latest: GeckoCandle | null = null;
-  for (const g of geckoH1) {
+  for (const g of deepH1) {
     if (g.c > 0 && (latest === null || g.t > latest.t)) latest = g;
   }
   if (latest === null) return null;
@@ -108,12 +142,12 @@ function scaleFromAnchor(geckoH1: GeckoCandle[], anchorPrice: number): number | 
 }
 
 /** The same scale, from where the walk and the index overlap. */
-function scaleFromOverlap(mineH1: readonly StoredCandle[], geckoH1: GeckoCandle[]): number | null {
+function scaleFromOverlap(mineH1: readonly StoredCandle[], deepH1: GeckoCandle[]): number | null {
   const mineByTime = new Map(
     mineH1.filter((c) => c.trades > 0).map((c) => [c.openTime, Number(c.close)]),
   );
   const ratios: number[] = [];
-  for (const g of geckoH1) {
+  for (const g of deepH1) {
     const mine = mineByTime.get(g.t);
     if (mine !== undefined && g.c > 0) ratios.push(mine / g.c);
   }
@@ -138,37 +172,47 @@ export async function spliceGeckoHistory(
   mint: string,
   anchorPrice?: number,
 ): Promise<number> {
-  const pool = await deepestPool(mint);
-  if (pool === null) return 0;
+  const pools = await listPools(mint);
+  if (pools.length === 0) return 0;
 
-  const geckoH1 = await fetchOhlcv(pool, 'hour', 1);
-  if (geckoH1.length === 0) return 0;
+  // The deep pool for the recent, reliable end; the earliest-created for the
+  // launch-to-graduation past that a graduated token's drained bonding-curve
+  // pool still holds and no other pool has.
+  const deepest = pools.reduce((a, b) => (b.liq > a.liq ? b : a));
+  const earliest = pools.reduce((a, b) => (b.createdAt !== '' && b.createdAt < a.createdAt ? b : a));
+  const selected = earliest.addr === deepest.addr ? [deepest] : [deepest, earliest];
 
+  // Anchor the scale on the deep pool's hourly, the most current and reliable.
+  const deepH1 = await fetchOhlcv(deepest.addr, 'hour', 1);
+  if (deepH1.length === 0) return 0;
   const scale =
     anchorPrice !== undefined && anchorPrice > 0
-      ? scaleFromAnchor(geckoH1, anchorPrice)
-      : scaleFromOverlap(await readCandles(client, mint, 'h1', 1000), geckoH1);
+      ? scaleFromAnchor(deepH1, anchorPrice)
+      : scaleFromOverlap(await readCandles(client, mint, 'h1', 1000), deepH1);
   if (scale === null) return 0;
 
   const priceOf = (value: number): bigint => BigInt(Math.max(1, Math.round(value * scale)));
 
   let added = 0;
   for (const source of TF_SOURCE) {
-    const gecko =
-      source.unit === 'hour' && source.aggregate === 1
-        ? geckoH1
-        : await fetchOhlcv(pool, source.unit, source.aggregate);
-    if (gecko.length === 0) continue;
+    const query = source.allPools ? selected : [deepest];
+    // Merge this timeframe across the queried pools into one series. Earliest
+    // pool first, deep pool last, so the deep pool wins any overlapping bucket.
+    const merged = new Map<number, GeckoCandle>();
+    for (const pool of [...query].reverse()) {
+      const reuseDeepH1 =
+        pool.addr === deepest.addr && source.unit === 'hour' && source.aggregate === 1;
+      const candles = reuseDeepH1 ? deepH1 : await fetchOhlcv(pool.addr, source.unit, source.aggregate);
+      for (const g of candles) merged.set(g.t, g);
+    }
+    if (merged.size === 0) continue;
 
     const mine = await readCandles(client, mint, source.timeframe, 5000);
-    // Fill any bucket the walk did not produce, not merely everything older than
-    // its oldest. The walk's history is not contiguous — a lone bonding-curve
-    // candle can sit at launch with a gap of days between it and where the pool
-    // walk reached — so "older than the oldest" would leave that gap empty. A
-    // per-bucket check fills every hole the walk left and rewrites none of it.
+    // Fill any bucket the store does not already have, and rewrite none — the
+    // walk's own candles, at the live scale, always win where it reached.
     const have = new Set(mine.map((c) => c.openTime));
 
-    const writes = gecko
+    const writes = [...merged.values()]
       .filter((g) => !have.has(g.t))
       .map((g) => ({
         openTime: g.t,
