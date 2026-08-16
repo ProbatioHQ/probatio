@@ -681,30 +681,20 @@ export function PriceChart({
     if (!fitted.current) {
       const scale = chart.current?.timeScale();
       const width = container.current?.clientWidth ?? 0;
-      // How many candles would fit at a sensible width. Fitting three of them
-      // to a wide canvas draws three enormous blocks that read as a rendering
-      // fault rather than as a token minutes old; pinning them to the right
-      // instead leaves a wall of empty space where history would be.
-      // Wide enough that candles are not tiny, tight enough that two of them
-      // are not marooned at the left edge of an otherwise empty canvas — which
-      // is the normal state of a token thirty seconds old.
-      const comfortable = Math.min(Math.floor(width / 12), Math.max(points.length + 8, 40));
 
-      // A token that has traded across hours has a real history, however few
-      // candles a coarse timeframe compresses it into. Fill the view with it,
-      // rather than pinning a handful to the left with a wall of empty space —
-      // which is what made a two-day token on the daily read as "no history".
-      const firstTime = points[0]?.time as number | undefined;
-      const lastTime = points[points.length - 1]?.time as number | undefined;
-      const spanSeconds = firstTime !== undefined && lastTime !== undefined ? lastTime - firstTime : 0;
-      const filling = spanSeconds < 2 * 3_600;
+      // Fit every candle into view first, so nothing is off-screen.
+      scale?.fitContent();
 
-      if (filling && points.length > 0 && points.length < comfortable) {
-        // A genuinely new token, filling forward from a cold start: data from
-        // the left, room to the right, which is what that should look like.
-        scale?.setVisibleLogicalRange({ from: -0.5, to: comfortable });
-      } else {
-        scale?.fitContent();
+      // Then keep the candles a sensible width. Fitting a handful of candles to
+      // a wide pane stretches each into an enormous block that reads as being
+      // zoomed in; a coarse timeframe on a two-day token is exactly that case.
+      // Past a maximum bar width the candles are shown at that width and centred
+      // instead, neither stretched across the pane nor marooned at one edge.
+      const MAX_BAR = 30;
+      if (scale && width > 0 && points.length > 0 && scale.options().barSpacing > MAX_BAR) {
+        const capacity = width / MAX_BAR;
+        const margin = Math.max(1, (capacity - points.length) / 2);
+        scale.setVisibleLogicalRange({ from: -margin, to: points.length - 1 + margin });
       }
       fitted.current = true;
     }
