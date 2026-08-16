@@ -65,11 +65,6 @@ function signedSol(lamports: string): string {
   return value < 0n ? `-${formatted}` : `+${formatted}`;
 }
 
-function percent(bps: number): string {
-  const value = bps / 100;
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-}
-
 function short(mint: string): string {
   return `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 }
@@ -141,49 +136,8 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
   if (error) return <p role="alert">{error}</p>;
   if (!snapshot) return <p>Loading…</p>;
 
-  const { equity } = snapshot;
-
-  const down = equity.returnBps < 0;
-
   return (
     <section aria-label="Positions">
-      {/* The same clean readout the public record uses, so signed in and public
-          read as one thing. Total return leads because it is the number a
-          season is ranked on. */}
-      <div className="panel">
-        <div className="panel-head">
-          <h2>Account</h2>
-        </div>
-        <div className="readout">
-          <div className="readout-row">
-            <span className="k">Total return</span>
-            <span className={`v ${down ? 'loss' : 'gain'}`}>
-              {percent(equity.returnBps)} ({signedSol(equity.totalPnl)} SOL)
-            </span>
-          </div>
-          <div className="readout-row">
-            <span className="k">Equity</span>
-            <span className="v">{sol(equity.equity)} SOL</span>
-          </div>
-          <div className="readout-row">
-            <span className="k">Cash</span>
-            <span className="v">{sol(equity.cash)} SOL</span>
-          </div>
-          <div className="readout-row">
-            <span className="k">In positions</span>
-            <span className="v">{sol(equity.positionValue)} SOL</span>
-          </div>
-          <div className="readout-row">
-            <span className="k">Realized</span>
-            <span className="v">{signedSol(equity.realized)} SOL</span>
-          </div>
-          <div className="readout-row">
-            <span className="k">Unrealized</span>
-            <span className="v">{signedSol(equity.unrealized)} SOL</span>
-          </div>
-        </div>
-      </div>
-
       <h2>Open positions</h2>
       {snapshot.positions.length === 0 ? (
         <p>Nothing open.</p>

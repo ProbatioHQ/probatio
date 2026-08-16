@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { AccountOverview } from '@/components/account-overview';
 import { Coach } from '@/components/coach';
 import { NameClaim } from '@/components/name-claim';
 import { Positions } from '@/components/positions';
@@ -42,6 +43,7 @@ export default async function AccountPage() {
         </p>
       </div>
 
+      <AccountOverview />
       <Positions refreshKey={0} />
       <Coach />
       <NameClaim />
