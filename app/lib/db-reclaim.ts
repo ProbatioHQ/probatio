@@ -1,7 +1,15 @@
 import 'server-only';
 import { createClient } from '@libsql/client';
 import { runRetention } from '@probatio/db';
-import { copyFileSync, existsSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  renameSync,
+  rmSync,
+  statfsSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { databaseUrl } from './env';
@@ -47,6 +55,46 @@ function remove(path: string): void {
       rmSync(p, { force: true });
     } catch {
       // Already gone, which is the state we wanted.
+    }
+  }
+}
+
+/**
+ * Start fresh if the database has corrupted, rather than serving a broken one.
+ *
+ * A file whose pages are damaged answers `SQLITE_CORRUPT` on any query that
+ * touches them, which is a failure no amount of retrying fixes. This happened
+ * once, from a VACUUM interrupted by a deploy — a rewrite that no longer runs.
+ * Caught here on boot: a database that fails its integrity check is set aside,
+ * not deleted, and the next open creates a clean one. What is lost is the
+ * re-derivable market history the corruption sat in; accounts and payments, if
+ * intact, are the exact thing a manual wipe would have thrown away too.
+ */
+export async function recoverIfCorrupt(): Promise<void> {
+  const url = databaseUrl();
+  const path = filePath(url);
+  if (!path || !existsSync(path)) return;
+
+  let healthy = false;
+  const probe = createClient({ url });
+  try {
+    const result = await probe.execute('PRAGMA quick_check');
+    const first = result.rows[0];
+    healthy = first !== undefined && Object.values(first).some((value) => value === 'ok');
+  } catch {
+    // A database too damaged even to check is not one to open.
+    healthy = false;
+  } finally {
+    probe.close();
+  }
+  if (healthy) return;
+
+  console.error('[db] database failed its integrity check; setting it aside and starting fresh');
+  for (const suffix of ['', '-wal', '-shm']) {
+    try {
+      if (existsSync(`${path}${suffix}`)) renameSync(`${path}${suffix}`, `${path}.corrupt${suffix}`);
+    } catch (error) {
+      console.error('[db] could not set the corrupt database aside', error);
     }
   }
 }

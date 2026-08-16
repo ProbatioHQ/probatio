@@ -1,5 +1,5 @@
 import 'server-only';
-import { runRetention, compact } from '@probatio/db';
+import { runRetention } from '@probatio/db';
 import { db } from './db';
 
 /**
@@ -8,9 +8,15 @@ import { db } from './db';
  * The curve watcher writes chart candles for every watched token on a timer, so
  * that table grows whether or not anybody is trading. Left alone it is the whole
  * disk within days, and a full disk fails every write, which takes the database
- * down. This drops candles too old for any chart to draw, then once a day
- * rewrites the file compact so the freed space returns to the disk rather than
- * sitting inside the file for ever.
+ * down. This drops candles too old for any chart to draw.
+ *
+ * It does NOT run VACUUM. VACUUM rewrites the whole file, and a rewrite killed
+ * partway through — which a container swap on every deploy does — can leave the
+ * database corrupt. The deletes here already bound the working set, and the
+ * pages they free are reused by later writes, so the file plateaus rather than
+ * growing without end. Reclaiming the file back to the disk is left to the
+ * boot-time step in db-reclaim, which only runs when the disk is genuinely tight
+ * and does its rewrite off the volume, never in place.
  *
  * Best effort, and quiet about it: a sweep that could not run is tried again
  * next time, never a reason to take the server down.
@@ -20,31 +26,15 @@ let started = false;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 const SWEEP_MS = 30 * 60 * 1_000;
-const COMPACT_MS = 24 * 60 * 60 * 1_000;
-
-let lastCompactAt = 0;
 
 async function sweep(): Promise<void> {
   const client = await db();
-  const now = Date.now();
-
-  const result = await runRetention(client, now);
+  const result = await runRetention(client, Date.now());
   if (result.candlesDeleted > 0 || result.poolSnapshotsDeleted > 0 || result.launchesDeleted > 0) {
     console.log(
       `[retention] dropped ${result.candlesDeleted} candles, ` +
         `${result.poolSnapshotsDeleted} pool snapshots, ${result.launchesDeleted} launches`,
     );
-  }
-
-  // Reclaiming the file is expensive and locks it, so it is done at most once a
-  // day, and only after a prune has freed pages worth reclaiming.
-  if (now - lastCompactAt >= COMPACT_MS) {
-    lastCompactAt = now;
-    try {
-      await compact(client);
-    } catch (error) {
-      console.error('[retention] compact failed', error);
-    }
   }
 }
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import { migrate, openDatabase, type Client } from '@probatio/db';
 import { databaseUrl } from './env';
-import { reclaimIfTight } from './db-reclaim';
+import { reclaimIfTight, recoverIfCorrupt } from './db-reclaim';
 
 /**
  * One connection per process, opened lazily.
@@ -12,6 +12,7 @@ import { reclaimIfTight } from './db-reclaim';
 let client: Client | undefined;
 let ready: Promise<void> | undefined;
 let reclaimed: Promise<void> | undefined;
+let corruptChecked: Promise<void> | undefined;
 
 export async function db(): Promise<Client> {
   // Before the shared connection opens, give a nearly-full disk its room back.
@@ -22,6 +23,13 @@ export async function db(): Promise<Client> {
     console.error('[db] disk reclaim failed', error);
   });
   await reclaimed;
+
+  // A corrupt database is set aside and rebuilt fresh, so a damaged file heals
+  // itself on the next boot rather than failing every query that touches it.
+  corruptChecked ??= recoverIfCorrupt().catch((error) => {
+    console.error('[db] corruption recovery failed', error);
+  });
+  await corruptChecked;
 
   client ??= openDatabase({ url: databaseUrl() });
   ready ??= migrate(client).then(() => undefined);
