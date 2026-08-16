@@ -49,7 +49,10 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const mint = url.searchParams.get('mint');
   const timeframe = url.searchParams.get('timeframe') ?? 'm1';
-  const limitParam = Number(url.searchParams.get('limit') ?? '300');
+  // Default to a full window, the way pump.fun's own chart loads one, so the
+  // fine timeframes go as far back as it serves them rather than a few hundred
+  // candles. The coarse timeframes ignore this and always return their full span.
+  const limitParam = Number(url.searchParams.get('limit') ?? String(MAX_CANDLES));
 
   if (!mint || !MINT_PATTERN.test(mint)) {
     return Response.json({ error: 'a valid mint address is required' }, { status: 400 });
