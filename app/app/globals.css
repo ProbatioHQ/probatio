@@ -3563,8 +3563,81 @@ body:has(main.wide) .site-footer .shell {
   cursor: pointer;
   transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
 }
-.tool-btn svg {
+/*
+ * Chart glyphs drawn from bars, not SVG.
+ *
+ * Inline SVG painted as empty boxes in a real browser here with no reproducible
+ * cause. Each bar below is an absolutely-positioned pseudo-element filled with
+ * the button's own text colour — the same paint path as the button background,
+ * which does show — so these are certain to render. An unused ::after has no
+ * dimensions and stays invisible.
+ */
+.ico {
+  position: relative;
   display: block;
+  width: 16px;
+  height: 16px;
+}
+.ico::before,
+.ico::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+  border-radius: 1px;
+}
+/* cursor: a crosshair plus */
+.ico-cursor::before {
+  left: 1px;
+  right: 1px;
+  top: 7px;
+  height: 2px;
+}
+.ico-cursor::after {
+  top: 1px;
+  bottom: 1px;
+  left: 7px;
+  width: 2px;
+}
+/* horizontal line */
+.ico-hline::before {
+  left: 0;
+  right: 0;
+  top: 7px;
+  height: 2px;
+}
+/* trend line: a diagonal bar */
+.ico-trend::before {
+  left: 0;
+  right: 0;
+  top: 7px;
+  height: 2px;
+  transform: rotate(-40deg);
+}
+/* clear: an x */
+.ico-clear::before,
+.ico-clear::after {
+  left: 1px;
+  right: 1px;
+  top: 7px;
+  height: 2px;
+}
+.ico-clear::before {
+  transform: rotate(45deg);
+}
+.ico-clear::after {
+  transform: rotate(-45deg);
+}
+/* fx (indicators): a slash */
+.ico-fx {
+  width: 12px;
+  height: 12px;
+}
+.ico-fx::before {
+  left: -1px;
+  right: -1px;
+  top: 5px;
+  height: 2px;
+  transform: rotate(-55deg);
 }
 .tool-btn:hover:not(.on) {
   color: var(--text);

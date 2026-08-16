@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type SVGProps } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CandlestickSeries,
   HistogramSeries,
@@ -98,50 +98,12 @@ const INDICATORS: readonly { id: string; name: string }[] = [
    the SVG namespace — a shared helper that passed paths in as a fragment could
    land them in the HTML namespace, where they exist but draw nothing. Stroked
    with currentColor so they take the button's own colour and its on-state. */
-const ICON: SVGProps<SVGSVGElement> = {
-  width: 18,
-  height: 18,
-  viewBox: '0 0 16 16',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': true,
-};
-const CursorIcon = () => (
-  <svg {...ICON}>
-    <path d="M8 1.5v13" />
-    <path d="M1.5 8h13" />
-  </svg>
-);
-const TrendIcon = () => (
-  <svg {...ICON}>
-    <path d="M2.5 13 13.5 3" />
-    <circle cx="2.5" cy="13" r="1.3" />
-    <circle cx="13.5" cy="3" r="1.3" />
-  </svg>
-);
-const HLineIcon = () => (
-  <svg {...ICON}>
-    <path d="M1.5 8h13" />
-    <circle cx="8" cy="8" r="1.3" />
-  </svg>
-);
-const TrashIcon = () => (
-  <svg {...ICON}>
-    <path d="M2.5 4h11" />
-    <path d="M6 4V2.5h4V4" />
-    <path d="M4 4l.7 9.5h6.6L12 4" />
-  </svg>
-);
-const FxIcon = () => (
-  <svg {...ICON}>
-    <path d="M2.5 13c2.5 0 1.5-10 4.5-10" />
-    <path d="M1.5 7h5" />
-    <path d="M9.5 6.5l4 4M13.5 6.5l-4 4" />
-  </svg>
-);
+// The chart's small glyphs are drawn in CSS (bars built from an element's own
+// background), not SVG. Inline SVG rendered as empty boxes in at least one real
+// browser here, with no reproducible cause; a CSS bar takes the same rendering
+// path as the button background that box already shows, so it is certain to
+// paint. Each glyph is a <span> whose class (below, in globals.css) composes it
+// from a couple of coloured bars. See `.ico-*` rules.
 
 export function PriceChart({
   mint,
@@ -756,13 +718,10 @@ export function PriceChart({
   const change =
     last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
 
-  // Icon as a component, rendered inline as <Icon /> below — the same way the
-  // fx button that does show its icon renders one, rather than as a prebuilt
-  // element handed through an array.
   const tools = [
-    { id: 'cursor' as const, label: 'Cursor', Icon: CursorIcon },
-    { id: 'trend' as const, label: 'Trend line', Icon: TrendIcon },
-    { id: 'hline' as const, label: 'Horizontal line', Icon: HLineIcon },
+    { id: 'cursor' as const, label: 'Cursor' },
+    { id: 'trend' as const, label: 'Trend line' },
+    { id: 'hline' as const, label: 'Horizontal line' },
   ];
 
   return (
@@ -793,7 +752,7 @@ export function PriceChart({
               aria-expanded={showIndicators}
               onClick={() => setShowIndicators((was) => !was)}
             >
-              <FxIcon /> Indicators
+              <span className="ico ico-fx" aria-hidden="true" /> Indicators
             </button>
             {showIndicators && (
               <div className="chart-menu" role="menu">
@@ -860,7 +819,7 @@ export function PriceChart({
       <div className="chart-body">
         {/* The drawing tools down the left, as a trading terminal arranges them. */}
         <div className="chart-toolbar" role="group" aria-label="Drawing tools">
-          {tools.map(({ id, label, Icon }) => (
+          {tools.map(({ id, label }) => (
             <button
               key={id}
               type="button"
@@ -870,7 +829,7 @@ export function PriceChart({
               aria-label={label}
               onClick={() => setTool(id)}
             >
-              <Icon />
+              <span className={`ico ico-${id}`} aria-hidden="true" />
             </button>
           ))}
           {lineCount > 0 && (
@@ -881,7 +840,7 @@ export function PriceChart({
               aria-label="Clear drawings"
               onClick={clearLines}
             >
-              <TrashIcon />
+              <span className="ico ico-clear" aria-hidden="true" />
             </button>
           )}
         </div>
