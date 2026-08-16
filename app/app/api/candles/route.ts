@@ -64,6 +64,7 @@ export async function GET(request: Request): Promise<Response> {
     ? Math.min(Math.max(Math.trunc(limitParam), 1), MAX_CANDLES)
     : 300;
 
+  try {
   const client = await db();
   let candles: StoredCandle[];
   if (stored) {
@@ -121,4 +122,19 @@ export async function GET(request: Request): Promise<Response> {
       seconds,
     ),
   });
+  } catch (error) {
+    // A chart data request must never 500 the chart. Log the real reason (it
+    // shows in the server logs), and answer with an empty, still-loading series
+    // so the chart reads as "reading history" and retries rather than failing.
+    console.error('[candles] failed for', mint, timeframe, error);
+    return Response.json({
+      mint,
+      timeframe,
+      backfilling: true,
+      tokenDecimals: PUMPFUN_TOKEN_DECIMALS,
+      totalSupply: PUMPFUN_TOKEN_TOTAL_SUPPLY.toString(),
+      candles: [],
+      diag: error instanceof Error ? (error.stack ?? error.message) : String(error),
+    });
+  }
 }
