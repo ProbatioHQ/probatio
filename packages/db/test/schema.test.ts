@@ -122,6 +122,7 @@ describe('migrations', () => {
       '019_practice_purchases.sql',
       '020_snapshot_deliverable_tokens.sql',
       '021_payout_engine.sql',
+      '022_reset_chart_history.sql',
     ]);
   });
 

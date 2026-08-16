@@ -245,64 +245,48 @@ export function backfillChart(mint: string): void {
       });
 
       /*
-       * A graduated token is charted from its pool, not its curve.
+       * The whole history, from launch: the trades up the bonding curve before
+       * graduation, then the trades on the pool after it.
        *
-       * This is what pump.fun shows and what makes the chart clean: the curve
-       * trades are an early, far lower price regime, and stitching them onto the
-       * pool history draws a cliff between the two rather than a market. So for a
-       * graduated token the pool history replaces the curve rather than joining
-       * it. Only if the pool read comes back empty, which on a throttled node it
-       * can, does the curve chart stand in so there is something to see.
+       * These used to be treated as either/or — a graduated token showed only
+       * its pool — which hid everything before it graduated, which for a token
+       * days old is most of its life. They sit on one price scale (the pool's
+       * reserve offset lines the two up), so writing both draws the real chart:
+       * the climb up the curve, graduation, and the market that followed.
        */
+      const curve = result.observations;
+      // The curve history first: a token's life before it graduated.
+      await writeObservationCandles(client, mint, curve);
+
       let pool: PoolBackfill = { count: 0, oldest: null, newest: null };
-      let graduated = false;
       try {
         const reader = new PoolReader(rpc);
         const resolution = await reader.resolve(mint);
         if (resolution.venue.kind === 'pumpswap') {
-          graduated = true;
-          // Writes candles page by page as it walks, so there is nothing to
-          // collect and write here.
+          // Writes candles page by page as it walks; nothing to collect here.
           pool = await poolBackfill(rpc, reader, mint, client);
         }
       } catch (error) {
         console.error('[chart] pool history failed for', mint, error);
       }
 
-      // The pool history is the chart for a graduated token; the curve stands in
-      // only when the pool read came back with nothing, which a throttled node
-      // can do. Recorded even when empty, so a token with no trades is not
-      // re-walked on every page view.
-      const usedPool = graduated && pool.count > 0;
-      if (usedPool) {
-        await recordBackfill(
-          client,
-          { mint, oldestTimestamp: pool.oldest, newestTimestamp: pool.newest, observations: pool.count, truncated: result.truncated },
-          Date.now(),
-        );
-        markSettled(mint);
-        console.log(`[chart] ${mint} backfilled ${pool.count} pool observations`);
-        return;
-      }
-
-      const curve = result.observations;
-      const timestamps = curve.map((observation) => observation.timestamp);
+      // Record the combined span, so the token is not walked again.
+      const times: number[] = curve.map((observation) => observation.timestamp);
+      if (pool.oldest !== null) times.push(pool.oldest);
+      if (pool.newest !== null) times.push(pool.newest);
       await recordBackfill(
         client,
         {
           mint,
-          oldestTimestamp: timestamps.length > 0 ? Math.min(...timestamps) : null,
-          newestTimestamp: timestamps.length > 0 ? Math.max(...timestamps) : null,
-          observations: curve.length,
+          oldestTimestamp: times.length > 0 ? Math.min(...times) : null,
+          newestTimestamp: times.length > 0 ? Math.max(...times) : null,
+          observations: curve.length + pool.count,
           truncated: result.truncated,
         },
         Date.now(),
       );
-
       markSettled(mint);
-      if (curve.length === 0) return;
-      await writeObservationCandles(client, mint, curve);
-      console.log(`[chart] ${mint} backfilled ${curve.length} curve observations`);
+      console.log(`[chart] ${mint} backfilled ${curve.length} curve + ${pool.count} pool observations`);
     } catch (error) {
       // Left unrecorded on failure, so the next visitor tries again rather
       // than inheriting a permanent blank.

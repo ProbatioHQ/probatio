@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SVGProps } from 'react';
 import {
   CandlestickSeries,
   HistogramSeries,
@@ -93,18 +93,55 @@ const INDICATORS: readonly { id: string; name: string }[] = [
   { id: 'macd', name: 'MACD (12/26/9)' },
 ];
 
-/* Small line-drawn icons for the toolbar and the indicators button. Stroked
+/* Line-drawn icons for the toolbar and the indicators button. Each is a full
+   inline <svg> with its paths directly inside, so React always renders them in
+   the SVG namespace — a shared helper that passed paths in as a fragment could
+   land them in the HTML namespace, where they exist but draw nothing. Stroked
    with currentColor so they take the button's own colour and its on-state. */
-const icon = (paths: ReactNode) => (
-  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {paths}
+const ICON: SVGProps<SVGSVGElement> = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 16 16',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+};
+const CursorIcon = () => (
+  <svg {...ICON}>
+    <path d="M8 1.5v13" />
+    <path d="M1.5 8h13" />
   </svg>
 );
-const CursorIcon = () => icon(<><path d="M8 1.5v13" /><path d="M1.5 8h13" /></>);
-const TrendIcon = () => icon(<><path d="M2.5 13 13.5 3" /><circle cx="2.5" cy="13" r="1.3" /><circle cx="13.5" cy="3" r="1.3" /></>);
-const HLineIcon = () => icon(<><path d="M1.5 8h13" /><circle cx="8" cy="8" r="1.3" /></>);
-const TrashIcon = () => icon(<><path d="M2.5 4h11" /><path d="M6 4V2.5h4V4" /><path d="M4 4l.7 9.5h6.6L12 4" /></>);
-const FxIcon = () => icon(<><path d="M2.5 13c2.5 0 1.5-10 4.5-10" /><path d="M1.5 7h5" /><path d="M9.5 6.5l4 4M13.5 6.5l-4 4" /></>);
+const TrendIcon = () => (
+  <svg {...ICON}>
+    <path d="M2.5 13 13.5 3" />
+    <circle cx="2.5" cy="13" r="1.3" />
+    <circle cx="13.5" cy="3" r="1.3" />
+  </svg>
+);
+const HLineIcon = () => (
+  <svg {...ICON}>
+    <path d="M1.5 8h13" />
+    <circle cx="8" cy="8" r="1.3" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg {...ICON}>
+    <path d="M2.5 4h11" />
+    <path d="M6 4V2.5h4V4" />
+    <path d="M4 4l.7 9.5h6.6L12 4" />
+  </svg>
+);
+const FxIcon = () => (
+  <svg {...ICON}>
+    <path d="M2.5 13c2.5 0 1.5-10 4.5-10" />
+    <path d="M1.5 7h5" />
+    <path d="M9.5 6.5l4 4M13.5 6.5l-4 4" />
+  </svg>
+);
 
 export function PriceChart({
   mint,
