@@ -170,6 +170,7 @@ export function PriceChart({
     });
   }, []);
   const [tool, setTool] = useState<'cursor' | 'hline' | 'trend'>('cursor');
+  const [trendArmed, setTrendArmed] = useState(false);
   const [lineCount, setLineCount] = useState(0);
   const [showIndicators, setShowIndicators] = useState(false);
   /*
@@ -184,14 +185,17 @@ export function PriceChart({
    * render: a ref mutated in the render body is a side effect in a function
    * React may run twice or discard.
    */
-  const toolRef = useRef(tool);
-  useEffect(() => {
-    toolRef.current = tool;
-  }, [tool]);
   /** The first point of a trend line, held while its second is placed. */
   const pendingTrend = useRef<{ time: UTCTimestamp; value: number } | null>(null);
   /** Every trend line drawn, so they clear together with the price lines. */
   const trendLines = useRef<ISeriesApi<'Line'>[]>([]);
+  const toolRef = useRef(tool);
+  useEffect(() => {
+    toolRef.current = tool;
+    // Switching tools abandons a half-drawn trend line.
+    pendingTrend.current = null;
+    setTrendArmed(false);
+  }, [tool]);
 
   // Close the indicators picker when a click lands outside it.
   const indicatorsWrap = useRef<HTMLDivElement>(null);
@@ -612,11 +616,13 @@ export function PriceChart({
 
       if (!pendingTrend.current) {
         pendingTrend.current = point;
+        setTrendArmed(true);
         return;
       }
 
       const [a, b] = [pendingTrend.current, point].sort((p, q) => (p.time as number) - (q.time as number));
       pendingTrend.current = null;
+      setTrendArmed(false);
       const line = chart.current.addSeries(LineSeries, {
         color: '#f0b429',
         lineWidth: 2,
@@ -867,7 +873,7 @@ export function PriceChart({
           )}
           {tool === 'trend' && (
             <p className="chart-hint-float dim">
-              {pendingTrend.current ? 'Click the end point' : 'Click two points to draw a trend line'}
+              {trendArmed ? 'Click the end point' : 'Click two points to draw a trend line'}
             </p>
           )}
         </div>
