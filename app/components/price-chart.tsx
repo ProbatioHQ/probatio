@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   CandlestickSeries,
   HistogramSeries,
@@ -82,16 +82,29 @@ const BB_EDGE = 'rgba(91,141,239,0.65)';
 const BB_MID = 'rgba(148,163,184,0.55)';
 const VWAP_COLOUR = '#e0b0ff';
 
-/** The indicators, in the order they appear in the rail. */
-const INDICATORS: readonly { id: string; label: string }[] = [
-  { id: 'sma', label: 'SMA' },
-  { id: 'ema', label: 'EMA' },
-  { id: 'bollinger', label: 'BB' },
-  { id: 'vwap', label: 'VWAP' },
-  { id: 'volume', label: 'VOL' },
-  { id: 'rsi', label: 'RSI' },
-  { id: 'macd', label: 'MACD' },
+/** The indicators, in the order they appear in the picker. */
+const INDICATORS: readonly { id: string; name: string }[] = [
+  { id: 'sma', name: 'Moving average (SMA 9/21/50)' },
+  { id: 'ema', name: 'Exponential MA (EMA 9/21)' },
+  { id: 'bollinger', name: 'Bollinger Bands (20, 2)' },
+  { id: 'vwap', name: 'VWAP' },
+  { id: 'volume', name: 'Volume' },
+  { id: 'rsi', name: 'RSI (14)' },
+  { id: 'macd', name: 'MACD (12/26/9)' },
 ];
+
+/* Small line-drawn icons for the toolbar and the indicators button. Stroked
+   with currentColor so they take the button's own colour and its on-state. */
+const icon = (paths: ReactNode) => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {paths}
+  </svg>
+);
+const CursorIcon = () => icon(<><path d="M8 1.5v13" /><path d="M1.5 8h13" /></>);
+const TrendIcon = () => icon(<><path d="M2.5 13 13.5 3" /><circle cx="2.5" cy="13" r="1.3" /><circle cx="13.5" cy="3" r="1.3" /></>);
+const HLineIcon = () => icon(<><path d="M1.5 8h13" /><circle cx="8" cy="8" r="1.3" /></>);
+const TrashIcon = () => icon(<><path d="M2.5 4h11" /><path d="M6 4V2.5h4V4" /><path d="M4 4l.7 9.5h6.6L12 4" /></>);
+const FxIcon = () => icon(<><path d="M2.5 13c2.5 0 1.5-10 4.5-10" /><path d="M1.5 7h5" /><path d="M9.5 6.5l4 4M13.5 6.5l-4 4" /></>);
 
 export function PriceChart({
   mint,
@@ -156,8 +169,9 @@ export function PriceChart({
       return next;
     });
   }, []);
-  const [drawing, setDrawing] = useState(false);
+  const [tool, setTool] = useState<'cursor' | 'hline' | 'trend'>('cursor');
   const [lineCount, setLineCount] = useState(0);
+  const [showIndicators, setShowIndicators] = useState(false);
   /*
    * Whether the live price stream has dropped. The candle poll still refreshes
    * every few seconds, but the in-progress bar stops moving when the stream is
@@ -165,15 +179,32 @@ export function PriceChart({
    */
   const [livePaused, setLivePaused] = useState(false);
   /*
-   * Read by the chart's click handler, registered once when the chart is
-   * created. Written in an effect rather than during render: a ref mutated in
-   * the render body is a side effect in a function React may run twice or
-   * discard.
+   * The active tool, read by the chart's click handler, which is registered
+   * once when the chart is created. Written in an effect rather than during
+   * render: a ref mutated in the render body is a side effect in a function
+   * React may run twice or discard.
    */
-  const drawingRef = useRef(drawing);
+  const toolRef = useRef(tool);
   useEffect(() => {
-    drawingRef.current = drawing;
-  }, [drawing]);
+    toolRef.current = tool;
+  }, [tool]);
+  /** The first point of a trend line, held while its second is placed. */
+  const pendingTrend = useRef<{ time: UTCTimestamp; value: number } | null>(null);
+  /** Every trend line drawn, so they clear together with the price lines. */
+  const trendLines = useRef<ISeriesApi<'Line'>[]>([]);
+
+  // Close the indicators picker when a click lands outside it.
+  const indicatorsWrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showIndicators) return;
+    const onDocument = (event: MouseEvent): void => {
+      if (indicatorsWrap.current && !indicatorsWrap.current.contains(event.target as Node)) {
+        setShowIndicators(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocument);
+    return () => document.removeEventListener('mousedown', onDocument);
+  }, [showIndicators]);
 
   /**
    * SOL in dollars, for the market-cap axis.
@@ -549,25 +580,53 @@ export function PriceChart({
     // that RSI and MACD add sit under it, each a fraction of the size.
     instance.panes()[0]?.setStretchFactor(4);
 
-    // A click while drawing leaves a horizontal line at that price. It is the
-    // one drawing tool that earns its place on a chart this size — a level you
-    // are watching, marked, and still there when the candles reach it.
-    const onClick = (param: { point?: { x: number; y: number } }): void => {
-      if (!drawingRef.current || !param.point || !series.current) return;
+    // Drawing, according to the tool the left rail has selected. The horizontal
+    // line marks a level at the clicked price; the trend line takes two clicks
+    // and draws the straight line between them. The cursor tool draws nothing.
+    const onClick = (param: { point?: { x: number; y: number }; time?: unknown }): void => {
+      const active = toolRef.current;
+      if (active === 'cursor' || !param.point || !series.current || !chart.current) return;
+
       const price = series.current.coordinateToPrice(param.point.y);
       if (price === null) return;
 
-      priceLines.current.push(
-        series.current.createPriceLine({
-          price: price as number,
-          color: '#f0b429',
-          lineWidth: 1,
-          lineStyle: 2,
-          axisLabelVisible: true,
-          title: '',
-        }),
-      );
-      setLineCount(priceLines.current.length);
+      if (active === 'hline') {
+        priceLines.current.push(
+          series.current.createPriceLine({
+            price: price as number,
+            color: '#f0b429',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: '',
+          }),
+        );
+        setLineCount(priceLines.current.length + trendLines.current.length);
+        return;
+      }
+
+      // Trend line: the time at the clicked x, and the price at the clicked y.
+      const time = chart.current.timeScale().coordinateToTime(param.point.x);
+      if (time === null) return;
+      const point = { time: time as UTCTimestamp, value: price as number };
+
+      if (!pendingTrend.current) {
+        pendingTrend.current = point;
+        return;
+      }
+
+      const [a, b] = [pendingTrend.current, point].sort((p, q) => (p.time as number) - (q.time as number));
+      pendingTrend.current = null;
+      const line = chart.current.addSeries(LineSeries, {
+        color: '#f0b429',
+        lineWidth: 2,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      line.setData([a!, b!]);
+      trendLines.current.push(line);
+      setLineCount(priceLines.current.length + trendLines.current.length);
     };
     instance.subscribeClick(onClick);
 
@@ -590,6 +649,8 @@ export function PriceChart({
       rsiRef.current = null;
       macdRef.current = null;
       priceLines.current = [];
+      trendLines.current = [];
+      pendingTrend.current = null;
     };
   }, [height]);
 
@@ -641,7 +702,10 @@ export function PriceChart({
 
   const clearLines = useCallback(() => {
     for (const line of priceLines.current) series.current?.removePriceLine(line);
+    for (const line of trendLines.current) chart.current?.removeSeries(line);
     priceLines.current = [];
+    trendLines.current = [];
+    pendingTrend.current = null;
     setLineCount(0);
   }, []);
 
@@ -650,68 +714,66 @@ export function PriceChart({
   const change =
     last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
 
+  const tools = [
+    { id: 'cursor' as const, label: 'Cursor', node: <CursorIcon /> },
+    { id: 'trend' as const, label: 'Trend line', node: <TrendIcon /> },
+    { id: 'hline' as const, label: 'Horizontal line', node: <HLineIcon /> },
+  ];
+
   return (
     <div className="chart">
-      <div className="chart-head">
-        <span className="cmd">
-          {unit === 'market-cap'
-            ? solUsd
-              ? 'market cap usd'
-              : 'market cap sol'
-            : 'price'}
-          <span className="caret" />
-        </span>
-
-        {change !== null && (
-          <span className={change >= 0 ? 'gain mono chart-change' : 'loss mono chart-change'}>
-            {change >= 0 ? '+' : ''}
-            {change.toFixed(2)}%
-          </span>
+      {/* Timeframes and controls across the top, the way a terminal keeps them. */}
+      <div className="chart-top">
+        {timeframes && timeframes.length > 0 && (
+          <div role="group" aria-label="Timeframe" className="chart-times">
+            {timeframes.map((frame) => (
+              <button
+                key={frame}
+                type="button"
+                className={frame === timeframe ? 'time-btn on' : 'time-btn'}
+                aria-pressed={frame === timeframe}
+                onClick={() => onTimeframe?.(frame)}
+              >
+                {TIMEFRAME_LABELS[frame] ?? frame}
+              </button>
+            ))}
+          </div>
         )}
 
-        {/* Honest about a chart that is not all there yet. Reading a token's past
-            off a public RPC is slow, so a freshly opened token shows the few
-            candles the live feed has caught while the history walks in behind
-            it. Without this, those few candles read as the whole story. */}
-        {data?.backfilling && (
-          <span className="chart-loading mono dim" role="status">
-            reading history<span className="caret" />
-          </span>
-        )}
-
-        {/* The live price stream is down, so the in-progress bar is frozen.
-            Said plainly, because a stale "live" price is one a trader might act
-            on. Not shown while history is still loading, which is its own state. */}
-        {livePaused && !data?.backfilling && (
-          <span className="chart-loading mono loss" role="status">
-            live paused
-          </span>
-        )}
-      </div>
-
-      <div className="chart-body">
-        <div className="chart-rail">
-          {timeframes && timeframes.length > 0 && (
-            <div role="group" aria-label="Timeframe" className="rail-group">
-              {timeframes.map((frame) => (
-                <button
-                  key={frame}
-                  type="button"
-                  className={frame === timeframe ? 'rail-btn on' : 'rail-btn'}
-                  aria-pressed={frame === timeframe}
-                  onClick={() => onTimeframe?.(frame)}
-                >
-                  {TIMEFRAME_LABELS[frame] ?? frame}
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="chart-top-actions">
+          <div className="chart-menu-wrap" ref={indicatorsWrap}>
+            <button
+              type="button"
+              className={showIndicators || enabled.size > 0 ? 'chart-top-btn on' : 'chart-top-btn'}
+              aria-expanded={showIndicators}
+              onClick={() => setShowIndicators((was) => !was)}
+            >
+              <FxIcon /> Indicators
+            </button>
+            {showIndicators && (
+              <div className="chart-menu" role="menu">
+                {INDICATORS.map((indicator) => (
+                  <button
+                    key={indicator.id}
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={enabled.has(indicator.id)}
+                    className={enabled.has(indicator.id) ? 'chart-menu-item on' : 'chart-menu-item'}
+                    onClick={() => toggle(indicator.id)}
+                  >
+                    <span className="tick" aria-hidden="true" />
+                    {indicator.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {onUnit && (
-            <div role="group" aria-label="Unit" className="rail-group">
+            <div role="group" aria-label="Unit" className="chart-seg">
               <button
                 type="button"
-                className={unit === 'market-cap' ? 'rail-btn on' : 'rail-btn'}
+                className={unit === 'market-cap' ? 'on' : undefined}
                 aria-pressed={unit === 'market-cap'}
                 onClick={() => onUnit('market-cap')}
               >
@@ -719,7 +781,7 @@ export function PriceChart({
               </button>
               <button
                 type="button"
-                className={unit === 'per-token' ? 'rail-btn on' : 'rail-btn'}
+                className={unit === 'per-token' ? 'on' : undefined}
                 aria-pressed={unit === 'per-token'}
                 onClick={() => onUnit('per-token')}
               >
@@ -728,62 +790,79 @@ export function PriceChart({
             </div>
           )}
 
-          <div role="group" aria-label="Indicators" className="rail-group">
-            {INDICATORS.map((indicator) => (
-              <button
-                key={indicator.id}
-                type="button"
-                className={enabled.has(indicator.id) ? 'rail-btn on' : 'rail-btn'}
-                aria-pressed={enabled.has(indicator.id)}
-                onClick={() => toggle(indicator.id)}
-              >
-                {indicator.label}
-              </button>
-            ))}
-          </div>
+          {change !== null && (
+            <span className={change >= 0 ? 'gain mono chart-change' : 'loss mono chart-change'}>
+              {change >= 0 ? '+' : ''}
+              {change.toFixed(2)}%
+            </span>
+          )}
 
-          <div role="group" aria-label="Drawing" className="rail-group">
-            <button
-              type="button"
-              className={drawing ? 'rail-btn on' : 'rail-btn'}
-              onClick={() => setDrawing((was) => !was)}
-              aria-pressed={drawing}
-              title="Click the chart to mark a price level"
-            >
-              LEVEL
-            </button>
-            {lineCount > 0 && (
-              <button type="button" className="rail-btn" onClick={clearLines}>
-                CLR {lineCount}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div
-          className={drawing ? 'chart-canvas drawing' : 'chart-canvas'}
-          style={{ height }}
-        >
-          <div ref={container} style={{ width: '100%', height }} />
-        {/* Centred in the plot area rather than under it. An empty box with a
-            caption below reads as a chart that failed to load. */}
-        {(error || (data && points.length === 0)) && (
-          <p
-            role={error ? 'alert' : undefined}
-            className={error ? 'chart-empty loss' : 'chart-empty dim'}
-          >
-            {error ??
-              (data?.backfilling
-                ? 'Reading this token’s history from the chain…'
-                : 'No trades on this token yet. The chart fills in as it trades.')}
-          </p>
-        )}
+          {/* Honest about a chart still filling in from the chain, and about a
+              live price gone stale because its stream dropped. */}
+          {data?.backfilling && (
+            <span className="chart-loading mono dim" role="status">
+              reading history<span className="caret" />
+            </span>
+          )}
+          {livePaused && !data?.backfilling && (
+            <span className="chart-loading mono loss" role="status">
+              live paused
+            </span>
+          )}
         </div>
       </div>
 
-      {drawing && (
-        <p className="dim chart-hint">Click anywhere on the chart to mark a price level.</p>
-      )}
+      <div className="chart-body">
+        {/* The drawing tools down the left, as a trading terminal arranges them. */}
+        <div className="chart-toolbar" role="group" aria-label="Drawing tools">
+          {tools.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={tool === entry.id ? 'tool-btn on' : 'tool-btn'}
+              aria-pressed={tool === entry.id}
+              title={entry.label}
+              aria-label={entry.label}
+              onClick={() => setTool(entry.id)}
+            >
+              {entry.node}
+            </button>
+          ))}
+          {lineCount > 0 && (
+            <button
+              type="button"
+              className="tool-btn"
+              title={`Clear ${lineCount} drawing${lineCount > 1 ? 's' : ''}`}
+              aria-label="Clear drawings"
+              onClick={clearLines}
+            >
+              <TrashIcon />
+            </button>
+          )}
+        </div>
+
+        <div className={tool === 'cursor' ? 'chart-canvas' : 'chart-canvas drawing'} style={{ height }}>
+          <div ref={container} style={{ width: '100%', height }} />
+          {/* Centred in the plot area rather than under it. An empty box with a
+              caption below reads as a chart that failed to load. */}
+          {(error || (data && points.length === 0)) && (
+            <p
+              role={error ? 'alert' : undefined}
+              className={error ? 'chart-empty loss' : 'chart-empty dim'}
+            >
+              {error ??
+                (data?.backfilling
+                  ? 'Reading this token’s history from the chain…'
+                  : 'No trades on this token yet. The chart fills in as it trades.')}
+            </p>
+          )}
+          {tool === 'trend' && (
+            <p className="chart-hint-float dim">
+              {pendingTrend.current ? 'Click the end point' : 'Click two points to draw a trend line'}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

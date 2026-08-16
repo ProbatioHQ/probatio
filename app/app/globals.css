@@ -3374,85 +3374,231 @@ body:has(main.wide) .site-footer .shell {
   color: var(--accent);
 }
 
-/* The chart and its left rail, the way a trading terminal arranges them. */
-.chart-body {
+/* A trading-terminal layout: timeframes and controls along the top, drawing
+   tools down the left, the plot filling the rest. */
+.chart-top {
   display: flex;
+  align-items: center;
   gap: 12px;
-  align-items: stretch;
-}
-.chart-body .chart-canvas { flex: 1; min-width: 0; }
-
-.chart-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 58px;
-  flex: none;
-}
-
-/* Grouped by kind — timeframes, unit, indicators, tools — with a hairline
-   between so the rail reads as sections rather than one long column. */
-.rail-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding-bottom: 11px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
-.rail-group:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+
+.chart-times {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.time-btn {
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.time-btn:hover:not(.on) {
+  color: var(--text-dim);
+  background: var(--ink-sunken);
+}
+.time-btn.on {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-.rail-btn {
-  padding: 5px 4px;
+.chart-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.chart-menu-wrap {
+  position: relative;
+}
+.chart-top-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
   border-radius: 6px;
   border: 1px solid var(--line);
   background: var(--ink-sunken);
-  color: var(--text-faint);
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.03em;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
-}
-.rail-btn:hover:not(.on) {
   color: var(--text-dim);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.chart-top-btn:hover {
+  color: var(--text);
   border-color: var(--line-bright);
 }
-.rail-btn.on {
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+.chart-top-btn svg {
+  opacity: 0.85;
 }
 
-/* On a narrow screen the rail lies flat above the chart, not beside it. */
+/* The indicators picker, dropped under its button. */
+.chart-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border-radius: 8px;
+  border: 1px solid var(--line-bright);
+  background: var(--ink-raised, #12161c);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.chart-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 110ms ease, color 110ms ease;
+}
+.chart-menu-item:hover {
+  background: var(--ink-sunken);
+  color: var(--text);
+}
+.chart-menu-item .tick {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid var(--line-bright);
+  position: relative;
+}
+.chart-menu-item.on {
+  color: var(--accent);
+}
+.chart-menu-item.on .tick {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+/* A CSS-drawn check, so no emoji is needed. */
+.chart-menu-item.on .tick::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* The MCAP / PRICE segmented toggle. */
+.chart-seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.chart-seg button {
+  padding: 5px 10px;
+  border: none;
+  background: var(--ink-sunken);
+  color: var(--text-faint);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.chart-seg button + button {
+  border-left: 1px solid var(--line);
+}
+.chart-seg button.on {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.chart-body {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.chart-body .chart-canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The left tool rail: icon buttons, one per drawing tool. */
+.chart-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 34px;
+  flex: none;
+  padding-top: 2px;
+}
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.tool-btn:hover:not(.on) {
+  color: var(--text);
+  background: var(--ink-sunken);
+}
+.tool-btn.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* A floating hint while a tool wants a click, over the plot not under it. */
+.chart-hint-float {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink-sunken) 88%, transparent);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* On a narrow screen the tool rail lies flat above the chart. */
 @media (max-width: 720px) {
   .chart-body {
     flex-direction: column;
   }
-  .chart-rail {
+  .chart-toolbar {
     width: auto;
     flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .rail-group {
-    flex-direction: row;
-    flex-wrap: wrap;
-    border-bottom: none;
-    padding-bottom: 0;
-    border-right: 1px solid var(--line);
-    padding-right: 8px;
-  }
-  .rail-group:last-child {
-    border-right: none;
-    padding-right: 0;
   }
 }
 
-/* While placing a level, the cursor says so. */
+/* While a drawing tool is active, the cursor says so. */
 .chart-canvas.drawing { cursor: crosshair; }
 
 .chart-hint {
