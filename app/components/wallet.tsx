@@ -27,6 +27,8 @@ interface WalletState {
   readonly status: Status;
   readonly pubkey: string | null;
   readonly error: string | null;
+  /** Lamports, as they arrived with the session. Null until one is known. */
+  readonly balance: string | null;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
 }
@@ -47,14 +49,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/auth/session')
-      .then((response) => response.json() as Promise<{ pubkey: string | null }>)
+    void fetch('/api/auth/session', { cache: 'no-store' })
+      .then(
+        (response) =>
+          response.json() as Promise<{ pubkey: string | null; balance?: string | null }>,
+      )
       .then((data) => {
         if (cancelled) return;
         setPubkey(data.pubkey);
+        if (data.balance) setBalance(data.balance);
         setStatus(data.pubkey ? 'signed-in' : 'signed-out');
       })
       .catch(() => {
@@ -148,8 +155,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<WalletState>(
-    () => ({ status, pubkey, error, signIn, signOut }),
-    [status, pubkey, error, signIn, signOut],
+    () => ({ status, pubkey, error, balance, signIn, signOut }),
+    [status, pubkey, error, balance, signIn, signOut],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
@@ -189,14 +196,18 @@ function AddressMark({ pubkey }: { pubkey: string }) {
  * to sit permanently next to the buy buttons.
  */
 export function WalletButton() {
-  const { status, pubkey, signIn, signOut } = useWallet();
+  const { status, pubkey, signIn, signOut, balance: fromSession } = useWallet();
   const [open, setOpen] = useState(false);
-  const [balance, setBalance] = useState<string | null>(null);
+  const [fresh, setFresh] = useState<string | null>(null);
+  // Whatever is newest: the refresher once it has answered, otherwise the
+  // figure that arrived with the session, so the pill has a number from the
+  // first render rather than waiting on a second request.
+  const balance = fresh ?? fromSession;
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (status !== 'signed-in') {
-      setBalance(null);
+      setFresh(null);
       return;
     }
     let cancelled = false;
@@ -223,7 +234,7 @@ export function WalletButton() {
           return (await response.json()) as { balance?: string };
         })
         .then((data) => {
-          if (!cancelled && data?.balance) setBalance(data.balance);
+          if (!cancelled && data?.balance) setFresh(data.balance);
         })
         .catch((error) => console.error('[wallet] balance read failed', error));
     };

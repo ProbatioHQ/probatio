@@ -27,7 +27,7 @@ import { useEffect, useRef } from 'react';
  */
 
 /** Points per range. One cycle spans the canvas width, and wraps seamlessly. */
-const POINTS = 112;
+const POINTS = 84;
 /** How long a mood is held, and how long the morph into the next one takes. */
 const HOLD_MS = 6_500;
 const MORPH_MS = 4_500;
@@ -204,13 +204,66 @@ export function MarketScene() {
     let animation = 0;
     let start = 0;
 
+    const backdrop = document.createElement('canvas');
+    const backdropContext = backdrop.getContext('2d');
+    /** Quantised colour of the cached sky, so it is repainted only when it moves. */
+    let backdropKey = '';
+
+    /*
+     * Rendered below the display's own density.
+     *
+     * Everything here is soft: gradients, haze, a few translucent shapes. At
+     * full device pixels on a wide screen that is several million pixels of
+     * fill per frame for an image with no edge sharp enough to show the
+     * difference, and it was the single biggest cost in the loop.
+     */
     const resize = (): void => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.25);
       width = canvas.offsetWidth;
       height = canvas.offsetHeight;
       canvas.width = Math.max(1, Math.floor(width * ratio));
       canvas.height = Math.max(1, Math.floor(height * ratio));
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      backdrop.width = canvas.width;
+      backdrop.height = canvas.height;
+      backdropContext?.setTransform(ratio, 0, 0, ratio, 0, 0);
+      backdropKey = '';
+    };
+
+    /**
+     * The sky and the light behind the ranges, drawn once and kept.
+     *
+     * Two gradients across the whole canvas every frame was most of the work
+     * the loop was doing, for an image that only changes while a mood is
+     * morphing into the next one. Redrawn when the colour actually moves,
+     * blitted the rest of the time.
+     */
+    const paintBackdrop = (sky: [number, number, number], accent: [number, number, number]): void => {
+      const ctx = backdropContext;
+      if (!ctx) return;
+      ctx.clearRect(0, 0, width, height);
+
+      const air = ctx.createLinearGradient(0, 0, 0, height);
+      air.addColorStop(0, rgb(sky, 0));
+      air.addColorStop(0.45, rgb(sky, 0.16));
+      air.addColorStop(0.72, rgb(sky, 0.42));
+      air.addColorStop(1, rgb(sky, 0.12));
+      ctx.fillStyle = air;
+      ctx.fillRect(0, 0, width, height);
+
+      const sun = ctx.createRadialGradient(
+        width * 0.5,
+        height * 0.72,
+        0,
+        width * 0.5,
+        height * 0.72,
+        Math.max(width, height) * 0.6,
+      );
+      sun.addColorStop(0, rgb(accent, 0.2));
+      sun.addColorStop(0.4, rgb(accent, 0.07));
+      sun.addColorStop(1, rgb(accent, 0));
+      ctx.fillStyle = sun;
+      ctx.fillRect(0, 0, width, height);
     };
 
     /**
@@ -246,40 +299,39 @@ export function MarketScene() {
         }
       }
 
-      const trace = (): void => {
-        context.moveTo(crest[0]!.x, crest[0]!.y);
-        for (let i = 1; i < crest.length - 1; i += 1) {
-          const midX = (crest[i]!.x + crest[i + 1]!.x) / 2;
-          const midY = (crest[i]!.y + crest[i + 1]!.y) / 2;
-          context.quadraticCurveTo(crest[i]!.x, crest[i]!.y, midX, midY);
-        }
-        const last = crest[crest.length - 1]!;
-        context.lineTo(last.x, last.y);
-      };
+      // Built once as a path object and used for both the fill and the light
+      // along the crest, rather than walking every point twice a frame.
+      const line = new Path2D();
+      line.moveTo(crest[0]!.x, crest[0]!.y);
+      for (let i = 1; i < crest.length - 1; i += 1) {
+        const midX = (crest[i]!.x + crest[i + 1]!.x) / 2;
+        const midY = (crest[i]!.y + crest[i + 1]!.y) / 2;
+        line.quadraticCurveTo(crest[i]!.x, crest[i]!.y, midX, midY);
+      }
+      const last = crest[crest.length - 1]!;
+      line.lineTo(last.x, last.y);
 
       // The body, solid, fading out toward its base so ranges sink into one
-      // another rather than stacking as four separate cut-outs.
-      context.beginPath();
-      context.moveTo(crest[0]!.x, height);
-      context.lineTo(crest[0]!.x, crest[0]!.y);
-      trace();
-      context.lineTo(crest[crest.length - 1]!.x, height);
-      context.closePath();
+      // another rather than stacking as separate cut-outs.
+      const body = new Path2D();
+      body.moveTo(crest[0]!.x, height);
+      body.lineTo(crest[0]!.x, crest[0]!.y);
+      body.addPath(line);
+      body.lineTo(last.x, height);
+      body.closePath();
 
-      const body = context.createLinearGradient(0, baseY - amplitude, 0, height);
-      body.addColorStop(0, rgb(fill, 0.95));
-      body.addColorStop(0.75, rgb(fill, 0.82));
-      body.addColorStop(1, rgb(fill, 0.6));
-      context.fillStyle = body;
-      context.fill();
+      const shade = context.createLinearGradient(0, baseY - amplitude, 0, height);
+      shade.addColorStop(0, rgb(fill, 0.95));
+      shade.addColorStop(0.75, rgb(fill, 0.82));
+      shade.addColorStop(1, rgb(fill, 0.6));
+      context.fillStyle = shade;
+      context.fill(body);
 
       // The light caught along the crest. This is the line that makes a shape
       // read as a ridge against a lit sky instead of a hole in the page.
-      context.beginPath();
-      trace();
       context.strokeStyle = rgb(rim, rimAlpha);
       context.lineWidth = 1.2;
-      context.stroke();
+      context.stroke(line);
     };
 
     /**
@@ -348,29 +400,13 @@ export function MarketScene() {
 
       context.clearRect(0, 0, width, height);
 
-      // The sky: darkest overhead, warming toward the horizon the ranges stand on.
-      const air = context.createLinearGradient(0, 0, 0, height);
-      air.addColorStop(0, rgb(sky, 0));
-      air.addColorStop(0.45, rgb(sky, 0.16));
-      air.addColorStop(0.72, rgb(sky, 0.42));
-      air.addColorStop(1, rgb(sky, 0.12));
-      context.fillStyle = air;
-      context.fillRect(0, 0, width, height);
-
-      // The light behind the ranges, low and wide, which is what they are lit by.
-      const sun = context.createRadialGradient(
-        width * 0.5,
-        height * 0.72,
-        0,
-        width * 0.5,
-        height * 0.72,
-        Math.max(width, height) * 0.6,
-      );
-      sun.addColorStop(0, rgb(accent, 0.2));
-      sun.addColorStop(0.4, rgb(accent, 0.07));
-      sun.addColorStop(1, rgb(accent, 0));
-      context.fillStyle = sun;
-      context.fillRect(0, 0, width, height);
+      // The sky and its light, from the cache, repainted only as the colour moves.
+      const key = `${Math.round(sky[0])},${Math.round(sky[1])},${Math.round(sky[2])},${Math.round(accent[0])},${Math.round(accent[1])},${Math.round(accent[2])}`;
+      if (key !== backdropKey) {
+        paintBackdrop(sky, accent);
+        backdropKey = key;
+      }
+      context.drawImage(backdrop, 0, 0, width, height);
 
       const seconds = elapsed / 1000;
       // Far to near, so each range is drawn over the one behind it.
