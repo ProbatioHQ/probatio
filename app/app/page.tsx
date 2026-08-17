@@ -1,6 +1,18 @@
 import { Hero } from '@/components/hero';
 
 /**
+ * Re-rendered on a short window rather than pinned for a year.
+ *
+ * As a fully static route this was prerendered at build time and served with a
+ * year of edge caching, and the cache is keyed on the address rather than the
+ * build. So a deploy shipped a new front page that nobody was given: the edge
+ * went on answering with the copy it already had, and every change to this page
+ * looked like it had failed to deploy. The page holds no data and costs nothing
+ * to rebuild, so it is worth far more kept current than kept cached.
+ */
+export const revalidate = 30;
+
+/**
  * The front page.
  *
  * One screen, and nothing under it. Everything this page used to stack up
