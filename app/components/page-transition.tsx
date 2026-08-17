@@ -70,10 +70,31 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 
       setLeavingFrom(pathname);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => router.push(href), EXIT_MS);
+      timer.current = setTimeout(() => {
+        router.push(href);
+        // Cleared as the navigation goes out, not left set.
+        //
+        // It used to stay behind, and because "is this page leaving" is derived
+        // by comparing it to the current path, coming back to a page that had
+        // once been left made that comparison true all over again: the arriving
+        // page rendered mid-exit, at zero opacity, and stayed blank until the
+        // whole site was reloaded. Which is what the browser's back button does
+        // every time.
+        setLeavingFrom(null);
+      }, EXIT_MS);
     },
     [pathname, router],
   );
+
+  /*
+   * Belt and braces for arrivals this component never initiated: the back and
+   * forward buttons, and anything that routes without going through the click
+   * handler. Written through the updater so an already-null value re-renders
+   * nothing.
+   */
+  useEffect(() => {
+    setLeavingFrom((current) => (current === null ? current : null));
+  }, [pathname]);
 
   useEffect(() => {
     document.addEventListener('click', onClick);

@@ -8,6 +8,7 @@ import {
 } from '@probatio/db';
 import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { marketCapLamports, priceFromReserves } from '@probatio/candles';
+import { capsFromChain } from '@/lib/curve-cap';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { cacheImages, knownImages, resolveLaunchImages } from '@/lib/token-images';
@@ -57,7 +58,12 @@ function marketCapOf(launch: LaunchWithCurve): string | null {
   return marketCapLamports(price, PUMPFUN_TOKEN_TOTAL_SUPPLY).toString();
 }
 
-function shape(launch: LaunchWithCurve, image: string | null, creatorLaunches: number) {
+function shape(
+  launch: LaunchWithCurve,
+  image: string | null,
+  creatorLaunches: number,
+  capFromChain?: string | null,
+) {
   return {
     mint: launch.mint,
     name: launch.name,
@@ -68,7 +74,9 @@ function shape(launch: LaunchWithCurve, image: string | null, creatorLaunches: n
     // Null means nothing has read this curve yet, which is normal for a token
     // that launched seconds ago and is different from a curve at zero.
     progressBps: launch.curve?.progressBps ?? null,
-    marketCap: marketCapOf(launch),
+    // The curve if the feed has read one, otherwise whatever the chain said
+    // when this page was built. Only null when neither knows.
+    marketCap: marketCapOf(launch) ?? capFromChain ?? null,
     complete: launch.curve?.complete ?? false,
     // A floor on how many tokens this wallet has launched, counted from what
     // this feed has seen. One is an unknown; forty is a pattern.
@@ -106,6 +114,7 @@ export async function GET(request: Request): Promise<Response> {
       const named = await resolveTokenName(query);
       resolveLaunchImages([query]);
       const image = (await knownImages([query])).get(query) ?? null;
+      const pastedCap = (await capsFromChain([query])).get(query) ?? null;
       return Response.json({
         query,
         solUsd: await solUsd(),
@@ -125,6 +134,7 @@ export async function GET(request: Request): Promise<Response> {
             },
             image,
             1,
+            pastedCap,
           ),
         ],
       });
@@ -160,12 +170,24 @@ export async function GET(request: Request): Promise<Response> {
     const capLamports = (usd: number | null): string | null =>
       usd !== null && sol && sol > 0 ? Math.round((usd / sol) * 1e9).toString() : null;
 
+    /*
+     * A price for the local results.
+     *
+     * Search drops the curve it was given and rebuilds each row with `curve:
+     * null`, so every token the feed itself knew about arrived without a market
+     * cap and rendered as "n/a" — a column of unknowns beside index results
+     * that all had a number. The curves are read from chain instead, in one
+     * batched call for the whole page.
+     */
+    const searchCaps = await capsFromChain(found.map((launch) => launch.mint));
+
     const results = [
       ...found.map((launch) =>
         shape(
           { ...launch, curve: null },
           images.get(launch.mint) ?? null,
           searchCounts.get(launch.creator) ?? 1,
+          searchCaps.get(launch.mint) ?? null,
         ),
       ),
       ...external.map((token) => ({
