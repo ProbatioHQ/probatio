@@ -13,6 +13,7 @@ import {
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { databaseUrl } from './env';
+import { db as dbClient } from './db';
 
 /**
  * Give a nearly-full database disk its room back before the app opens it.
@@ -226,4 +227,31 @@ export function storageStats(): {
   }
 
   return { databaseBytes, freeBytes: free, totalBytes: total };
+}
+
+/**
+ * Whether the database can actually be written to, and what it says if not.
+ *
+ * The health probe reads, so a volume that has filled or a lock that is never
+ * released both report a healthy database while every authenticated request
+ * fails. This does the one thing reading cannot: it writes, into a table that
+ * exists for no other purpose, and hands back the error rather than swallowing
+ * it. Reported unauthenticated so the failure can be seen from outside without
+ * a session, which is exactly the situation where nobody can get one.
+ */
+export async function writeProbe(): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const client = await dbClient();
+    await client.execute(
+      'CREATE TABLE IF NOT EXISTS _write_probe (id INTEGER PRIMARY KEY, at INTEGER NOT NULL)',
+    );
+    await client.execute({
+      sql: `INSERT INTO _write_probe (id, at) VALUES (1, ?)
+            ON CONFLICT (id) DO UPDATE SET at = excluded.at`,
+      args: [Date.now()],
+    });
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }

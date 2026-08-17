@@ -5,7 +5,7 @@ import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
 import { pendingTradeMints } from '@/lib/trade-candles';
 import { driftStatus } from '@/lib/drift-watch';
 import { priceStreamStatus } from '@/lib/price-stream';
-import { storageStats } from '@/lib/db-reclaim';
+import { storageStats, writeProbe } from '@/lib/db-reclaim';
 
 /**
  * What the site can currently do.
@@ -36,6 +36,8 @@ export async function GET(request: Request): Promise<Response> {
        * This is the number that says so.
        */
       storage: storageStats(),
+      /* Whether a write actually lands, and what it says if it does not. */
+      writable: await writeProbe(),
       capabilities: states.filter((state) => state.level !== 'ok'),
       /*
        * The live subsystems, counted rather than assumed.
