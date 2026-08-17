@@ -53,15 +53,35 @@ const MINT_IDLE_SECONDS = 2 * 24 * 60 * 60;
  */
 export async function pruneIdleMints(db: Client, now: number): Promise<number> {
   const cutoff = Math.floor(now / 1_000) - MINT_IDLE_SECONDS;
-  const result = await db.execute({
-    sql: `DELETE FROM candles WHERE mint IN (
-            SELECT mint FROM candles
-            GROUP BY mint
-            HAVING MAX(open_time) < ?
-          )
-          AND mint NOT IN (SELECT mint FROM positions)`,
+  const stale = await db.execute({
+    sql: `SELECT mint FROM candles
+          GROUP BY mint
+          HAVING MAX(open_time) < ?
+          EXCEPT SELECT mint FROM positions`,
     args: [cutoff],
   });
+  const mints = stale.rows.map((row) => String(row['mint']));
+  if (mints.length === 0) return 0;
+
+  const marks = mints.map(() => '?').join(',');
+  const result = await db.execute({
+    sql: `DELETE FROM candles WHERE mint IN (${marks})`,
+    args: mints,
+  });
+
+  /*
+   * The walk record goes with them.
+   *
+   * A token is only ever walked once, and the record of that walk is what says
+   * so. Dropping its candles and keeping the record leaves it marked as having
+   * a history it no longer has, and nothing will ever fetch it again: the chart
+   * opens empty, for good. They are one thing and are removed as one.
+   */
+  await db.execute({
+    sql: `DELETE FROM candle_backfills WHERE mint IN (${marks})`,
+    args: mints,
+  });
+
   return Number(result.rowsAffected ?? 0);
 }
 

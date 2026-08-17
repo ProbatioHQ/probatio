@@ -91,18 +91,39 @@ const pending = new Set<string>();
  * evicted mint costs one database round trip to re-confirm, not a re-walk.
  */
 const SETTLED_MAX = 5_000;
-const settled = new Set<string>();
+const settled = new Map<string, number>();
 
-/** Record a mint as walked, evicting the oldest once the cache is full. */
-function markSettled(mint: string): void {
-  // Re-adding moves it to the newest position, so eviction is by recency.
+/**
+ * How long a token's history stands before it is fetched again.
+ *
+ * It used to stand for ever, which is wrong for half the chart. The live
+ * watcher writes the timeframes it knows about, an hour and shorter, and
+ * nothing writes the four-hour, twelve-hour and daily series at all except the
+ * fetch that built them. So the moment a token was backfilled, every coarse
+ * timeframe on it froze: a chart opened a day later showed a day-old last
+ * candle and called it the present.
+ *
+ * Refetching is eight requests to a service that answers them in one call each,
+ * so the cost of keeping every timeframe current is small and the cost of not
+ * doing it is a chart that is quietly wrong.
+ */
+const REFRESH_MS = 8 * 60 * 1_000;
+
+/** Record when a mint was last brought up to date, evicting by recency. */
+function markSettled(mint: string, at: number): void {
   settled.delete(mint);
-  settled.add(mint);
+  settled.set(mint, at);
   while (settled.size > SETTLED_MAX) {
-    const oldest = settled.values().next().value;
+    const oldest = settled.keys().next().value;
     if (oldest === undefined) break;
     settled.delete(oldest);
   }
+}
+
+/** Whether this mint's history was refreshed recently enough to leave alone. */
+function isFresh(mint: string, now: number): boolean {
+  const at = settled.get(mint);
+  return at !== undefined && now - at < REFRESH_MS;
 }
 
 export function backfillInFlight(mint: string): boolean {
@@ -216,7 +237,7 @@ async function poolBackfill(
  * dead RPC is not a reason to fail the page.
  */
 export function backfillChart(mint: string): void {
-  if (settled.has(mint) || running.has(mint)) return;
+  if (isFresh(mint, Date.now()) || running.has(mint)) return;
   if (running.size >= MAX_CONCURRENT) {
     // Owed a walk, not done. Kept in-flight so the chart waits; a later poll
     // with a free slot picks it up.
@@ -230,10 +251,19 @@ export function backfillChart(mint: string): void {
     try {
       const client = await db();
 
-      // Recorded, so this is once per token for the life of the database
-      // rather than once per visitor.
-      if (await getBackfill(client, mint)) {
-        markSettled(mint);
+      /*
+       * Walked once; refreshed for as long as anybody is looking.
+       *
+       * The chain walk is the expensive half and only ever needs doing once,
+       * so a token that has a record of one never walks again. The history
+       * fetch is the cheap half and is what keeps every timeframe current, so
+       * it runs again whenever the record has gone stale. Treating both as one
+       * decision is what froze the coarse timeframes.
+       */
+      const record = await getBackfill(client, mint);
+      const walked = record !== null;
+      if (walked && Date.now() - record.completedAt < REFRESH_MS) {
+        markSettled(mint, record.completedAt);
         return;
       }
 
@@ -287,30 +317,45 @@ export function backfillChart(mint: string): void {
         }
       }
 
-      const result = await backfillFromCurve(rpc, mint, bondingCurveAddress(mint), {
-        maxTransactions: MAX_TRANSACTIONS,
-        concurrency: WALK_CONCURRENCY,
-      });
-
       /*
-       * The on-chain history: the trades up the bonding curve before graduation,
-       * then the trades on the pool after it, on one price scale (the pool's
-       * reserve offset lines the two up). This refines what the index laid down.
+       * The chain walk, once and no more.
+       *
+       * This is the expensive half: pages of signatures and a read per trade.
+       * What it produces does not change once it has been done, so a token that
+       * already carries a record of one skips straight past it and keeps only
+       * the refresh above, which is what the coarse timeframes actually need.
        */
-      const curve = result.observations;
-      await writeObservationCandles(client, mint, curve);
-
+      let curve: readonly Observation[] = [];
       let pool: PoolBackfill = { count: 0, oldest: null, newest: null };
-      if (resolution?.venue.kind === 'pumpswap') {
-        try {
-          // Writes candles page by page as it walks; nothing to collect here.
-          pool = await poolBackfill(rpc, reader, mint, client);
-        } catch (error) {
-          console.error('[chart] pool history failed for', mint, error);
+      let truncated = false;
+
+      if (!walked) {
+        const result = await backfillFromCurve(rpc, mint, bondingCurveAddress(mint), {
+          maxTransactions: MAX_TRANSACTIONS,
+          concurrency: WALK_CONCURRENCY,
+        });
+        truncated = result.truncated;
+
+        /*
+         * The on-chain history: the trades up the bonding curve before
+         * graduation, then the trades on the pool after it, on one price scale.
+         * This refines what the fetched history laid down.
+         */
+        curve = result.observations;
+        await writeObservationCandles(client, mint, curve);
+
+        if (resolution?.venue.kind === 'pumpswap') {
+          try {
+            // Writes candles page by page as it walks; nothing to collect here.
+            pool = await poolBackfill(rpc, reader, mint, client);
+          } catch (error) {
+            console.error('[chart] pool history failed for', mint, error);
+          }
         }
       }
 
-      // Record the combined span, so the token is not walked again.
+      // Recorded with the time of this pass, so the walk is not repeated and
+      // the refresh knows when it last ran.
       const times: number[] = curve.map((observation) => observation.timestamp);
       if (pool.oldest !== null) times.push(pool.oldest);
       if (pool.newest !== null) times.push(pool.newest);
@@ -321,11 +366,11 @@ export function backfillChart(mint: string): void {
           oldestTimestamp: times.length > 0 ? Math.min(...times) : null,
           newestTimestamp: times.length > 0 ? Math.max(...times) : null,
           observations: curve.length + pool.count,
-          truncated: result.truncated,
+          truncated,
         },
         Date.now(),
       );
-      markSettled(mint);
+      markSettled(mint, Date.now());
       console.log(
         `[chart] ${mint} backfilled ${curve.length} curve + ${pool.count} pool + ${historyAdded} history observations`,
       );

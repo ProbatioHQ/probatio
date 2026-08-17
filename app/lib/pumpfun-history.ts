@@ -147,8 +147,19 @@ export async function splicePumpfunHistory(
     const mine = await readCandles(client, mint, source.timeframe, 5000);
     const have = new Set(mine.map((c) => c.openTime));
 
+    /*
+     * The bucket still being filled is always rewritten.
+     *
+     * Every other bucket is closed and will never say anything different, so
+     * one that is already held is skipped. The newest is the exception: it is
+     * the candle currently forming, and skipping it because a version of it was
+     * stored earlier is what leaves the right-hand end of a chart frozen at
+     * whatever it happened to be when the token was first opened.
+     */
+    const newest = candles.reduce((latest, g) => (g.t > latest ? g.t : latest), 0);
+
     const writes = candles
-      .filter((g) => !have.has(g.t))
+      .filter((g) => !have.has(g.t) || g.t === newest)
       .map((g) => ({
         openTime: g.t,
         open: priceOf(g.o),
