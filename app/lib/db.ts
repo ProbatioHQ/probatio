@@ -1,4 +1,5 @@
 import 'server-only';
+import { restoreAccountsIfEmpty } from './account-backup';
 import { migrate, openDatabase, type Client } from '@probatio/db';
 import { databaseUrl } from './env';
 import { reclaimIfTight, recoverIfCorrupt } from './db-reclaim';
@@ -32,7 +33,17 @@ export async function db(): Promise<Client> {
   await corruptChecked;
 
   client ??= openDatabase({ url: databaseUrl() });
-  ready ??= migrate(client).then(() => undefined);
+  const opened = client;
+  /*
+   * Migrate, then put the accounts back if the file came up without them.
+   *
+   * Chained onto the same promise every caller already waits on, so nothing
+   * reads an account before the restore has had its turn. It does nothing at
+   * all when the database has accounts on it, which is every ordinary boot.
+   */
+  ready ??= migrate(opened)
+    .then(() => restoreAccountsIfEmpty(opened))
+    .then(() => undefined);
   await ready;
-  return client;
+  return opened;
 }

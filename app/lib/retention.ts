@@ -1,5 +1,6 @@
 import 'server-only';
 import { runRetention } from '@probatio/db';
+import { snapshotAccounts } from './account-backup';
 import { db } from './db';
 
 /**
@@ -24,8 +25,17 @@ import { db } from './db';
 
 let started = false;
 let timer: ReturnType<typeof setInterval> | null = null;
+let snapshotTimer: ReturnType<typeof setInterval> | null = null;
 
 const SWEEP_MS = 30 * 60 * 1_000;
+/*
+ * The account tables are copied far more often than the sweep runs.
+ *
+ * A snapshot is only worth what it would cost to fall back to it, and half an
+ * hour of somebody's trading is too much to lose to a file being replaced. It
+ * is a few kilobytes and it writes in milliseconds.
+ */
+const SNAPSHOT_MS = 3 * 60 * 1_000;
 
 async function sweep(): Promise<void> {
   const client = await db();
@@ -49,10 +59,21 @@ export function startRetention(): void {
   run();
   timer = setInterval(run, SWEEP_MS);
   timer.unref?.();
+
+  const copy = (): void => {
+    void db()
+      .then((client) => snapshotAccounts(client))
+      .catch((error) => console.error('[backup] snapshot failed', error));
+  };
+  copy();
+  snapshotTimer = setInterval(copy, SNAPSHOT_MS);
+  snapshotTimer.unref?.();
 }
 
 export function stopRetention(): void {
   if (timer) clearInterval(timer);
+  if (snapshotTimer) clearInterval(snapshotTimer);
   timer = null;
+  snapshotTimer = null;
   started = false;
 }
