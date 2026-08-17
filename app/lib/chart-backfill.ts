@@ -295,7 +295,19 @@ export function backfillChart(mint: string): void {
        * detail the index does not carry; the two meet at the live price.
        */
       let historyAdded = 0;
-      if (resolution?.venue.kind === 'pumpswap' && resolution.pool) {
+      /*
+       * Every token, not only the graduated ones.
+       *
+       * This was gated on the venue being a PumpSwap pool, which is a token
+       * that has already bonded. Everything in the new lane is still on its
+       * bonding curve, so the one source that carries a full history never ran
+       * for the tokens this site is most about: they got the chain walk and the
+       * live watcher and nothing else, and a chart opened on a fresh token
+       * showed almost nothing. pump.fun serves candles for a curve exactly as
+       * it does for a pool. A curve quotes against virtual reserves, which is
+       * the same pair of numbers the anchor needs, so both venues price here.
+       */
+      if (resolution?.pool) {
         const anchor = Number(
           priceFromReserves(resolution.pool.solReserve, resolution.pool.tokenReserve),
         );
