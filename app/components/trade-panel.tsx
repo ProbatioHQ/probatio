@@ -106,6 +106,16 @@ export function TradePanel({
   const signedIn = status === 'signed-in' && pubkey !== null;
 
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
+  /*
+   * One field, two units, so it is cleared when the side changes.
+   *
+   * Buying reads the field as SOL and selling reads it as a token count, which
+   * are not remotely the same size. Carrying a number across meant choosing a
+   * two SOL buy and then switching to sell offered to sell two tokens, and the
+   * button said "sell 2.00" beside a holding of two million. A figure that
+   * means something entirely different from what was typed should not survive
+   * the change.
+   */
   const [amount, setAmount] = useState('');
   const [slippageBps, setSlippageBps] = useState(1_000);
   const [showSlippage, setShowSlippage] = useState(false);
@@ -219,6 +229,14 @@ export function TradePanel({
    * already traded by the time they looked for the confirm button. Choosing is
    * separate from committing now; the button below commits.
    */
+  /** Switch sides, dropping a figure that no longer means anything. */
+  const chooseSide = useCallback((next: 'buy' | 'sell') => {
+    setSide((current) => {
+      if (current !== next) setAmount('');
+      return next;
+    });
+  }, []);
+
   const buyPreset = useCallback((sol: number) => {
     setSide('buy');
     setAmount(String(sol));
@@ -385,7 +403,7 @@ export function TradePanel({
           <button
             type="button"
             className={side === 'buy' ? 'side buy on' : 'side buy'}
-            onClick={() => setSide('buy')}
+            onClick={() => chooseSide('buy')}
             aria-pressed={side === 'buy'}
           >
             Buy
@@ -393,7 +411,7 @@ export function TradePanel({
           <button
             type="button"
             className={side === 'sell' ? 'side sell on' : 'side sell'}
-            onClick={() => setSide('sell')}
+            onClick={() => chooseSide('sell')}
             aria-pressed={side === 'sell'}
           >
             Sell

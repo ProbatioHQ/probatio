@@ -76,19 +76,45 @@ export async function recoverIfCorrupt(): Promise<void> {
   const path = filePath(url);
   if (!path || !existsSync(path)) return;
 
-  let healthy = false;
+  /*
+   * Only a database that says it is damaged is set aside.
+   *
+   * This used to treat any failure of the check as corruption, which is the
+   * most destructive possible reading of "something went wrong". A locked file,
+   * a busy timeout, a slow check on a large database, an I/O hiccup while the
+   * container is still starting, a volume with no room left to open a
+   * connection: every one of those came back as "corrupt", and the answer to
+   * corrupt is to rename the live database aside so the next open builds an
+   * empty one. Every account, position and trade on it goes with it, on a
+   * deploy where nothing was actually wrong.
+   *
+   * So the two cases are separated. A check that runs and reports damage is
+   * damage. A check that could not run is unknown, and the database is left
+   * exactly where it is: a real corruption will announce itself again on the
+   * next query, and losing nothing is recoverable in a way that losing
+   * everything is not.
+   */
+  let verdict: 'ok' | 'damaged' | 'unknown' = 'unknown';
   const probe = createClient({ url });
   try {
     const result = await probe.execute('PRAGMA quick_check');
     const first = result.rows[0];
-    healthy = first !== undefined && Object.values(first).some((value) => value === 'ok');
-  } catch {
-    // A database too damaged even to check is not one to open.
-    healthy = false;
+    const reported = first === undefined ? [] : Object.values(first).map((value) => String(value));
+    verdict = reported.some((value) => value === 'ok') ? 'ok' : 'damaged';
+  } catch (error) {
+    // Only the errors that actually mean a malformed file. Anything else is a
+    // database this process could not read, which is not the same thing.
+    const message = error instanceof Error ? error.message : String(error);
+    verdict = /SQLITE_CORRUPT|malformed|not a database|file is encrypted/i.test(message)
+      ? 'damaged'
+      : 'unknown';
+    if (verdict === 'unknown') {
+      console.error('[db] integrity check could not run; leaving the database untouched', error);
+    }
   } finally {
     probe.close();
   }
-  if (healthy) return;
+  if (verdict !== 'damaged') return;
 
   console.error('[db] database failed its integrity check; setting it aside and starting fresh');
   for (const suffix of ['', '-wal', '-shm']) {
@@ -302,9 +328,35 @@ export async function seasonProbe(): Promise<Record<string, string>> {
     return result.rows.length > 0 ? 'found' : 'MISSING';
   });
 
+  /*
+   * What is actually on the database, so a wipe cannot happen quietly.
+   *
+   * These went to zero once and nothing said so: every authenticated request
+   * failed, the health endpoint reported the database as fine, and the first
+   * sign was a trader noticing their balance had gone back to its opening
+   * figure. Counted here so a redeploy that loses somebody's account is visible
+   * from outside in one request.
+   */
   await run('accountsTable', async () => {
     const result = await client.execute('SELECT COUNT(*) AS n FROM accounts');
     return String(result.rows[0]?.['n']);
+  });
+
+  await run('users', async () => {
+    const result = await client.execute('SELECT COUNT(*) AS n FROM users');
+    return String(result.rows[0]?.['n']);
+  });
+
+  await run('trades', async () => {
+    const result = await client.execute('SELECT COUNT(*) AS n FROM trades');
+    return String(result.rows[0]?.['n']);
+  });
+
+  await run('setAside', async () => {
+    // A database previously judged corrupt is renamed rather than deleted, so
+    // its presence is the record that a reset happened and what it cost.
+    const path = filePath(databaseUrl());
+    return path && existsSync(`${path}.corrupt`) ? 'A PREVIOUS DATABASE WAS SET ASIDE' : 'none';
   });
 
   return steps;
