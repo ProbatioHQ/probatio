@@ -5,6 +5,7 @@ import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
 import { pendingTradeMints } from '@/lib/trade-candles';
 import { driftStatus } from '@/lib/drift-watch';
 import { priceStreamStatus } from '@/lib/price-stream';
+import { storageStats } from '@/lib/db-reclaim';
 
 /**
  * What the site can currently do.
@@ -27,6 +28,14 @@ export async function GET(request: Request): Promise<Response> {
     {
       status: level,
       down,
+      /*
+       * Room on the volume.
+       *
+       * When it runs out, reads keep working and every write fails, so a probe
+       * that reads reports a healthy database while nothing can be recorded.
+       * This is the number that says so.
+       */
+      storage: storageStats(),
       capabilities: states.filter((state) => state.level !== 'ok'),
       /*
        * The live subsystems, counted rather than assumed.

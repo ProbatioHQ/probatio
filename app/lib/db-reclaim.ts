@@ -182,3 +182,48 @@ export async function reclaimIfTight(): Promise<void> {
     console.error('[reclaim] could not reclaim disk; leaving the database as it is', error);
   }
 }
+
+/**
+ * How much room is left, and how much of it the database is using.
+ *
+ * Reported by the health endpoint because the failure this diagnoses is
+ * invisible from everywhere else: when the volume fills, reads keep working and
+ * every write fails, so a health check that probes by reading says the database
+ * is fine while nothing can be recorded. A number here would have said what
+ * eight identical 503s in a browser console could not.
+ */
+export function storageStats(): {
+  databaseBytes: number | null;
+  freeBytes: number | null;
+  totalBytes: number | null;
+} {
+  const path = filePath(databaseUrl());
+  if (path === null) return { databaseBytes: null, freeBytes: null, totalBytes: null };
+
+  let databaseBytes: number | null = null;
+  try {
+    // The write-ahead log counts: it lives beside the file and takes the volume.
+    databaseBytes = ['', '-wal', '-shm'].reduce((sum, suffix) => {
+      try {
+        return sum + statSync(`${path}${suffix}`).size;
+      } catch {
+        return sum;
+      }
+    }, 0);
+  } catch {
+    databaseBytes = null;
+  }
+
+  let free: number | null = null;
+  let total: number | null = null;
+  try {
+    const fs = statfsSync(dirname(path));
+    free = Number(fs.bavail) * Number(fs.bsize);
+    total = Number(fs.blocks) * Number(fs.bsize);
+  } catch {
+    free = null;
+    total = null;
+  }
+
+  return { databaseBytes, freeBytes: free, totalBytes: total };
+}

@@ -30,6 +30,41 @@ import type { Client } from '@libsql/client';
  */
 export const CANDLE_KEEP = 1_200;
 
+/**
+ * How long a token's candles are kept after anybody last looked at one.
+ *
+ * The count cap alone bounds a token and does not bound the table: every mint
+ * anyone opens keeps its full set for ever, and a feed that charts thousands a
+ * day fills a volume with the history of tokens nobody will open again. Whole
+ * mints are dropped once they have gone quiet, which is the only eviction that
+ * scales with the feed rather than with the number of timeframes.
+ *
+ * A held token is never dropped, however quiet: its chart belongs to a position
+ * somebody still owns.
+ */
+const MINT_IDLE_SECONDS = 2 * 24 * 60 * 60;
+
+/**
+ * Drop every candle of a token that has gone quiet.
+ *
+ * Judged by the newest candle the token has: the writers keep it current for
+ * anything being charted or watched, so an old newest means nothing has touched
+ * this mint in days. Tokens somebody holds are kept regardless.
+ */
+export async function pruneIdleMints(db: Client, now: number): Promise<number> {
+  const cutoff = Math.floor(now / 1_000) - MINT_IDLE_SECONDS;
+  const result = await db.execute({
+    sql: `DELETE FROM candles WHERE mint IN (
+            SELECT mint FROM candles
+            GROUP BY mint
+            HAVING MAX(open_time) < ?
+          )
+          AND mint NOT IN (SELECT mint FROM positions)`,
+    args: [cutoff],
+  });
+  return Number(result.rowsAffected ?? 0);
+}
+
 /** Pool snapshots older than this are dropped, except the newest per mint. */
 const POOL_SNAPSHOT_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
@@ -118,7 +153,7 @@ export async function pruneLaunches(db: Client, now: number): Promise<number> {
 /** Run every retention pass there is. Safe to call as often as you like. */
 export async function runRetention(db: Client, now: number): Promise<RetentionResult> {
   return {
-    candlesDeleted: await pruneCandles(db),
+    candlesDeleted: (await pruneIdleMints(db, now)) + (await pruneCandles(db)),
     poolSnapshotsDeleted: await prunePoolSnapshots(db, now),
     launchesDeleted: await pruneLaunches(db, now),
   };
