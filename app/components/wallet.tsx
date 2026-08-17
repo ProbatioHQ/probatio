@@ -228,7 +228,11 @@ export function WalletButton() {
       void fetch('/api/balance', { cache: 'no-store', credentials: 'same-origin' })
         .then(async (response) => {
           if (!response.ok) {
-            console.error('[wallet] balance read failed', response.status);
+            // The body carries the reason. A status on its own says something
+            // broke; the detail says what, which is the difference between
+            // guessing at this and fixing it.
+            const body = await response.text().catch(() => '');
+            console.error('[wallet] balance read failed', response.status, body);
             return null;
           }
           return (await response.json()) as { balance?: string };

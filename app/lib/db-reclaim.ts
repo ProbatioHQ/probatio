@@ -255,3 +255,57 @@ export async function writeProbe(): Promise<{ ok: boolean; error: string | null 
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
+
+/**
+ * The account-resolution path, walked step by step.
+ *
+ * Every authenticated endpoint failed together while a plain write landed
+ * fine, which narrows the fault to whatever resolving an account does that a
+ * write does not. Each step is run on its own here and reports its own error,
+ * so the failing one names itself instead of being inferred from five
+ * endpoints returning five hundred. Unauthenticated, because the situation
+ * being diagnosed is one where nobody can hold a session.
+ */
+export async function seasonProbe(): Promise<Record<string, string>> {
+  const steps: Record<string, string> = {};
+  const run = async (name: string, work: () => Promise<unknown>): Promise<void> => {
+    try {
+      const value = await work();
+      steps[name] = `ok:${String(value)}`;
+    } catch (error) {
+      steps[name] = `FAILED:${error instanceof Error ? error.message : String(error)}`;
+    }
+  };
+
+  const client = await dbClient();
+  const now = Date.now();
+
+  await run('rankedSeason', async () => {
+    const { currentRankedSeason } = await import('@probatio/db');
+    const season = await currentRankedSeason(client, now);
+    return season ? season.id : 'none';
+  });
+
+  let freeId: number | null = null;
+  await run('freePlaySeason', async () => {
+    const { ensureFreePlaySeason } = await import('@probatio/db');
+    freeId = await ensureFreePlaySeason(client, now);
+    return freeId;
+  });
+
+  await run('seasonRow', async () => {
+    if (freeId === null) return 'skipped';
+    const result = await client.execute({
+      sql: 'SELECT id FROM seasons WHERE id = ?',
+      args: [freeId],
+    });
+    return result.rows.length > 0 ? 'found' : 'MISSING';
+  });
+
+  await run('accountsTable', async () => {
+    const result = await client.execute('SELECT COUNT(*) AS n FROM accounts');
+    return String(result.rows[0]?.['n']);
+  });
+
+  return steps;
+}
