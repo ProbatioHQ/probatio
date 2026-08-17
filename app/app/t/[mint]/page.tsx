@@ -4,7 +4,6 @@ import { launchByMint } from '@probatio/db';
 import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
 import { db } from '@/lib/db';
-import { isDexIndexed } from '@/lib/dex-pairs';
 import { knownImages, resolveLaunchImages } from '@/lib/token-images';
 import { shortMint, tokenName } from '@/lib/token-name';
 
@@ -46,13 +45,41 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   // page is where somebody came to trade, and a missing name or picture is no
   // reason to deny them that. A page that crashed here surfaced as a server
   // render error with only a digest, impossible to read from the outside.
-  const [token, launch, images, dexIndexed] = await Promise.all([
-    tokenName(mint).catch(() => ({ name: shortMint(mint), symbol: null, known: false }) as const),
+  /*
+   * Three reads of our own, and nothing over the network to anybody else.
+   *
+   * Whether an outside index carries this pair used to be asked here as well,
+   * which put a call to another company's server in front of every token page
+   * on the site: the click did nothing at all until that answered, and it was
+   * answering for a value that decides only which chart is selected first. The
+   * native chart is the default now, and the browser already asks the same
+   * question a moment after arriving and switches if the answer is yes. So the
+   * page opens on its own data and finds that out afterwards, where waiting for
+   * it costs nobody anything.
+   */
+  /*
+   * A name is worth waiting a moment for and not worth waiting on.
+   *
+   * Resolving one for a token the feed never saw is a chain read, and a slow
+   * node holds the whole page on a value that only fills a heading. Past a
+   * second and a half the short mint stands in, which is what an unknown token
+   * shows anyway.
+   */
+  const withinAMoment = <T,>(work: Promise<T>, fallback: T): Promise<T> =>
+    Promise.race([
+      work,
+      new Promise<T>((resolve) => {
+        setTimeout(() => resolve(fallback), 1_500);
+      }),
+    ]);
+
+  const [token, launch, images] = await Promise.all([
+    withinAMoment(
+      tokenName(mint).catch(() => ({ name: shortMint(mint), symbol: null, known: false }) as const),
+      { name: shortMint(mint), symbol: null, known: false } as const,
+    ),
     launchByMint(client, mint).catch(() => null),
     knownImages([mint]).catch(() => new Map<string, string>()),
-    // Asked here rather than in the browser, so the page opens on the chart
-    // that actually has data instead of flipping once it finds out.
-    isDexIndexed(mint).catch(() => false),
   ]);
   const image = images.get(mint) ?? null;
 
@@ -90,7 +117,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
         </div>
       </div>
 
-      <TokenView mint={mint} dexIndexed={dexIndexed} />
+      <TokenView mint={mint} dexIndexed={false} />
 
       {/* Below the trading surface, not above it. Somebody who navigated to a
           token came to trade it, and putting the explainer first pushed the
