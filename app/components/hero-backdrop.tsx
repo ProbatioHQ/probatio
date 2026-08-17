@@ -9,8 +9,8 @@ import { useEffect, useRef } from 'react';
  * shape a market makes at its simplest, and the only thing on a trading screen
  * that reads instantly without asking to be studied: no bodies, no wicks, no
  * grid, nothing to count. Two of them at different depths drift left at their
- * own speeds, the near one lit along its edge with its fall shaded underneath,
- * the far one barely there.
+ * own speeds, the near one brighter and the far one barely there. Lines only:
+ * anything filled beneath them reads as a wedge across the page.
  *
  * Seeded and unlabelled, like the rest of the ambient layer. It is not a price
  * and could not be read as one at this scale, which is the line this product
@@ -29,7 +29,6 @@ interface Layer {
   readonly speed: number;
   readonly alpha: number;
   readonly width: number;
-  readonly fill: number;
 }
 
 function seeded(seed: number): () => number {
@@ -82,7 +81,6 @@ export function HeroBackdrop() {
         speed: 5,
         alpha: 0.16,
         width: 1,
-        fill: 0.03,
       },
       // Near: the one the eye actually follows.
       {
@@ -92,7 +90,6 @@ export function HeroBackdrop() {
         speed: 12,
         alpha: 0.5,
         width: 1.6,
-        fill: 0.09,
       },
     ];
 
@@ -138,19 +135,16 @@ export function HeroBackdrop() {
       const last = points[points.length - 1]!;
       line.lineTo(last.x, last.y);
 
-      // The fall under the line, fading out, so it has weight without an edge.
-      const under = new Path2D();
-      under.moveTo(points[0]!.x, height);
-      under.lineTo(points[0]!.x, points[0]!.y);
-      under.addPath(line);
-      under.lineTo(last.x, height);
-      under.closePath();
-
-      const shade = context.createLinearGradient(0, baseY - amplitude, 0, height);
-      shade.addColorStop(0, `rgba(63, 224, 138, ${layer.fill})`);
-      shade.addColorStop(1, 'rgba(63, 224, 138, 0)');
-      context.fillStyle = shade;
-      context.fill(under);
+      /*
+       * No shading under the line.
+       *
+       * Filling everything beneath it seemed like a way to give the line weight
+       * without an edge, and it did the opposite: a long smooth walk across a
+       * wide screen has a nearly straight top, so the fill read as a huge dark
+       * wedge lying diagonally across the page with a visible boundary. Two of
+       * them crossing made it worse. The line alone is what says market; the
+       * ground under it should stay ground.
+       */
 
       context.strokeStyle = `rgba(63, 224, 138, ${layer.alpha})`;
       context.lineWidth = layer.width;
