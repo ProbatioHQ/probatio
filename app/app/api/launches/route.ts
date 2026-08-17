@@ -8,7 +8,7 @@ import {
 } from '@probatio/db';
 import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { marketCapLamports, priceFromReserves } from '@probatio/candles';
-import { capsFromChain } from '@/lib/curve-cap';
+import { capsFromChain, capsFromIndex } from '@/lib/curve-cap';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { cacheImages, knownImages, resolveLaunchImages } from '@/lib/token-images';
@@ -184,13 +184,26 @@ export async function GET(request: Request): Promise<Response> {
       ...external.map((token) => token.mint),
     ]);
 
+    /*
+     * Anything the curve could not price, asked of the index in one call: a
+     * graduated token whose curve reserves are zeroed, and a token that never
+     * came from pump.fun and has no curve to read.
+     */
+    const unpriced = [
+      ...found.filter((launch) => !searchCaps.has(launch.mint)).map((launch) => launch.mint),
+      ...external
+        .filter((token) => token.marketCapUsd === null && !searchCaps.has(token.mint))
+        .map((token) => token.mint),
+    ];
+    const indexCaps = await capsFromIndex(unpriced, sol);
+
     const results = [
       ...found.map((launch) =>
         shape(
           { ...launch, curve: null },
           images.get(launch.mint) ?? null,
           searchCounts.get(launch.creator) ?? 1,
-          searchCaps.get(launch.mint) ?? null,
+          searchCaps.get(launch.mint) ?? indexCaps.get(launch.mint) ?? null,
         ),
       ),
       ...external.map((token) => ({
@@ -211,7 +224,11 @@ export async function GET(request: Request): Promise<Response> {
           1,
         ),
         // The index's dollars where it has them, the curve where it does not.
-        marketCap: capLamports(token.marketCapUsd) ?? searchCaps.get(token.mint) ?? null,
+        marketCap:
+          capLamports(token.marketCapUsd) ??
+          searchCaps.get(token.mint) ??
+          indexCaps.get(token.mint) ??
+          null,
       })),
     ].slice(0, limit);
 

@@ -60,3 +60,57 @@ export async function capsFromChain(mints: readonly string[]): Promise<Map<strin
 
   return caps;
 }
+
+/**
+ * Market caps from the index, for tokens no curve can price.
+ *
+ * Two kinds of token fall through the curve read and both are real. A graduated
+ * one has a curve whose reserves are zeroed, so there is nothing on it to price
+ * from and its market now lives in a pool. A token that never came from
+ * pump.fun has no curve at all. Both were showing as unknown next to results
+ * that had a number.
+ *
+ * One call for the whole page: the index takes a list of mints and answers for
+ * all of them at once, so this costs the same whether one token needs it or
+ * thirty. Display only, like everything else here.
+ */
+const INDEX_TOKENS = 'https://api.dexscreener.com/latest/dex/tokens';
+/** The index's own ceiling on how many addresses one call may carry. */
+const MAX_INDEXED = 30;
+
+export async function capsFromIndex(
+  mints: readonly string[],
+  solUsd: number | null,
+): Promise<Map<string, string>> {
+  const caps = new Map<string, string>();
+  const wanted = [...new Set(mints)].slice(0, MAX_INDEXED);
+  if (wanted.length === 0 || !solUsd || solUsd <= 0) return caps;
+
+  try {
+    const response = await fetch(`${INDEX_TOKENS}/${wanted.join(',')}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return caps;
+    const body = (await response.json()) as { pairs?: unknown };
+    if (!Array.isArray(body.pairs)) return caps;
+
+    for (const entry of body.pairs) {
+      const pair = entry as {
+        baseToken?: { address?: unknown };
+        marketCap?: unknown;
+        fdv?: unknown;
+      };
+      const mint = String(pair.baseToken?.address ?? '');
+      if (!mint || caps.has(mint)) continue;
+      // Market cap where the index has it, fully diluted where it does not.
+      const usd = Number(pair.marketCap ?? pair.fdv ?? 0);
+      if (!Number.isFinite(usd) || usd <= 0) continue;
+      caps.set(mint, Math.round((usd / solUsd) * 1e9).toString());
+    }
+  } catch {
+    // Unreachable or slow. The tokens it would have priced stay unknown.
+  }
+
+  return caps;
+}
