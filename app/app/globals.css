@@ -4914,68 +4914,12 @@ button {
   overflow: hidden;
   pointer-events: none;
   background:
-    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
+    radial-gradient(90% 60% at 50% 26%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    radial-gradient(120% 80% at 50% 100%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 65%),
     var(--ink);
 }
 
-.scene-wash {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  will-change: transform;
-}
 
-/* The one behind the mark, which is where the eye lands first. */
-.scene-wash.one {
-  top: -18%;
-  left: 50%;
-  width: 62vw;
-  height: 62vw;
-  max-width: 900px;
-  max-height: 900px;
-  margin-left: -31vw;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--accent) 26%, transparent),
-    transparent
-  );
-  opacity: 0.55;
-  animation: wash-a 26s ease-in-out infinite;
-}
-
-/* Two quieter ones, off to either side, to keep the field from reading flat. */
-.scene-wash.two {
-  bottom: -26%;
-  left: -12%;
-  width: 58vw;
-  height: 58vw;
-  max-width: 820px;
-  max-height: 820px;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--accent) 16%, transparent),
-    transparent
-  );
-  opacity: 0.4;
-  animation: wash-b 34s ease-in-out infinite;
-}
-
-@keyframes wash-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(0, 5%, 0) scale(1.1); }
-}
-@keyframes wash-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(9%, -7%, 0) scale(1.14); }
-}
-@keyframes wash-c {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(-8%, -5%, 0) scale(1.12); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .scene-wash { animation: none; }
-}
 
 /* The market line over the light, faded off at every edge. */
 .scene-line {
@@ -5041,15 +4985,6 @@ body:has(main.home) .glow {
   z-index: -1;
 }
 
-/* Fixed to the viewport, so the washes are placed against it rather than
-   against a section that starts under the header. */
-.home .scene-wash.one {
-  top: -14%;
-  margin-left: -31vw;
-}
-.home .scene-wash.two {
-  bottom: -22%;
-}
 
 /* ------------------------------------------------------------------ *
  * Between pages.

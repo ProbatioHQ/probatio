@@ -183,9 +183,18 @@ export function HeroBackdrop() {
   }, []);
 
   return (
+    /*
+     * One ground and one light, both on this element.
+     *
+     * The light used to be two enormous blurred circles laid over it. A circle
+     * more than half the width of the screen has an arc so shallow across the
+     * viewport that it reads as a straight edge, so each one drew a band lying
+     * diagonally across the page and behind the headline — which is what kept
+     * coming back after the shading under the lines was removed, because the
+     * shading was never what was drawing it. A gradient painted on the ground
+     * itself has no element, no edge and nothing to clip.
+     */
     <div className="scene" aria-hidden="true">
-      <span className="scene-wash one" />
-      <span className="scene-wash two" />
       <canvas ref={ref} className="scene-line" />
     </div>
   );
