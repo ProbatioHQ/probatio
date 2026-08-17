@@ -126,8 +126,17 @@ export function TradePanel({
     let cancelled = false;
 
     const read = (): void => {
-      void fetch('/api/positions')
-        .then((response) => (response.ok ? response.json() : null))
+      void fetch('/api/positions', { cache: 'no-store' })
+        .then(async (response) => {
+          if (!response.ok) {
+            // Left alone rather than zeroed: a read that failed says nothing
+            // about the holding, and showing "none" for it is a claim the
+            // server never made.
+            console.error('[trade] positions read failed', response.status, await response.text().catch(() => ''));
+            return null;
+          }
+          return response.json();
+        })
         .then(
           (
             data: {

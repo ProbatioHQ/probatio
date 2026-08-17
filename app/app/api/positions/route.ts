@@ -33,6 +33,7 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ error: 'sign in to see your positions' }, { status: 401 });
   }
 
+  try {
   const client = await db();
   const now = Date.now();
   const { account, seasonId } = await activeSeason(client, user.pubkey, now);
@@ -120,4 +121,21 @@ export async function GET(request: Request): Promise<Response> {
       };
     }),
   });
+  } catch (error) {
+    /*
+     * The holding, the sell buttons, the position figure and the entry line on
+     * the chart are all read from here, so one unhandled throw takes all four
+     * out at once and every one of them renders as "you own nothing", which is
+     * a different and much more alarming statement than "this could not be
+     * read". The reason is logged and returned rather than lost.
+     */
+    console.error('[positions] failed for', user.pubkey, error);
+    return Response.json(
+      {
+        error: 'positions unavailable',
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      { status: 503 },
+    );
+  }
 }

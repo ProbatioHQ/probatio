@@ -83,7 +83,7 @@ export function TokenView({
   useEffect(() => {
     let cancelled = false;
     const read = (): void => {
-      void fetch('/api/positions')
+      void fetch('/api/positions', { cache: 'no-store' })
         .then((response) => (response.ok ? response.json() : null))
         .then(
           (
