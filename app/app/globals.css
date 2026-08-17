@@ -5050,3 +5050,32 @@ body:has(main.home) .glow {
 .home .scene-wash.two {
   bottom: -22%;
 }
+
+/* ------------------------------------------------------------------ *
+ * Between pages.
+ *
+ * Out over a moment, then the new page up from nothing. Opacity only:
+ * these used to move as well, out to -6px and in from +8px, which sent
+ * the content up, cut it back below where it started and climbed again,
+ * a flick in both directions on every navigation.
+ * ------------------------------------------------------------------ */
+.page.leaving {
+  animation: page-out 130ms ease both;
+  /* Nothing is clickable on a page that is on its way out, so a second
+     click during the fade cannot start a navigation the first one has
+     already begun. */
+  pointer-events: none;
+}
+
+/* A shade slower coming in than going out, which is what reads as arriving
+   rather than snapping. */
+.page {
+  animation: page-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .page.leaving {
+    animation: none;
+  }
+}

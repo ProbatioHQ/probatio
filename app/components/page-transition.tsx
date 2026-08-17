@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Fading between pages instead of cutting.
@@ -16,19 +16,30 @@ import { useCallback, useEffect } from 'react';
  * nothing left to fade.
  */
 
+/** Long enough to read as a fade, short enough that a click still feels instant. */
+const EXIT_MS = 130;
+
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   /*
-   * Which page is on its way out, rather than a boolean saying one is.
+   * Whether a page this component sent away is still on its way out.
    *
-   * The flag used to be reset by an effect watching the path, which meant every
-   * navigation rendered twice: once with the new route still marked as leaving,
-   * then again after the effect cleared it. Derived from the path instead, it
-   * is simply false the moment the path changes — no effect, no second render,
-   * and no window in which the arriving page is styled as though it were
-   * departing.
+   * Set on the click and cleared only when the path has actually changed, which
+   * is the whole of what went wrong before. Clearing it alongside the call to
+   * navigate returned the outgoing page to full opacity while the new route was
+   * still being fetched, so a click read as the page you were on, blank, the
+   * page you were on again, and then the one you asked for. It is never set by
+   * the back button, so returning to a page cannot leave it faded out either,
+   * which is the other way this has been broken.
    */
+  const [exiting, setExiting] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setExiting((current) => (current ? false : current));
+  }, [pathname]);
+
 
   const onClick = useCallback(
     (event: MouseEvent) => {
@@ -64,18 +75,13 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       }
 
       /*
-       * Straight there. There is no exit animation any more.
-       *
-       * The page used to fade out, wait, and then navigate, and the flag saying
-       * it was leaving had to be cleared again afterwards. Clearing it before
-       * the route had actually changed brought the old page back to full
-       * opacity for a frame, so every navigation read as a blink: the page you
-       * were on, blank, the page you were on again, then the one you asked for.
-       * Nothing about a fade out was worth that, and a page that leaves the
-       * instant it is asked to is what quick feels like anyway. The arriving
-       * page still fades in.
+       * Out, then across. The page holds for a moment on its way to nothing,
+       * the route changes underneath it, and what arrives comes up from
+       * nothing in its place.
        */
-      router.push(href);
+      setExiting(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => router.push(href), EXIT_MS);
     },
     [pathname, router],
   );
@@ -84,6 +90,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
     document.addEventListener('click', onClick);
     return () => {
       document.removeEventListener('click', onClick);
+      if (timer.current) clearTimeout(timer.current);
     };
   }, [onClick]);
 
@@ -92,7 +99,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
   // runs the quick one — a click lands almost at once, the site still fades in.
   return (
     <div className="page-root">
-      <div key={pathname} className="page">
+      <div key={pathname} className={exiting ? 'page leaving' : 'page'}>
         {children}
       </div>
     </div>
