@@ -24,11 +24,18 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ error: 'sign in to see your balance' }, { status: 401 });
   }
 
-  const client = await db();
-  const { account } = await activeSeason(client, user.pubkey, Date.now());
+  try {
+    const client = await db();
+    const { account } = await activeSeason(client, user.pubkey, Date.now());
 
-  return Response.json({
-    balance: account.solBalance,
-    startingBalance: account.startingBalance,
-  });
+    return Response.json({
+      balance: account.solBalance,
+      startingBalance: account.startingBalance,
+    });
+  } catch (error) {
+    // A header that shows nothing is the symptom of a 500 nobody is looking at,
+    // so the reason is logged and answered rather than thrown away.
+    console.error('[balance] failed for', user.pubkey, error);
+    return Response.json({ error: 'balance unavailable' }, { status: 503 });
+  }
 }

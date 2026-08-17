@@ -268,20 +268,20 @@ export function WalletButton() {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        {/* The balance leads. It is the thing being checked on every page, and
-            behind an address it was the smaller half of a pill people read as
-            an address chip. The address stays as the second line, which is
-            where identity belongs once the number has been found. */}
-        <span className="wallet-figure">
+        {/* One line, not two. The balance is what is checked on every page, so
+            it is the whole pill; the address moved into the menu, where
+            identity is looked up rather than monitored. While the balance is
+            still being read the address stands in, so the pill is never a row
+            of placeholder dots waiting for a number. */}
+        <AddressMark pubkey={pubkey} />
+        {balance === null ? (
+          <span className="wallet-addr">{shortenPubkey(pubkey)}</span>
+        ) : (
           <span className="wallet-amount">
-            {balance === null ? '·····' : (Number(BigInt(balance)) / 1e9).toFixed(2)}
+            {(Number(BigInt(balance)) / 1e9).toFixed(2)}
             <span className="unit">SOL</span>
           </span>
-          <span className="wallet-addr">
-            <AddressMark pubkey={pubkey} />
-            {shortenPubkey(pubkey)}
-          </span>
-        </span>
+        )}
         <span className="wallet-chevron" aria-hidden="true" />
       </button>
 
@@ -291,6 +291,8 @@ export function WalletButton() {
         // implement. Every item is a real link or button reachable by Tab, and
         // Escape and click-outside close it.
         <div className="wallet-menu">
+          {/* The address, where it is looked up rather than watched. */}
+          <span className="wallet-menu-head">{shortenPubkey(pubkey)}</span>
           <a href="/me">Your account</a>
           <a href={`/p/${pubkey}`}>Public record</a>
           <a href="/season">This season</a>

@@ -5,41 +5,66 @@ import { useEffect, useRef } from 'react';
 /**
  * The market as a landscape, behind the hero.
  *
- * A trading site's backdrop should be the thing it is about, so this is a
- * skyline built out of price: three ridgelines at different depths, drifting at
- * their own speeds, with candlesticks running along the front. It reads as a
- * vista and it is made entirely of the shape a market makes.
+ * A trading site's backdrop should be the thing it is about, so this is a vista
+ * built entirely out of price: four ranges of it receding into haze, and a
+ * skyline of candlesticks standing along the front.
  *
- * It does not sit still. Four moods — an advance, a range, a flush, a recovery
- * — are held for a few seconds each and then morphed into, geometry and colour
- * together, so the scene is always somewhere between two markets rather than
- * cutting between them. That is a real interpolation of every point, not a
- * cross-fade of two pictures.
+ * What makes a range read as distance is not drawing it smaller, it is
+ * atmospheric perspective: the far ones sit pale and low-contrast because there
+ * is air in the way, the near ones fall to almost black, and each one catches a
+ * line of light along its top edge. Drawn as flat translucent shapes of the
+ * same tone they read as overlapping smears, which is what this used to be.
+ *
+ * It does not sit still. Four moods (an advance, a range, a flush, a recovery)
+ * are held and then morphed into, geometry and light together, so the scene is
+ * always somewhere between two markets rather than cutting between them. Every
+ * point is interpolated; nothing is cross-faded.
  *
  * Nothing here is real data and it never pretends to be. Like the rest of the
- * ambient layer, it is unlabelled, unreadable as a price, and generated from a
- * seeded walk, because decoration that could be mistaken for a number to act on
- * is the one thing this product refuses to draw.
+ * ambient layer it is seeded, unlabelled and unreadable as a price, because
+ * decoration that could be mistaken for a number to act on is the one thing
+ * this product will not draw.
  */
 
-/** Points per ridgeline. One full cycle spans the canvas width, and wraps. */
-const POINTS = 96;
+/** Points per range. One cycle spans the canvas width, and wraps seamlessly. */
+const POINTS = 112;
 /** How long a mood is held, and how long the morph into the next one takes. */
-const HOLD_MS = 6_200;
-const MORPH_MS = 4_200;
+const HOLD_MS = 6_500;
+const MORPH_MS = 4_500;
 
-interface Mood {
-  /** Ridge shapes, far to near, each normalised to 0..1. */
-  readonly far: number[];
-  readonly mid: number[];
-  /** Candle bodies along the front, as [open, close] pairs in 0..1. */
-  readonly candles: { open: number; close: number; high: number; low: number }[];
-  /** The light this mood is lit by. */
-  readonly sky: [number, number, number];
-  readonly ridge: [number, number, number];
+/**
+ * The ranges, far to near.
+ *
+ * `haze` is how much air is in front of a range: one is the horizon, zero is
+ * close enough to be a silhouette. It drives colour, contrast and the strength
+ * of the light along the top edge all at once, which is what keeps the depth
+ * consistent rather than four separately tuned layers.
+ */
+const RANGES = [
+  { baseY: 0.66, amplitude: 0.15, speed: 2.5, haze: 0.78 },
+  { baseY: 0.75, amplitude: 0.19, speed: 5, haze: 0.55 },
+  { baseY: 0.85, amplitude: 0.23, speed: 9.5, haze: 0.32 },
+  { baseY: 0.97, amplitude: 0.27, speed: 17, haze: 0.13 },
+];
+
+interface Candle {
+  open: number;
+  close: number;
+  high: number;
+  low: number;
 }
 
-/** A small deterministic generator, so a mood is the same every time it comes round. */
+interface Mood {
+  /** One ridgeline per range, each normalised to 0..1. */
+  readonly ranges: number[][];
+  /** The skyline of candles along the front. */
+  readonly candles: Candle[];
+  /** The light this mood is lit by, and the colour its edges catch. */
+  readonly sky: [number, number, number];
+  readonly accent: [number, number, number];
+}
+
+/** A small deterministic generator, so a mood is identical every time round. */
 function seeded(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -48,10 +73,7 @@ function seeded(seed: number): () => number {
   };
 }
 
-/**
- * One ridgeline: a random walk, normalised, with its tail blended back into its
- * head so scrolling it forever never shows a seam.
- */
+/** A ridgeline: a walk, normalised, with its tail blended back into its head. */
 function ridgeline(random: () => number, drift: number, volatility: number): number[] {
   const raw: number[] = [];
   let value = 0.5;
@@ -65,7 +87,7 @@ function ridgeline(random: () => number, drift: number, volatility: number): num
   const span = high - low || 1;
   const norm = raw.map((v) => (v - low) / span);
 
-  const blend = Math.floor(POINTS * 0.22);
+  const blend = Math.floor(POINTS * 0.24);
   for (let i = 0; i < blend; i += 1) {
     const t = i / blend;
     const index = POINTS - blend + i;
@@ -74,8 +96,8 @@ function ridgeline(random: () => number, drift: number, volatility: number): num
   return norm;
 }
 
-function candlesFrom(random: () => number, drift: number, volatility: number) {
-  const out: Mood['candles'] = [];
+function candlesFrom(random: () => number, drift: number, volatility: number): Candle[] {
+  const out: Candle[] = [];
   let price = 0.5;
   for (let i = 0; i < POINTS; i += 1) {
     const open = price;
@@ -83,14 +105,13 @@ function candlesFrom(random: () => number, drift: number, volatility: number) {
     let low = open;
     for (let tick = 0; tick < 4; tick += 1) {
       price += drift + (random() - 0.5) * volatility;
-      price = Math.min(0.95, Math.max(0.05, price));
+      price = Math.min(0.95, Math.max(0.08, price));
       high = Math.max(high, price);
       low = Math.min(low, price);
     }
     out.push({ open, close: price, high, low });
   }
-  // Wrap the last few back toward the first, so the scroll has no step in it.
-  const blend = Math.floor(POINTS * 0.18);
+  const blend = Math.floor(POINTS * 0.2);
   for (let i = 0; i < blend; i += 1) {
     const t = i / blend;
     const index = POINTS - blend + i;
@@ -111,31 +132,38 @@ function mood(
   drift: number,
   volatility: number,
   sky: [number, number, number],
-  ridge: [number, number, number],
+  accent: [number, number, number],
 ): Mood {
   const random = seeded(seed);
   return {
-    far: ridgeline(random, drift * 0.35, volatility * 0.5),
-    mid: ridgeline(random, drift * 0.7, volatility * 0.85),
+    // Further ranges are shallower and calmer, the way distance flattens relief.
+    ranges: RANGES.map((range) =>
+      ridgeline(random, drift * (1.15 - range.haze * 0.8), volatility * (1.1 - range.haze * 0.55)),
+    ),
     candles: candlesFrom(random, drift, volatility),
     sky,
-    ridge,
+    accent,
   };
 }
 
-/*
- * The four moods, in the order they come round. The palette stays inside the
- * product's own: the green it marks a gain with, the red it marks a loss with,
- * and the steel everything else is drawn in.
- */
+/* The palette stays inside the product's own: the green a gain is marked with,
+   the red a loss is, and the steel everything else is drawn in. */
 const MOODS: Mood[] = [
-  mood(0x51a3, 0.014, 0.05, [16, 46, 34], [63, 224, 138]), // an advance
-  mood(0x7f21, 0.0, 0.055, [22, 30, 38], [120, 150, 170]), // a range
-  mood(0x2c9d, -0.014, 0.07, [48, 22, 24], [255, 95, 86]), // a flush
-  mood(0x9e44, 0.011, 0.045, [18, 42, 44], [70, 200, 190]), // a recovery
+  mood(0x51a3, 0.015, 0.05, [22, 74, 52], [63, 224, 138]), // an advance
+  mood(0x7f21, 0.0, 0.055, [28, 40, 52], [128, 158, 178]), // a range
+  mood(0x2c9d, -0.015, 0.072, [70, 30, 32], [255, 95, 86]), // a flush
+  mood(0x9e44, 0.012, 0.045, [20, 60, 62], [72, 206, 196]), // a recovery
 ];
 
+/** Almost black, with a breath of the mood in it, for the nearest silhouettes. */
+const INK: [number, number, number] = [6, 9, 11];
+
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
+const mixColour = (
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number,
+): [number, number, number] => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
 const rgb = (c: [number, number, number], alpha: number): string =>
   `rgba(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])}, ${alpha})`;
 
@@ -154,14 +182,7 @@ export function MarketScene() {
     let animation = 0;
     let start = 0;
 
-    /*
-     * Motes in the air above the range.
-     *
-     * What separates a drawn backdrop from a place is whether anything is
-     * between the viewer and it. These drift up slowly, at their own speeds and
-     * depths, and take their colour from whichever mood is lit, so the space in
-     * front of the landscape is not empty glass.
-     */
+    /* Motes in the air, so the space in front of the ranges is not empty glass. */
     interface Mote {
       x: number;
       y: number;
@@ -174,35 +195,15 @@ export function MarketScene() {
 
     const seedMotes = (): void => {
       const random = seeded(0x4d07);
-      const count = Math.round(Math.min(46, Math.max(16, width / 42)));
+      const count = Math.round(Math.min(40, Math.max(14, width / 52)));
       motes = Array.from({ length: count }, () => ({
         x: random(),
         y: random(),
-        radius: 0.6 + random() * 1.7,
-        speed: 0.004 + random() * 0.014,
+        radius: 0.7 + random() * 1.6,
+        speed: 0.004 + random() * 0.013,
         phase: random() * Math.PI * 2,
-        depth: 0.3 + random() * 0.7,
+        depth: 0.35 + random() * 0.65,
       }));
-    };
-
-    const drawMotes = (elapsed: number, colour: [number, number, number]): void => {
-      const seconds = elapsed / 1000;
-      for (const mote of motes) {
-        // Upward and wrapping, with a lateral sway so they do not run in rails.
-        const y = (mote.y - seconds * mote.speed) % 1;
-        const top = (y + 1) % 1;
-        const sway = Math.sin(seconds * 0.28 + mote.phase) * 0.012;
-        const x = ((mote.x + sway) % 1) * width;
-        // Brightest in the middle of their travel, so they appear and go rather
-        // than blinking out at an edge.
-        const fade = Math.sin(top * Math.PI);
-        const alpha = 0.05 + fade * 0.3 * mote.depth;
-
-        context.beginPath();
-        context.arc(x, top * height * 0.92, mote.radius * mote.depth, 0, Math.PI * 2);
-        context.fillStyle = rgb(colour, alpha);
-        context.fill();
-      }
     };
 
     const resize = (): void => {
@@ -215,60 +216,94 @@ export function MarketScene() {
       seedMotes();
     };
 
-    /** A ridge, drawn twice end to end so it can scroll without a seam. */
-    const drawRidge = (
+    /**
+     * A range, as a smooth silhouette with light along its top.
+     *
+     * The path runs through midpoints with a quadratic through each sample, so
+     * the crest is a curve rather than the string of straight segments that
+     * made the old ranges read as folded paper.
+     */
+    const drawRange = (
       from: number[],
       to: number[],
       t: number,
       baseY: number,
       amplitude: number,
       offset: number,
-      colour: [number, number, number],
-      fillAlpha: number,
-      lineAlpha: number,
+      fill: [number, number, number],
+      rim: [number, number, number],
+      rimAlpha: number,
     ): void => {
       const dx = width / POINTS;
       const shift = offset % width;
+      const crest: { x: number; y: number }[] = [];
 
-      context.beginPath();
-      context.moveTo(-shift, height);
       for (let pass = 0; pass < 2; pass += 1) {
         const originX = pass * width - shift;
         for (let i = 0; i <= POINTS; i += 1) {
           const index = i % POINTS;
-          const value = mix(from[index]!, to[index]!, t);
-          context.lineTo(originX + i * dx, baseY - value * amplitude);
+          crest.push({
+            x: originX + i * dx,
+            y: baseY - mix(from[index]!, to[index]!, t) * amplitude,
+          });
         }
       }
-      context.lineTo(width * 2 - shift, height);
+
+      const trace = (): void => {
+        context.moveTo(crest[0]!.x, crest[0]!.y);
+        for (let i = 1; i < crest.length - 1; i += 1) {
+          const midX = (crest[i]!.x + crest[i + 1]!.x) / 2;
+          const midY = (crest[i]!.y + crest[i + 1]!.y) / 2;
+          context.quadraticCurveTo(crest[i]!.x, crest[i]!.y, midX, midY);
+        }
+        const last = crest[crest.length - 1]!;
+        context.lineTo(last.x, last.y);
+      };
+
+      // The body, solid, fading out toward its base so ranges sink into one
+      // another rather than stacking as four separate cut-outs.
+      context.beginPath();
+      context.moveTo(crest[0]!.x, height);
+      context.lineTo(crest[0]!.x, crest[0]!.y);
+      trace();
+      context.lineTo(crest[crest.length - 1]!.x, height);
       context.closePath();
 
-      const gradient = context.createLinearGradient(0, baseY - amplitude, 0, height);
-      gradient.addColorStop(0, rgb(colour, fillAlpha));
-      gradient.addColorStop(1, rgb(colour, 0));
-      context.fillStyle = gradient;
+      const body = context.createLinearGradient(0, baseY - amplitude, 0, height);
+      body.addColorStop(0, rgb(fill, 0.95));
+      body.addColorStop(0.75, rgb(fill, 0.82));
+      body.addColorStop(1, rgb(fill, 0.6));
+      context.fillStyle = body;
       context.fill();
 
-      context.strokeStyle = rgb(colour, lineAlpha);
-      context.lineWidth = 1;
+      // The light caught along the crest. This is the line that makes a shape
+      // read as a ridge against a lit sky instead of a hole in the page.
+      context.beginPath();
+      trace();
+      context.strokeStyle = rgb(rim, rimAlpha);
+      context.lineWidth = 1.2;
       context.stroke();
     };
 
-    const drawCandles = (
-      from: Mood['candles'],
-      to: Mood['candles'],
+    /** The candles standing along the front, like a skyline. */
+    const drawSkyline = (
+      from: Candle[],
+      to: Candle[],
       t: number,
-      baseY: number,
-      amplitude: number,
       offset: number,
     ): void => {
       const dx = width / POINTS;
       const shift = offset % width;
-      const bodyWidth = Math.max(3, dx * 0.42);
+      const bodyWidth = Math.max(2.5, dx * 0.34);
+      const floor = height * 1.04;
+      const scale = height * 0.3;
 
       for (let pass = 0; pass < 2; pass += 1) {
         const originX = pass * width - shift;
         for (let i = 0; i < POINTS; i += 1) {
+          const x = originX + i * dx;
+          if (x < -dx * 2 || x > width + dx * 2) continue;
+
           const a = from[i]!;
           const b = to[i]!;
           const open = mix(a.open, b.open, t);
@@ -276,30 +311,43 @@ export function MarketScene() {
           const high = mix(a.high, b.high, t);
           const low = mix(a.low, b.low, t);
 
-          const x = originX + i * dx;
-          if (x < -dx || x > width + dx) continue;
-
-          const y = (v: number): number => baseY - v * amplitude;
+          const y = (v: number): number => floor - v * scale;
           const rising = close >= open;
-          const colour = rising ? '63, 224, 138' : '255, 95, 86';
+          const colour: [number, number, number] = rising ? [63, 224, 138] : [255, 95, 86];
 
-          // Nearer candles read brighter, which is what gives the front layer
-          // its depth against the ridges behind it.
-          context.globalAlpha = 1;
-          context.strokeStyle = `rgba(${colour}, 0.42)`;
+          // Near-black bodies with a lit edge, so the skyline belongs to the
+          // same world as the ranges rather than sitting on top of them.
+          context.strokeStyle = rgb(mixColour(INK, colour, 0.42), 0.75);
           context.lineWidth = 1;
           context.beginPath();
           context.moveTo(x + bodyWidth / 2, y(high));
           context.lineTo(x + bodyWidth / 2, y(low));
           context.stroke();
 
-          context.fillStyle = `rgba(${colour}, 0.5)`;
           const top = y(Math.max(open, close));
-          const bodyHeight = Math.max(1.5, Math.abs(y(open) - y(close)));
+          const bodyHeight = Math.max(2, Math.abs(y(open) - y(close)));
+          context.fillStyle = rgb(mixColour(INK, colour, 0.3), 0.92);
           context.fillRect(x, top, bodyWidth, bodyHeight);
+          context.fillStyle = rgb(colour, 0.65);
+          context.fillRect(x, top, bodyWidth, 1.4);
         }
       }
-      context.globalAlpha = 1;
+    };
+
+    const drawMotes = (elapsed: number, colour: [number, number, number]): void => {
+      const seconds = elapsed / 1000;
+      for (const mote of motes) {
+        const drifted = (mote.y - seconds * mote.speed) % 1;
+        const top = (drifted + 1) % 1;
+        const sway = Math.sin(seconds * 0.28 + mote.phase) * 0.012;
+        const x = (((mote.x + sway) % 1) + 1) % 1;
+        const fade = Math.sin(top * Math.PI);
+
+        context.beginPath();
+        context.arc(x * width, top * height * 0.9, mote.radius * mote.depth, 0, Math.PI * 2);
+        context.fillStyle = rgb(colour, 0.04 + fade * 0.26 * mote.depth);
+        context.fill();
+      }
     };
 
     const render = (elapsed: number): void => {
@@ -307,48 +355,63 @@ export function MarketScene() {
       const index = Math.floor(elapsed / cycle) % MOODS.length;
       const next = (index + 1) % MOODS.length;
       const into = elapsed % cycle;
-      // Eased, so a mood settles rather than sliding at a constant rate.
       const raw = Math.min(1, Math.max(0, (into - HOLD_MS) / MORPH_MS));
       const t = raw * raw * (3 - 2 * raw);
 
       const a = MOODS[index]!;
       const b = MOODS[next]!;
-      const sky: [number, number, number] = [
-        mix(a.sky[0], b.sky[0], t),
-        mix(a.sky[1], b.sky[1], t),
-        mix(a.sky[2], b.sky[2], t),
-      ];
-      const ridge: [number, number, number] = [
-        mix(a.ridge[0], b.ridge[0], t),
-        mix(a.ridge[1], b.ridge[1], t),
-        mix(a.ridge[2], b.ridge[2], t),
-      ];
+      const sky = mixColour(a.sky, b.sky, t);
+      const accent = mixColour(a.accent, b.accent, t);
 
       context.clearRect(0, 0, width, height);
 
-      // The light of the mood, low and wide, like a sun behind the range.
-      const glow = context.createRadialGradient(
-        width * 0.5,
-        height * 0.82,
-        0,
-        width * 0.5,
-        height * 0.82,
-        Math.max(width, height) * 0.75,
-      );
-      glow.addColorStop(0, rgb(sky, 0.5));
-      glow.addColorStop(0.55, rgb(sky, 0.16));
-      glow.addColorStop(1, rgb(sky, 0));
-      context.fillStyle = glow;
+      // The sky: darkest overhead, warming toward the horizon the ranges stand on.
+      const air = context.createLinearGradient(0, 0, 0, height);
+      air.addColorStop(0, rgb(sky, 0));
+      air.addColorStop(0.45, rgb(sky, 0.16));
+      air.addColorStop(0.72, rgb(sky, 0.42));
+      air.addColorStop(1, rgb(sky, 0.12));
+      context.fillStyle = air;
       context.fillRect(0, 0, width, height);
 
-      // In the air, behind the range, so the ridges pass in front of them.
-      drawMotes(elapsed, ridge);
+      // The light behind the ranges, low and wide, which is what they are lit by.
+      const sun = context.createRadialGradient(
+        width * 0.5,
+        height * 0.72,
+        0,
+        width * 0.5,
+        height * 0.72,
+        Math.max(width, height) * 0.6,
+      );
+      sun.addColorStop(0, rgb(accent, 0.2));
+      sun.addColorStop(0.4, rgb(accent, 0.07));
+      sun.addColorStop(1, rgb(accent, 0));
+      context.fillStyle = sun;
+      context.fillRect(0, 0, width, height);
+
+      drawMotes(elapsed, accent);
 
       const seconds = elapsed / 1000;
-      // Parallax: the far range barely moves, the front runs.
-      drawRidge(a.far, b.far, t, height * 0.86, height * 0.34, seconds * 5, ridge, 0.1, 0.16);
-      drawRidge(a.mid, b.mid, t, height * 0.95, height * 0.28, seconds * 13, ridge, 0.14, 0.22);
-      drawCandles(a.candles, b.candles, t, height * 1.02, height * 0.24, seconds * 26);
+      // Far to near, so each range is drawn over the one behind it.
+      RANGES.forEach((range, layer) => {
+        // Atmospheric perspective: the far ranges hold the sky's own colour and
+        // barely separate from it, the near ones fall almost to black.
+        const fill = mixColour(INK, mixColour(sky, accent, 0.22), range.haze * 0.85);
+        const rimAlpha = 0.16 + (1 - range.haze) * 0.4;
+        drawRange(
+          a.ranges[layer]!,
+          b.ranges[layer]!,
+          t,
+          height * range.baseY,
+          height * range.amplitude,
+          seconds * range.speed,
+          fill,
+          accent,
+          rimAlpha,
+        );
+      });
+
+      drawSkyline(a.candles, b.candles, t, seconds * 26);
     };
 
     const loop = (now: number): void => {
