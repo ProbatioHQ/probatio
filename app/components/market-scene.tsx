@@ -154,6 +154,57 @@ export function MarketScene() {
     let animation = 0;
     let start = 0;
 
+    /*
+     * Motes in the air above the range.
+     *
+     * What separates a drawn backdrop from a place is whether anything is
+     * between the viewer and it. These drift up slowly, at their own speeds and
+     * depths, and take their colour from whichever mood is lit, so the space in
+     * front of the landscape is not empty glass.
+     */
+    interface Mote {
+      x: number;
+      y: number;
+      radius: number;
+      speed: number;
+      phase: number;
+      depth: number;
+    }
+    let motes: Mote[] = [];
+
+    const seedMotes = (): void => {
+      const random = seeded(0x4d07);
+      const count = Math.round(Math.min(46, Math.max(16, width / 42)));
+      motes = Array.from({ length: count }, () => ({
+        x: random(),
+        y: random(),
+        radius: 0.6 + random() * 1.7,
+        speed: 0.004 + random() * 0.014,
+        phase: random() * Math.PI * 2,
+        depth: 0.3 + random() * 0.7,
+      }));
+    };
+
+    const drawMotes = (elapsed: number, colour: [number, number, number]): void => {
+      const seconds = elapsed / 1000;
+      for (const mote of motes) {
+        // Upward and wrapping, with a lateral sway so they do not run in rails.
+        const y = (mote.y - seconds * mote.speed) % 1;
+        const top = (y + 1) % 1;
+        const sway = Math.sin(seconds * 0.28 + mote.phase) * 0.012;
+        const x = ((mote.x + sway) % 1) * width;
+        // Brightest in the middle of their travel, so they appear and go rather
+        // than blinking out at an edge.
+        const fade = Math.sin(top * Math.PI);
+        const alpha = 0.05 + fade * 0.3 * mote.depth;
+
+        context.beginPath();
+        context.arc(x, top * height * 0.92, mote.radius * mote.depth, 0, Math.PI * 2);
+        context.fillStyle = rgb(colour, alpha);
+        context.fill();
+      }
+    };
+
     const resize = (): void => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       width = canvas.offsetWidth;
@@ -161,6 +212,7 @@ export function MarketScene() {
       canvas.width = Math.max(1, Math.floor(width * ratio));
       canvas.height = Math.max(1, Math.floor(height * ratio));
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      seedMotes();
     };
 
     /** A ridge, drawn twice end to end so it can scroll without a seam. */
@@ -288,6 +340,9 @@ export function MarketScene() {
       glow.addColorStop(1, rgb(sky, 0));
       context.fillStyle = glow;
       context.fillRect(0, 0, width, height);
+
+      // In the air, behind the range, so the ridges pass in front of them.
+      drawMotes(elapsed, ridge);
 
       const seconds = elapsed / 1000;
       // Parallax: the far range barely moves, the front runs.

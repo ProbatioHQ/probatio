@@ -4468,3 +4468,233 @@ h3 {
 .acct-return-pct {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
 }
+
+/* ------------------------------------------------------------------ *
+ * The wallet pill, with the balance leading.
+ *
+ * It read as an address chip with a number bolted on: the address had the
+ * width and the balance had a label in 8px type. The number is what is
+ * checked on every page, so it takes the top line at full size and the
+ * address sits under it as identity.
+ * ------------------------------------------------------------------ */
+.wallet-pill {
+  height: auto;
+  gap: 12px;
+  padding: 7px 12px 7px 14px;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 4%, var(--ink-raised)), var(--ink-raised) 60%);
+  border-color: var(--line-bright);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
+    0 1px 3px rgb(0 0 0 / 0.4);
+}
+.wallet-pill:hover,
+.wallet-pill[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent),
+    0 0 20px -6px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.wallet-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.wallet-amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.wallet-amount .unit {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+
+.wallet-addr {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.wallet-addr .addr-mark {
+  width: 9px;
+  height: 9px;
+  gap: 1px;
+}
+
+/* A caret that turns over when the menu is open. */
+.wallet-chevron {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-faint);
+  transition: transform 180ms ease, border-top-color 160ms ease;
+}
+.wallet-pill:hover .wallet-chevron {
+  border-top-color: var(--accent);
+}
+.wallet-pill[aria-expanded='true'] .wallet-chevron {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 720px) {
+  /* The amount is the point, so the address is what goes, not the balance. */
+  .wallet-pill .wallet-addr { display: none; }
+  .wallet-pill { padding: 8px 10px 8px 12px; }
+}
+
+/* ================================================================== *
+ * The hero, as one screen: entrance, depth, and the mark floating.
+ * ================================================================== */
+
+/* Only page with no content under the fold, so it fills the view and the
+   footer sits just past it rather than a screen of empty column. */
+main.home {
+  gap: 0;
+  padding: 0;
+}
+.home .hero-cinema {
+  min-height: calc(100svh - 64px);
+  display: grid;
+  place-items: center;
+  padding-top: clamp(48px, 8vh, 96px);
+  padding-bottom: clamp(56px, 9vh, 104px);
+}
+
+/* Three depths, moved by the pointer by different amounts. The variables are
+   written by the hero and default to zero, so this is inert until it moves. */
+.hero-cinema {
+  --px: 0;
+  --py: 0;
+}
+.hero-cinema .scene-canvas {
+  transform: translate3d(calc(var(--px) * -18px), calc(var(--py) * -10px), 0) scale(1.04);
+}
+.home .hero-mark {
+  transform: translate3d(calc(var(--px) * 26px), calc(var(--py) * 18px), 0);
+}
+.home .display {
+  transform: translate3d(calc(var(--px) * 10px), calc(var(--py) * 6px), 0);
+}
+.home .hero-tagline,
+.home .lede {
+  transform: translate3d(calc(var(--px) * 5px), calc(var(--py) * 3px), 0);
+}
+
+/* The mark: parallax on the outside, float on the inside, so the shadow it
+   casts stays on the ground while the mark rises off it. */
+.hero-mark {
+  animation: none;
+}
+.hero-mark-float {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  animation: mark-float 6.5s ease-in-out infinite;
+}
+.hero-mark-float img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 10px 22px rgb(0 0 0 / 0.55))
+    drop-shadow(0 0 26px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
+/* The headline, uncovered a line at a time. */
+.display .reveal {
+  display: block;
+  overflow: hidden;
+  /* Descenders would otherwise be clipped by the overflow that does the
+     uncovering, so the box is opened up and the gap taken back. */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+.display .reveal > span {
+  display: block;
+  will-change: transform;
+}
+
+/* ---- the entrance, in order ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .home .hero-mark {
+    animation: mark-in 900ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+  }
+  .home .display .reveal:nth-child(1) > span {
+    animation: uncover 1s cubic-bezier(0.16, 1, 0.3, 1) 300ms both;
+  }
+  .home .display .reveal:nth-child(2) > span {
+    animation: uncover 1s cubic-bezier(0.16, 1, 0.3, 1) 400ms both;
+  }
+  .home .hero-tagline {
+    animation: hero-in 800ms cubic-bezier(0.16, 1, 0.3, 1) 700ms both;
+  }
+  .home .lede {
+    animation: hero-in 800ms cubic-bezier(0.16, 1, 0.3, 1) 800ms both;
+  }
+  .home .cta-row {
+    animation: hero-in 800ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both;
+  }
+  /* The scene fades up under all of it, last to settle. */
+  .home .scene-canvas {
+    animation: scene-in 1.8s ease-out 60ms both;
+  }
+  /* Each word of the tagline arrives on its own beat. */
+  .home .hero-tagline span:nth-child(1) { animation: word-in 620ms ease-out 900ms both; }
+  .home .hero-tagline span:nth-child(2) { animation: word-in 620ms ease-out 1000ms both; }
+  .home .hero-tagline span:nth-child(3) { animation: word-in 620ms ease-out 1100ms both; }
+}
+
+@keyframes mark-in {
+  from { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.82); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes uncover {
+  from { transform: translate3d(0, 112%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes hero-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes word-in {
+  from { opacity: 0; letter-spacing: 0.42em; }
+  to { opacity: 1; letter-spacing: 0.24em; }
+}
+@keyframes scene-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-mark-float { animation: none; }
+  .hero-cinema .scene-canvas,
+  .home .hero-mark,
+  .home .display,
+  .home .hero-tagline,
+  .home .lede { transform: none; }
+}
+
+@media (max-width: 720px) {
+  .home .hero-cinema {
+    min-height: auto;
+    padding-top: 44px;
+    padding-bottom: 64px;
+  }
+}

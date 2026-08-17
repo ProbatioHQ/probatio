@@ -201,15 +201,18 @@ export function WalletButton() {
     }
     let cancelled = false;
     const read = (): void => {
-      void fetch('/api/positions')
+      // The cash balance, not equity: it is what a buy spends and a sell
+      // returns, so it moves exactly when the trader acts, which is the number
+      // being checked. Equity (cash plus the value of what is held) barely
+      // moves on a buy, since the spend becomes a holding, and that reads as
+      // "it did not take my SOL". The holding's worth lives with the position
+      // on the trade panel, where it belongs.
+      //
+      // From the one-row endpoint rather than the positions one, which prices
+      // every holding from chain and shares the chain-read budget with trading.
+      void fetch('/api/balance')
         .then((response) => (response.ok ? response.json() : null))
         .then((data: { balance?: string } | null) => {
-          // The cash balance, not equity: it is what a buy spends and a sell
-          // returns, so it moves exactly when the trader acts — which is the
-          // number they are checking against. Equity (cash plus the value of
-          // what is held) barely moves on a buy, since the spend becomes a
-          // holding, and that reads as "it didn't take my SOL". The holding's
-          // worth lives with the position on the trade panel, where it belongs.
           if (!cancelled && data?.balance) setBalance(data.balance);
         })
         .catch(() => undefined);
@@ -265,20 +268,21 @@ export function WalletButton() {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <AddressMark pubkey={pubkey} />
-        <span className="addr">{shortenPubkey(pubkey)}</span>
-        {balance !== null && (
-          <span className="bal">
-            {/* Labelled, and the label is not decoration. "10.00" beside a
-                symbol nobody reads as SOL looks like ten thousand of
-                something. The unit has to be a word. */}
-            <span className="bal-k">balance</span>
-            <span className="bal-v">
-              {(Number(BigInt(balance)) / 1e9).toFixed(2)}
-              <span className="unit">SOL</span>
-            </span>
+        {/* The balance leads. It is the thing being checked on every page, and
+            behind an address it was the smaller half of a pill people read as
+            an address chip. The address stays as the second line, which is
+            where identity belongs once the number has been found. */}
+        <span className="wallet-figure">
+          <span className="wallet-amount">
+            {balance === null ? '·····' : (Number(BigInt(balance)) / 1e9).toFixed(2)}
+            <span className="unit">SOL</span>
           </span>
-        )}
+          <span className="wallet-addr">
+            <AddressMark pubkey={pubkey} />
+            {shortenPubkey(pubkey)}
+          </span>
+        </span>
+        <span className="wallet-chevron" aria-hidden="true" />
       </button>
 
       {open && (
