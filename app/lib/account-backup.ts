@@ -111,3 +111,34 @@ export async function restoreAccountsIfEmpty(client: Client): Promise<void> {
     console.error('[backup] could not restore the account tables', error);
   }
 }
+
+/**
+ * What the safety net currently holds, for the health endpoint.
+ *
+ * A backup nobody has looked at is a hope rather than a guarantee, and this one
+ * exists because balances were lost twice. Reported so it can be seen from
+ * outside that a copy exists, when it was taken and what is in it, without
+ * anybody having to trust that the timer is running.
+ */
+export function snapshotState(): {
+  exists: boolean;
+  takenAt: string | null;
+  accounts: number | null;
+  trades: number | null;
+} {
+  const path = snapshotPath();
+  if (path === null || !existsSync(path)) {
+    return { exists: false, takenAt: null, accounts: null, trades: null };
+  }
+  try {
+    const snapshot = JSON.parse(readFileSync(path, 'utf8')) as Snapshot;
+    return {
+      exists: true,
+      takenAt: new Date(snapshot.at).toISOString(),
+      accounts: snapshot.rows['accounts']?.length ?? 0,
+      trades: snapshot.rows['trades']?.length ?? 0,
+    };
+  } catch {
+    return { exists: true, takenAt: null, accounts: null, trades: null };
+  }
+}

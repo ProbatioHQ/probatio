@@ -80,9 +80,18 @@ body {
 
 /* ------------------------------------------------------------------ layout */
 
+/*
+ * One width for the whole site.
+ *
+ * The terminal ran to 1400 and everything else stopped at 1080, so moving from
+ * it to the season or the store felt like the page had shrunk: the header
+ * narrowed, the panels narrowed, and the same content sat in a column two
+ * hundred pixels tighter on each side for no reason anybody could see. The
+ * widest page was the right one; the rest now match it.
+ */
 .shell {
   width: 100%;
-  max-width: 1080px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -884,10 +893,6 @@ body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link):not(.site-header) 
    settling fade; navigations remount only the inner .page and stay quick. */
 .page-root {
   animation: page-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.page.leaving {
-  animation: page-out 110ms ease both;
 }
 
 /*

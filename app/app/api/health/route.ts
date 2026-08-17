@@ -6,6 +6,7 @@ import { pendingTradeMints } from '@/lib/trade-candles';
 import { driftStatus } from '@/lib/drift-watch';
 import { priceStreamStatus } from '@/lib/price-stream';
 import { seasonProbe, storageStats, writeProbe } from '@/lib/db-reclaim';
+import { snapshotState } from '@/lib/account-backup';
 
 /**
  * What the site can currently do.
@@ -40,6 +41,8 @@ export async function GET(request: Request): Promise<Response> {
       writable: await writeProbe(),
       /* Each step of resolving an account, so the failing one names itself. */
       season: await seasonProbe(),
+      /* The account safety net: that it exists, and what it is holding. */
+      backup: snapshotState(),
       capabilities: states.filter((state) => state.level !== 'ok'),
       /*
        * The live subsystems, counted rather than assumed.
