@@ -3,6 +3,7 @@ import {
   currentRankedSeason,
   ensureAccount,
   ensureFreePlaySeason,
+  upsertUser,
   hasEntered,
   type AccountRow,
 } from '@probatio/db';
@@ -87,6 +88,27 @@ async function resolveSeason(
   pubkey: string,
   now: number,
 ): Promise<ActiveSeason> {
+  /*
+   * The wallet's own row, before anything is hung off it.
+   *
+   * An account carries a foreign key to `users`, so building one for a wallet
+   * that has no row there fails on the constraint, and every authenticated
+   * request fails with it: the balance, the positions, the trade log, the
+   * stats, the coach. All of them at once, while reading the session and
+   * writing anything else both keep working, because a session is verified
+   * from its own signature and only reads.
+   *
+   * That gap is reachable. A session outlives the row it was issued against if
+   * the database is ever rebuilt underneath it, and the cookie stays valid for
+   * as long as it was minted for, so the browser goes on believing it is signed
+   * in against a database that has never heard of it.
+   *
+   * Written here rather than only at sign-in, because this is the point every
+   * authenticated path passes through. Idempotent, and does nothing at all once
+   * the row is there.
+   */
+  await upsertUser(client, pubkey, now);
+
   // Every authenticated action resolves a season, which makes this the one
   // place a wallet's presence is reliably known. Best-effort and awaited
   // deliberately: it is a single upsert at most once a day per wallet.
