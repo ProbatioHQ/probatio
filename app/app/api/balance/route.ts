@@ -41,6 +41,15 @@ export async function GET(request: Request): Promise<Response> {
     // A header that shows nothing is the symptom of a 500 nobody is looking at,
     // so the reason is logged and answered rather than thrown away.
     console.error('[balance] failed for', user.pubkey, error);
-    return Response.json({ error: 'balance unavailable' }, { status: 503 });
+    // The reason travels with the failure. This is the caller's own account on
+    // an open-source practice app, and a bare 503 repeated in a console is what
+    // made this take as long as it did to find.
+    return Response.json(
+      {
+        error: 'balance unavailable',
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      { status: 503 },
+    );
   }
 }

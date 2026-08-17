@@ -49,7 +49,40 @@ async function freePlayId(client: Client, now: number): Promise<number> {
   return freePlaySeasonId;
 }
 
+/**
+ * Forget the remembered id, so the next call resolves it again.
+ *
+ * The cache is only correct while the database it was read from is the one
+ * still being written to. That is not guaranteed for the life of a process: a
+ * database found corrupt is set aside and rebuilt, and a tight volume is
+ * reclaimed by swapping in a compacted copy. Either leaves this holding the id
+ * of a season row that no longer exists, and `ensureAccount` refuses to build
+ * an account against a season it cannot find. Every authenticated request then
+ * fails, for as long as the process lives, while reads and ordinary writes both
+ * keep working, which is exactly as confusing to diagnose as it sounds.
+ */
+function forgetFreePlay(): void {
+  freePlaySeasonId = undefined;
+}
+
 export async function activeSeason(
+  client: Client,
+  pubkey: string,
+  now: number,
+): Promise<ActiveSeason> {
+  try {
+    return await resolveSeason(client, pubkey, now);
+  } catch (error) {
+    // Once, with a cleared cache. If the remembered free-play id had gone
+    // stale this resolves it and the request proceeds; if the failure was
+    // anything else the second attempt raises it the same way the first did.
+    forgetFreePlay();
+    console.error('[season] resolve failed, retrying with a fresh season id', error);
+    return resolveSeason(client, pubkey, now);
+  }
+}
+
+async function resolveSeason(
   client: Client,
   pubkey: string,
   now: number,
