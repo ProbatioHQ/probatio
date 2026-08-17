@@ -165,6 +165,21 @@ export async function reclaimIfTight(): Promise<void> {
   console.warn(`[reclaim] ${Math.round(free / 1e6)}MB free; compacting the database off-volume`);
 
   try {
+    // What must survive this, so the copy can be checked against it before it
+    // is allowed to replace anything.
+    let accountsBefore = 0;
+    {
+      const before = createClient({ url });
+      try {
+        const result = await before.execute('SELECT COUNT(*) AS n FROM accounts');
+        accountsBefore = Number(result.rows[0]?.['n'] ?? 0);
+      } catch {
+        accountsBefore = 0;
+      } finally {
+        before.close();
+      }
+    }
+
     // 1. A consistent, compacted copy onto the roomy container disk. Reads the
     //    live database only, so a volume with nothing left to write can still
     //    produce it.
@@ -188,13 +203,61 @@ export async function reclaimIfTight(): Promise<void> {
       staged.close();
     }
 
-    // 3. Swap the small copy in. The volume has no room for both, so the big
-    //    one goes first. The mark is set before the removal and cleared after
-    //    the copy, so a death anywhere in between is caught at the next boot,
-    //    which restores the whole staged copy rather than opening a half-file.
+    /*
+     * 3. Swap the small copy in, without ever being without a database.
+     *
+     * This step used to delete the live file and then copy the staged one back
+     * over it, with a marker recording that it was mid-swap. Both the staged
+     * copy and the marker live on the container's own disk, which does not
+     * survive the container. So a restart inside that window — a deploy, a
+     * crash, a redeploy on a push — came back to a volume with no database and
+     * a throwaway disk with no copy and no marker, and everything anybody had
+     * done was gone. That is the shape of both losses.
+     *
+     * The compacted copy is moved onto the volume first and only then renamed
+     * over the live file. A rename within one filesystem is atomic: at every
+     * instant the path is either the old database or the new one, and there is
+     * no moment where it is neither. If the volume cannot take the copy, the
+     * reclaim is abandoned with the live database untouched, because running
+     * out of room is a smaller problem than not having a database at all.
+     */
+    const beside = `${path}.compacted`;
+    try {
+      copyFileSync(staging, beside);
+    } catch (error) {
+      console.error('[reclaim] no room beside the database; leaving it alone', error);
+      remove(beside);
+      return;
+    }
+
+    // The copy is only worth swapping in if it still has the rows that cannot
+    // be rebuilt. A compaction that lost them is a compaction to throw away.
+    const check = createClient({ url: `file:${beside}` });
+    let accounts = 0;
+    try {
+      const result = await check.execute('SELECT COUNT(*) AS n FROM accounts');
+      accounts = Number(result.rows[0]?.['n'] ?? 0);
+    } catch (error) {
+      console.error('[reclaim] the compacted copy could not be read; leaving the database alone', error);
+      remove(beside);
+      return;
+    } finally {
+      check.close();
+    }
+    if (accounts < accountsBefore) {
+      console.error(
+        `[reclaim] the compacted copy has ${accounts} accounts against ${accountsBefore}; leaving the database alone`,
+      );
+      remove(beside);
+      return;
+    }
+
     writeFileSync(marker, '');
-    remove(path);
-    copyFileSync(staging, path);
+    // Atomic, and on the same filesystem, so there is no instant without a
+    // database. The stale write-ahead files belong to the replaced file.
+    renameSync(beside, path);
+    remove(`${path}-wal`);
+    remove(`${path}-shm`);
     try {
       rmSync(marker, { force: true });
     } catch {

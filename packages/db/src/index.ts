@@ -59,6 +59,8 @@ export {
 export type { BackfillRecord, CandleWrite, StoredCandle } from './candles';
 
 export {
+  CANDLE_KEEP,
+  KEEP_BY_TIMEFRAME,
   compact,
   pruneCandles,
   pruneIdleMints,

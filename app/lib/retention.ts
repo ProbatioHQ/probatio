@@ -27,7 +27,7 @@ let started = false;
 let timer: ReturnType<typeof setInterval> | null = null;
 let snapshotTimer: ReturnType<typeof setInterval> | null = null;
 
-const SWEEP_MS = 30 * 60 * 1_000;
+const SWEEP_MS = 8 * 60 * 1_000;
 /*
  * The account tables are copied far more often than the sweep runs.
  *

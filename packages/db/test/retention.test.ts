@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../src/testing';
 import {
-  CANDLE_KEEP,
+  KEEP_BY_TIMEFRAME,
   pruneCandles,
   pruneLaunches,
   prunePoolSnapshots,
@@ -36,18 +36,18 @@ async function candleCount(timeframe: string): Promise<number> {
 }
 
 describe('candle retention', () => {
-  it('keeps the most recent CANDLE_KEEP of a timeframe and drops the rest', async () => {
+  it('keeps the most recent allowance of a timeframe and drops the rest', async () => {
     const now = 1_000 * DAY;
     // A few more than the cap; the oldest few should be dropped.
     const over = 3;
-    for (let i = 0; i < CANDLE_KEEP + over; i += 1) {
+    for (let i = 0; i < KEEP_BY_TIMEFRAME['s1']! + over; i += 1) {
       await writeCandle('s1', now - i);
     }
 
     const dropped = await pruneCandles(test.db);
 
     expect(dropped).toBe(over);
-    expect(await candleCount('s1')).toBe(CANDLE_KEEP);
+    expect(await candleCount('s1')).toBe(KEEP_BY_TIMEFRAME['s1']!);
   });
 
   it('keeps a sparse old timeframe in full, however far back it reaches', async () => {
@@ -65,18 +65,18 @@ describe('candle retention', () => {
   it('counts each timeframe on its own, not pooled together', async () => {
     const now = 1_000 * DAY;
     // The cap is per timeframe, so filling one does not evict another's.
-    for (let i = 0; i < CANDLE_KEEP + 5; i += 1) await writeCandle('s1', now - i);
+    for (let i = 0; i < KEEP_BY_TIMEFRAME['s1']! + 5; i += 1) await writeCandle('s1', now - i);
     await writeCandle('h1', now - 10 * DAY);
 
     await pruneCandles(test.db);
 
-    expect(await candleCount('s1')).toBe(CANDLE_KEEP);
+    expect(await candleCount('s1')).toBe(KEEP_BY_TIMEFRAME['s1']!);
     expect(await candleCount('h1')).toBe(1);
   });
 
   it('reports how many rows it dropped', async () => {
     const now = 1_000 * DAY;
-    for (let i = 0; i < CANDLE_KEEP + 2; i += 1) await writeCandle('s1', now - i);
+    for (let i = 0; i < KEEP_BY_TIMEFRAME['s1']! + 2; i += 1) await writeCandle('s1', now - i);
 
     const result = await runRetention(test.db, now * 1_000);
     expect(result.candlesDeleted).toBe(2);

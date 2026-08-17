@@ -31,6 +31,33 @@ import type { Client } from '@libsql/client';
 export const CANDLE_KEEP = 1_200;
 
 /**
+ * The cap per timeframe, where a flat one was wrong in both directions.
+ *
+ * The short timeframes are where every row is: a token being watched writes a
+ * fifteen-second candle four times a minute, and twelve hundred of those is
+ * five hours of a chart nobody scrolls back through. The long ones are the
+ * opposite — a daily candle is one row a day and twelve hundred of them is
+ * three years of history in the space the short ones use in an afternoon.
+ *
+ * Deep where rows are cheap, shallow where they are not. This is what actually
+ * bounds the table: the fine timeframes across thousands of mints were the
+ * growth that filled the volume, and no eviction by age touches them fast
+ * enough while a token is still being watched.
+ */
+export const KEEP_BY_TIMEFRAME: Record<string, number> = {
+  s1: 240,
+  s5: 300,
+  s15: 400,
+  m1: 500,
+  m5: 600,
+  m15: 800,
+  h1: 1_000,
+  h4: 1_000,
+  h12: 1_000,
+  d1: 1_200,
+};
+
+/**
  * How long a token's candles are kept after anybody last looked at one.
  *
  * The count cap alone bounds a token and does not bound the table: every mint
@@ -42,7 +69,7 @@ export const CANDLE_KEEP = 1_200;
  * A held token is never dropped, however quiet: its chart belongs to a position
  * somebody still owns.
  */
-const MINT_IDLE_SECONDS = 2 * 24 * 60 * 60;
+const MINT_IDLE_SECONDS = 6 * 60 * 60;
 
 /**
  * Drop every candle of a token that has gone quiet.
@@ -114,19 +141,30 @@ export interface RetentionResult {
  * newest-first and deleting past the cap.
  */
 export async function pruneCandles(db: Client): Promise<number> {
-  const result = await db.execute({
-    sql: `DELETE FROM candles WHERE (mint, timeframe, open_time) IN (
-            SELECT mint, timeframe, open_time FROM (
-              SELECT mint, timeframe, open_time,
-                     ROW_NUMBER() OVER (
-                       PARTITION BY mint, timeframe ORDER BY open_time DESC
-                     ) AS rn
-              FROM candles
-            ) WHERE rn > ?
-          )`,
-    args: [CANDLE_KEEP],
-  });
-  return Number(result.rowsAffected ?? 0);
+  // One statement per timeframe, because each keeps a different depth and a
+  // single cap would either strand the short ones or starve the long ones.
+  const found = await db.execute('SELECT DISTINCT timeframe FROM candles');
+  let deleted = 0;
+
+  for (const row of found.rows) {
+    const timeframe = String(row['timeframe']);
+    const keep = KEEP_BY_TIMEFRAME[timeframe] ?? CANDLE_KEEP;
+    const result = await db.execute({
+      sql: `DELETE FROM candles WHERE (mint, timeframe, open_time) IN (
+              SELECT mint, timeframe, open_time FROM (
+                SELECT mint, timeframe, open_time,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY mint ORDER BY open_time DESC
+                       ) AS rn
+                FROM candles WHERE timeframe = ?
+              ) WHERE rn > ?
+            )`,
+      args: [timeframe, keep],
+    });
+    deleted += Number(result.rowsAffected ?? 0);
+  }
+
+  return deleted;
 }
 
 /**
