@@ -4210,3 +4210,261 @@ body:has(main.wide) .site-footer .shell {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* ================================================================== *
+ * The cinematic hero.
+ *
+ * Full bleed, centred, and lit from behind by a market drawn as a
+ * landscape. The page above it is a document; this is the one place that
+ * is allowed to be a poster.
+ * ================================================================== */
+
+/* `clip` rather than `hidden`: hidden makes the root a scroll container,
+   which silently breaks the sticky header. */
+html {
+  overflow-x: clip;
+}
+
+.hero-cinema {
+  /* Out to the viewport edges, from inside a centred column. */
+  margin-inline: calc(50% - 50vw);
+  width: 100vw;
+  padding: clamp(72px, 11vh, 132px) 24px clamp(76px, 12vh, 128px);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-cinema .hero-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+}
+
+.scene-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  /* Open at the bottom where the landscape sits, faded off at the top and
+     the sides so the headline never competes with it. */
+  mask-image:
+    linear-gradient(180deg, transparent 4%, #000 42%, #000 88%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(180deg, transparent 4%, #000 42%, #000 88%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+/* The mark, floating over the scene. */
+.hero-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  animation: mark-float 6.5s ease-in-out infinite;
+}
+.hero-mark img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Lit from above, and grounded by a shadow that is its own colour rather
+     than a grey box shadow, which is what makes it read as floating. */
+  filter:
+    drop-shadow(0 10px 22px rgb(0 0 0 / 0.55))
+    drop-shadow(0 0 26px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+/* The pool of light it floats above. */
+.hero-mark::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -16px;
+  width: 76px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--accent) 34%, transparent),
+    transparent
+  );
+  animation: mark-shadow 6.5s ease-in-out infinite;
+}
+
+@keyframes mark-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes mark-shadow {
+  0%, 100% { opacity: 0.85; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: 0.5; transform: translateX(-50%) scaleX(0.82); }
+}
+
+/* The headline, at poster weight. */
+.hero-cinema .display {
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 900;
+  font-size: clamp(44px, 8.2vw, 92px);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  background: linear-gradient(
+    180deg,
+    #fff 18%,
+    color-mix(in srgb, var(--text) 78%, transparent) 96%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-wrap: balance;
+}
+
+/* Three words, spaced out, the way a title card sets them. */
+.hero-tagline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin-top: -6px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.hero-tagline span {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+.hero-tagline span::after {
+  content: '';
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.hero-tagline span:last-child::after {
+  display: none;
+}
+
+.hero-cinema .lede {
+  max-width: 56ch;
+  font-size: clamp(15px, 1.5vw, 17.5px);
+}
+
+.hero-cinema .cta-row {
+  justify-content: center;
+  margin-top: 6px;
+}
+
+/* Pill buttons, with a lift. */
+.button-link,
+.ghost-link,
+.wallet-connect {
+  border-radius: 999px;
+  padding: 11px 22px;
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+.button-link:hover,
+.ghost-link:hover,
+.wallet-connect:hover {
+  transform: translateY(-1px);
+}
+.button-link:active,
+.ghost-link:active,
+.wallet-connect:active {
+  transform: translateY(0);
+}
+.button-link:hover {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent),
+    0 0 34px -6px color-mix(in srgb, var(--accent) 85%, transparent);
+}
+.ghost-link:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-mark,
+  .hero-mark::after {
+    animation: none;
+  }
+  .button-link:hover,
+  .ghost-link:hover,
+  .wallet-connect:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero-cinema {
+    padding-top: 56px;
+    padding-bottom: 72px;
+  }
+  .hero-mark {
+    width: 84px;
+    height: 84px;
+  }
+  .hero-tagline {
+    letter-spacing: 0.16em;
+    font-size: 10.5px;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Headings, in the display face.
+ *
+ * Geist is drawn to be read in paragraphs and is deliberately even, which
+ * is exactly wrong at heading size: set large, it reads as a bigger body
+ * paragraph rather than a title. The display face carries the weight and
+ * the tighter fit a heading wants, so page and section titles take it. The
+ * terminal bars keep the monospace they are named for.
+ * ------------------------------------------------------------------ */
+/* Applied to every heading, then taken back off the terminal bars below. A
+   `:not()` carrying a combinator would risk invalidating this whole rule in a
+   parser that does not take one, and losing the face on every heading. */
+h1,
+.page-head h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+}
+h1,
+.page-head h1 {
+  font-weight: 800;
+  letter-spacing: -0.032em;
+}
+h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+/* The terminal bar's title is part of the chrome, not the typography. */
+.term > .term-bar h2 {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+/* The account hero's big figure keeps the monospace it needs for digits. */
+.acct-eq,
+.acct-stat-v,
+.acct-return-pct {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}

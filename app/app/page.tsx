@@ -1,7 +1,7 @@
 import { LaunchFeedList } from '@/components/launch-feed';
 import { Leaderboard } from '@/components/leaderboard';
+import { MarketScene } from '@/components/market-scene';
 import { Onboarding } from '@/components/onboarding';
-import { PriceCanvas } from '@/components/price-canvas';
 import { Season } from '@/components/season';
 import { SignIn } from '@/components/wallet';
 
@@ -54,9 +54,14 @@ const AGAINST = [
 export default function Home() {
   return (
     <main className="wide" style={{ gap: 64 }}>
-      <section className="hero">
-        <PriceCanvas />
+      <section className="hero hero-cinema">
+        <MarketScene />
         <div className="hero-inner stagger">
+          <span className="hero-mark" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/probatio-logo.png" alt="" width={104} height={104} />
+          </span>
+
           <span className="badge">
             <span className="dot" />
             Live pump.fun markets
@@ -68,6 +73,12 @@ export default function Home() {
             on real tokens.
           </h1>
 
+          <p className="hero-tagline" aria-hidden="true">
+            <span>Real prices</span>
+            <span>Honest fills</span>
+            <span>Provable record</span>
+          </p>
+
           {/*
             Says what the system does without asserting what it has done.
             "Every trade is written to Solana as you make it" was present tense
@@ -78,9 +89,8 @@ export default function Home() {
           */}
           <p className="lede">
             Practice money, live prices, and fills that model real slippage and real delay. Every
-            trade is hashed the moment it fills and committed to Solana in batches, so a record
-            can be checked by anyone and edited by nobody.{' '}
-            <a href="/trust">including what that does not cover yet</a>.
+            trade is hashed as it fills and committed to Solana, so a record can be checked by
+            anyone and edited by nobody, <a href="/trust">including what that does not cover yet</a>.
           </p>
 
           <div className="cta-row">
@@ -89,11 +99,6 @@ export default function Home() {
               How the fills work
             </a>
           </div>
-
-          <p className="dim" style={{ fontSize: 13.5 }}>
-            The fill engine is measured against real trades, not taken on trust.{' '}
-            <a href="/docs/fills">See the numbers</a>
-          </p>
         </div>
       </section>
 

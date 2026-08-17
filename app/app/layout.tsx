@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Archivo, Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AmbientTerminal } from '@/components/ambient-terminal';
 import { HeaderScroll } from '@/components/header-scroll';
@@ -10,6 +10,19 @@ import { WalletButton, WalletProvider } from '@/components/wallet';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+/*
+ * The display face, for the few places something is meant to be seen from
+ * across a room rather than read. Geist is a fine interface face and a weak
+ * headline one: at poster size its letterforms are so even that a headline set
+ * in it reads as a large paragraph. Archivo is drawn for exactly this, holds
+ * its shape tight at 900, and is a grotesque rather than one of the display
+ * faces every generated landing page reaches for.
+ */
+const archivo = Archivo({
+  variable: '--font-display',
+  subsets: ['latin'],
+  weight: ['600', '700', '800', '900'],
+});
 
 export const metadata: Metadata = {
   /*
@@ -36,7 +49,7 @@ export const metadata: Metadata = {
  */
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable}`}>
       <body>
         <div className="grain" aria-hidden="true" />
         <div className="glow" aria-hidden="true" />
