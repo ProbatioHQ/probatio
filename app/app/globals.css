@@ -4230,8 +4230,6 @@ html {
   margin-inline: calc(50% - 50vw);
   width: 100vw;
   padding: clamp(72px, 11vh, 132px) 24px clamp(76px, 12vh, 128px);
-  overflow: hidden;
-  isolation: isolate;
 }
 
 .hero-cinema .hero-inner {
@@ -5013,4 +5011,37 @@ body:has(main.home) .site-header.stuck {
   mask-image: linear-gradient(180deg, #000 62%, transparent);
   -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
   padding-bottom: 10px;
+}
+
+/* ------------------------------------------------------------------ *
+ * The front page has one ground, and the header stands on it.
+ *
+ * The backdrop covered the hero, and the hero begins below the header,
+ * so the top strip of the page was lit by the site's own glow instead
+ * and a seam ran across the screen exactly where the header ended.
+ * Covering the viewport removes the join: there is one ground, the
+ * header sits on it with nothing of its own, and scrolling changes
+ * nothing behind it.
+ * ------------------------------------------------------------------ */
+body:has(main.home) .glow {
+  /* The scene brings its own light. Two sources lit the same strip twice,
+     and the site's own is anchored to the top of the viewport, which is
+     precisely where the header is. */
+  display: none;
+}
+
+.home .scene {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+
+/* Fixed to the viewport, so the washes are placed against it rather than
+   against a section that starts under the header. */
+.home .scene-wash.one {
+  top: -14%;
+  margin-left: -31vw;
+}
+.home .scene-wash.two {
+  bottom: -22%;
 }
