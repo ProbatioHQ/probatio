@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { MarketScene } from '@/components/market-scene';
+import { HeroBackdrop } from '@/components/hero-backdrop';
 import { SignIn } from '@/components/wallet';
 
 /**
@@ -13,7 +13,7 @@ import { SignIn } from '@/components/wallet';
  * fade says a page loaded; an uncovering says something was revealed.
  *
  * The second is depth. The pointer moves the layers by different amounts, so
- * the mark, the headline and the landscape behind them sit at three distances
+ * the mark, the headline and the grid behind them sit at three distances
  * rather than flat against the glass. It is a few pixels at most, which is the
  * point: parallax that can be noticed is parallax that has been overdone.
  *
@@ -75,7 +75,7 @@ export function Hero() {
 
   return (
     <section className="hero hero-cinema" ref={root}>
-      <MarketScene />
+      <HeroBackdrop />
       <div className="hero-inner">
         <span className="hero-mark" aria-hidden="true">
           <span className="hero-mark-float">
