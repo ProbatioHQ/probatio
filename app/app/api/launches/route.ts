@@ -179,7 +179,10 @@ export async function GET(request: Request): Promise<Response> {
      * that all had a number. The curves are read from chain instead, in one
      * batched call for the whole page.
      */
-    const searchCaps = await capsFromChain(found.map((launch) => launch.mint));
+    const searchCaps = await capsFromChain([
+      ...found.map((launch) => launch.mint),
+      ...external.map((token) => token.mint),
+    ]);
 
     const results = [
       ...found.map((launch) =>
@@ -207,7 +210,8 @@ export async function GET(request: Request): Promise<Response> {
           images.get(token.mint) ?? token.image,
           1,
         ),
-        marketCap: capLamports(token.marketCapUsd),
+        // The index's dollars where it has them, the curve where it does not.
+        marketCap: capLamports(token.marketCapUsd) ?? searchCaps.get(token.mint) ?? null,
       })),
     ].slice(0, limit);
 
