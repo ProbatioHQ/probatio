@@ -26,6 +26,8 @@ const SELL_PRESETS: { label: string; numerator: number; denominator: number }[] 
 interface Filled {
   status: 'filled';
   tradeId: number;
+  /** Which way it went, so the receipt can name its own rows. */
+  side: 'buy' | 'sell';
   expected: { solAmount: string; tokenAmount: string };
   filled: {
     solAmount: string;
@@ -111,6 +113,8 @@ export function TradePanel({
   const [result, setResult] = useState<TradeResult | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const [held, setHeld] = useState<string>('0');
+  /** What the holding cost and what it is worth now, for the live position. */
+  const [position, setPosition] = useState<{ costBasis: string; value: string | null } | null>(null);
   /** Scopes the hotkeys: see the keydown handler below. */
   const panel = useRef<HTMLElement>(null);
 
@@ -124,18 +128,37 @@ export function TradePanel({
     const read = (): void => {
       void fetch('/api/positions')
         .then((response) => (response.ok ? response.json() : null))
-        .then((data: { balance?: string; positions?: { mint: string; tokenAmount: string }[] } | null) => {
-          if (cancelled || !data) return;
-          if (data.balance) setBalance(data.balance);
-          const position = data.positions?.find((entry) => entry.mint === mint);
-          setHeld(position?.tokenAmount ?? '0');
-        })
+        .then(
+          (
+            data: {
+              balance?: string;
+              positions?: {
+                mint: string;
+                tokenAmount: string;
+                costBasis: string;
+                value: string | null;
+              }[];
+            } | null,
+          ) => {
+            if (cancelled || !data) return;
+            if (data.balance) setBalance(data.balance);
+            const open = data.positions?.find((entry) => entry.mint === mint);
+            setHeld(open?.tokenAmount ?? '0');
+            setPosition(
+              open ? { costBasis: open.costBasis, value: open.value } : null,
+            );
+          },
+        )
         .catch(() => undefined);
     };
 
     read();
+    // Marked to the market while it is held, so the figure moves with the price
+    // rather than only when a trade is made.
+    const timer = setInterval(read, 12_000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [signedIn, mint, result]);
 
@@ -177,7 +200,20 @@ export function TradePanel({
     [mint, onTraded, signedIn, slippageBps, working],
   );
 
-  const buyPreset = useCallback((sol: number) => void send(toLamports(sol), 'buy'), [send]);
+  /*
+   * A size button fills the field. It does not trade.
+   *
+   * It used to send the order on the single click that chose the size, so
+   * picking an amount and placing an order were the same gesture and there was
+   * no moment in between to change your mind or check the number. Anybody who
+   * expected the ordinary two-step of choosing a size and then confirming had
+   * already traded by the time they looked for the confirm button. Choosing is
+   * separate from committing now; the button below commits.
+   */
+  const buyPreset = useCallback((sol: number) => {
+    setSide('buy');
+    setAmount(String(sol));
+  }, []);
 
   const sellFraction = useCallback(
     (numerator: number, denominator: number) => {
@@ -185,9 +221,12 @@ export function TradePanel({
       if (holding === 0n) return;
       const value =
         numerator === denominator ? holding : (holding * BigInt(numerator)) / BigInt(denominator);
-      if (value > 0n) void send(String(value), 'sell');
+      if (value <= 0n) return;
+      setSide('sell');
+      // The field is a token count, so the base units come back to whole tokens.
+      setAmount((Number(value) / 10 ** TOKEN_DECIMALS).toString());
     },
-    [held, send],
+    [held],
   );
 
   const submit = useCallback(() => {
@@ -290,6 +329,49 @@ export function TradePanel({
       </div>
 
       <div className="term-body">
+        {/*
+          The position, marked to the market.
+          
+          What a holding cost and what it is worth now, side by side, with the
+          difference in both SOL and percent. Without it the only way to know
+          whether a trade was working was to read a fill receipt and do the
+          arithmetic, and a receipt reports one trade rather than a position.
+        */}
+        {holding > 0n && position && position.value !== null && (
+          (() => {
+            const cost = Number(BigInt(position.costBasis)) / Number(LAMPORTS_PER_SOL);
+            const now = Number(BigInt(position.value)) / Number(LAMPORTS_PER_SOL);
+            const change = now - cost;
+            const percent = cost > 0 ? (change / cost) * 100 : 0;
+            const up = change >= 0;
+            return (
+              <div className={up ? 'position up' : 'position down'}>
+                <div className="position-legs">
+                  <span>
+                    <em>Cost</em>
+                    <b className="mono">{cost.toFixed(4)}</b>
+                  </span>
+                  <span className="position-arrow" aria-hidden="true" />
+                  <span>
+                    <em>Now</em>
+                    <b className="mono">{now.toFixed(4)}</b>
+                  </span>
+                </div>
+                <div className="position-pnl mono">
+                  <span className="position-pct">
+                    {up ? '+' : ''}
+                    {percent.toFixed(2)}%
+                  </span>
+                  <span className="position-abs">
+                    {up ? '+' : ''}
+                    {change.toFixed(4)} SOL
+                  </span>
+                </div>
+              </div>
+            );
+          })()
+        )}
+
         <div className="sides" role="group" aria-label="Side">
           <button
             type="button"
@@ -430,15 +512,37 @@ export function TradePanel({
               {result.filled.partial && <span className="pill">partial</span>}
             </div>
 
+            {/*
+              Named for the direction traded.
+              
+              Both sides used to read "Size / Quoted / Got", where size was
+              always the SOL leg and quoted and got were always the token leg.
+              On a sell that meant the SOL you received was labelled as the size
+              you sent and the tokens you sold were labelled as what you got,
+              which reads as a loss on a winning trade and is how a sell at a
+              higher price came out looking wrong.
+            */}
             <dl className="fill-rows">
-              <dt>Size</dt>
-              <dd className="mono">{solFromLamports(result.filled.solAmount)} SOL</dd>
+              <dt>{result.side === 'sell' ? 'Sold' : 'Spent'}</dt>
+              <dd className="mono">
+                {result.side === 'sell'
+                  ? tokens(result.filled.tokenAmount)
+                  : `${solFromLamports(result.filled.solAmount)} SOL`}
+              </dd>
+
+              <dt>{result.side === 'sell' ? 'Received' : 'Got'}</dt>
+              <dd className="mono">
+                {result.side === 'sell'
+                  ? `${solFromLamports(result.filled.solAmount)} SOL`
+                  : tokens(result.filled.tokenAmount)}
+              </dd>
 
               <dt>Quoted</dt>
-              <dd className="mono">{tokens(result.expected.tokenAmount)}</dd>
-
-              <dt>Got</dt>
-              <dd className="mono">{tokens(result.filled.tokenAmount)}</dd>
+              <dd className="mono">
+                {result.side === 'sell'
+                  ? `${solFromLamports(result.expected.solAmount)} SOL`
+                  : tokens(result.expected.tokenAmount)}
+              </dd>
 
               <dt>Fee</dt>
               <dd className="mono">{solFromLamports(result.filled.feeLamports)} SOL</dd>

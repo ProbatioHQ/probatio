@@ -339,6 +339,9 @@ export async function POST(request: Request): Promise<Response> {
     status: 'filled',
     tradeId: recorded.id,
     sequence: recorded.sequence,
+    // The side travels with the fill, so a receipt can name its rows for the
+    // direction actually traded rather than labelling both the same way.
+    side,
     // Both figures are returned so the interface can show the haircut rather
     // than quietly presenting the fill as though it were the quote.
     expected: {

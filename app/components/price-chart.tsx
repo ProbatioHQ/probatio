@@ -10,6 +10,7 @@ import {
   type CandlestickData,
   type HistogramData,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type LineData,
   type UTCTimestamp,
@@ -112,9 +113,16 @@ export function PriceChart({
   onHistory,
   unit = 'market-cap',
   onUnit,
+  entryPrice = null,
   height = 560,
 }: {
   mint: string;
+  /**
+   * What the holding cost, per token, as a scaled price. Drawn as a line, so a
+   * chart says where a position was opened rather than leaving it to be worked
+   * out from a receipt. Null when nothing is held.
+   */
+  entryPrice?: string | null;
   timeframe?: string;
   /** The timeframes the left rail offers. Omitted, the rail hides them. */
   timeframes?: readonly string[];
@@ -146,6 +154,8 @@ export function PriceChart({
     hist: ISeriesApi<'Histogram'>;
   } | null>(null);
   const fitted = useRef(false);
+  /** The line marking where the holding was opened. */
+  const entryLine = useRef<IPriceLine | null>(null);
   /*
    * Whether a chart has ever drawn for this mint/timeframe. Held in a ref, not
    * read from `data`: the poll interval closes over the `data` from the render
@@ -625,6 +635,36 @@ export function PriceChart({
   useEffect(() => {
     fitted.current = false;
   }, [mint, timeframe]);
+
+  /*
+   * Where this position was opened, on the price axis.
+   *
+   * Converted through the same function the candles are, so it lands on the
+   * axis actually being shown and follows the market-cap and price toggle
+   * without being recomputed by hand. Redrawn when the entry or the unit
+   * changes, and taken away when the position closes.
+   */
+  useEffect(() => {
+    const series_ = series.current;
+    if (!series_) return;
+    if (entryLine.current) {
+      series_.removePriceLine(entryLine.current);
+      entryLine.current = null;
+    }
+    if (!entryPrice || !data) return;
+
+    const value = toDisplay(entryPrice, unit, data.tokenDecimals, data.totalSupply, solUsd);
+    if (!Number.isFinite(value) || value <= 0) return;
+
+    entryLine.current = series_.createPriceLine({
+      price: value,
+      color: '#f0b429',
+      lineWidth: 1,
+      lineStyle: 2,
+      axisLabelVisible: true,
+      title: 'your entry',
+    });
+  }, [entryPrice, unit, data, solUsd, points]);
 
   const last = points.at(-1);
   const first = points.at(0);

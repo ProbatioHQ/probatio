@@ -70,6 +70,48 @@ export function TokenView({
   const { status } = useWallet();
   const signedIn = status === 'signed-in';
   const [tradeCount, setTradeCount] = useState(0);
+
+  /*
+   * What this holding cost per token, for the line the chart draws at it.
+   *
+   * Derived from the position rather than remembered from a fill: an average
+   * over everything bought is what a second buy at a different price makes of
+   * an entry, and a receipt only knows about one trade. Scaled the way every
+   * price in the store is, so the chart converts it with the candles.
+   */
+  const [entryPrice, setEntryPrice] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const read = (): void => {
+      void fetch('/api/positions')
+        .then((response) => (response.ok ? response.json() : null))
+        .then(
+          (
+            body: {
+              positions?: { mint: string; tokenAmount: string; costBasis: string }[];
+            } | null,
+          ) => {
+            if (cancelled) return;
+            const open = body?.positions?.find((entry) => entry.mint === mint);
+            if (!open || BigInt(open.tokenAmount) === 0n) {
+              setEntryPrice(null);
+              return;
+            }
+            setEntryPrice(
+              ((BigInt(open.costBasis) * 10n ** 18n) / BigInt(open.tokenAmount)).toString(),
+            );
+          },
+        )
+        .catch(() => undefined);
+    };
+    read();
+    const timer = setInterval(read, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [mint, tradeCount]);
+
   /*
    * Fifteen seconds to begin with, because a token doing its whole life in
    * minutes puts sixty trades inside one 1m bucket and draws as a single
@@ -197,6 +239,7 @@ export function TokenView({
                 }}
                 unit={unit}
                 onUnit={setUnit}
+                entryPrice={entryPrice}
                 height={560}
                 onHistory={({ candles, spanSeconds, backfilling }) => {
                   // The reader's own pick wins and ends the fitting for good.
