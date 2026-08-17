@@ -101,12 +101,6 @@ export function Hero() {
           <span>Provable record</span>
         </p>
 
-        <p className="lede">
-          Practice money, live prices, and fills that model real slippage and real delay. Every
-          trade is hashed as it fills and committed to Solana, so a record can be checked by
-          anyone and edited by nobody, <a href="/trust">including what that does not cover yet</a>.
-        </p>
-
         <div className="cta-row">
           <SignIn />
           <a href="/feed" className="ghost-link">

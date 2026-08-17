@@ -4957,22 +4957,6 @@ button {
   animation: wash-b 34s ease-in-out infinite;
 }
 
-.scene-wash.three {
-  bottom: -30%;
-  right: -14%;
-  width: 52vw;
-  height: 52vw;
-  max-width: 760px;
-  max-height: 760px;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, #7fd7ff 12%, transparent),
-    transparent
-  );
-  opacity: 0.28;
-  animation: wash-c 40s ease-in-out infinite;
-}
-
 @keyframes wash-a {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
   50% { transform: translate3d(0, 5%, 0) scale(1.1); }
@@ -4988,4 +4972,45 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .scene-wash { animation: none; }
+}
+
+/* The market line over the light, faded off at every edge. */
+.scene-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mask-image: radial-gradient(115% 100% at 50% 55%, #000 30%, transparent 86%);
+  -webkit-mask-image: radial-gradient(115% 100% at 50% 55%, #000 30%, transparent 86%);
+}
+
+/* ------------------------------------------------------------------ *
+ * The header, over the front page.
+ *
+ * It sat on its own ground with its own edge, so the top of the one
+ * full-screen page on the site was a bar with a line under it and then
+ * the page. Over the hero it is nothing at all, and what it gains on
+ * scroll is a fade rather than an edge: no border, just the page
+ * darkening under it so the links stay readable as content passes.
+ * ------------------------------------------------------------------ */
+body:has(main.home) .site-header {
+  background: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+}
+body:has(main.home) .site-header.stuck {
+  border-bottom-color: transparent;
+  backdrop-filter: blur(16px) saturate(130%);
+  /* Deepest at the top and gone by the bottom edge, so there is no line where
+     the header stops and the page starts. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ink) 92%, transparent) 40%,
+    color-mix(in srgb, var(--ink) 55%, transparent) 78%,
+    transparent
+  );
+  mask-image: linear-gradient(180deg, #000 62%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
+  padding-bottom: 10px;
 }
