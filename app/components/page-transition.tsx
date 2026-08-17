@@ -51,8 +51,24 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       if (href === pathname) return;
 
       event.preventDefault();
-      setLeavingFrom(pathname);
 
+      /*
+       * Moving inside one section is not an arrival, so it does not get an
+       * arrival's fade.
+       *
+       * Stepping through the documentation pages meant watching the article
+       * fade out, the route change, and the whole thing fade back in, which on
+       * pages that share their layout and their heading reads as a flicker
+       * rather than a transition — the only part that actually changed was the
+       * body. Same first segment, so straight there.
+       */
+      const section = (path: string): string => path.split('/')[1] ?? '';
+      if (section(href) === section(pathname)) {
+        router.push(href);
+        return;
+      }
+
+      setLeavingFrom(pathname);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => router.push(href), EXIT_MS);
     },

@@ -41,11 +41,20 @@ const MORPH_MS = 4_500;
  * consistent rather than four separately tuned layers.
  */
 const RANGES = [
-  { baseY: 0.66, amplitude: 0.15, speed: 2.5, haze: 0.78 },
-  { baseY: 0.75, amplitude: 0.19, speed: 5, haze: 0.55 },
-  { baseY: 0.85, amplitude: 0.23, speed: 9.5, haze: 0.32 },
-  { baseY: 0.97, amplitude: 0.27, speed: 17, haze: 0.13 },
+  { baseY: 0.70, amplitude: 0.13, speed: 2, haze: 0.8 },
+  { baseY: 0.82, amplitude: 0.17, speed: 4.5, haze: 0.5 },
+  { baseY: 0.98, amplitude: 0.2, speed: 8, haze: 0.2 },
 ];
+
+/**
+ * How many candles stand across the width.
+ *
+ * Far fewer than the ranges have points, and deliberately. Drawn one per ridge
+ * sample they came out two pixels wide with their bodies inside a tenth of the
+ * height, which is not a chart, it is a dashed line. At this count each one has
+ * a body wide enough to read an open and a close from.
+ */
+const CANDLES = 34;
 
 interface Candle {
   open: number;
@@ -99,7 +108,7 @@ function ridgeline(random: () => number, drift: number, volatility: number): num
 function candlesFrom(random: () => number, drift: number, volatility: number): Candle[] {
   const out: Candle[] = [];
   let price = 0.5;
-  for (let i = 0; i < POINTS; i += 1) {
+  for (let i = 0; i < CANDLES; i += 1) {
     const open = price;
     let high = open;
     let low = open;
@@ -111,10 +120,10 @@ function candlesFrom(random: () => number, drift: number, volatility: number): C
     }
     out.push({ open, close: price, high, low });
   }
-  const blend = Math.floor(POINTS * 0.2);
+  const blend = Math.max(2, Math.floor(CANDLES * 0.2));
   for (let i = 0; i < blend; i += 1) {
     const t = i / blend;
-    const index = POINTS - blend + i;
+    const index = CANDLES - blend + i;
     const a = out[index]!;
     const b = out[i]!;
     out[index] = {
@@ -124,7 +133,20 @@ function candlesFrom(random: () => number, drift: number, volatility: number): C
       low: a.low * (1 - t) + b.low * t,
     };
   }
-  return out;
+
+  // Stretched to fill the space it is given. A walk that happens to stay near
+  // the middle would otherwise draw a row of flat ticks whatever height it is
+  // handed, which is the other half of why these read as a dashed line.
+  const floor = Math.min(...out.map((c) => c.low));
+  const ceiling = Math.max(...out.map((c) => c.high));
+  const span = ceiling - floor || 1;
+  const fit = (v: number): number => (v - floor) / span;
+  return out.map((c) => ({
+    open: fit(c.open),
+    close: fit(c.close),
+    high: fit(c.high),
+    low: fit(c.low),
+  }));
 }
 
 function mood(
@@ -182,30 +204,6 @@ export function MarketScene() {
     let animation = 0;
     let start = 0;
 
-    /* Motes in the air, so the space in front of the ranges is not empty glass. */
-    interface Mote {
-      x: number;
-      y: number;
-      radius: number;
-      speed: number;
-      phase: number;
-      depth: number;
-    }
-    let motes: Mote[] = [];
-
-    const seedMotes = (): void => {
-      const random = seeded(0x4d07);
-      const count = Math.round(Math.min(40, Math.max(14, width / 52)));
-      motes = Array.from({ length: count }, () => ({
-        x: random(),
-        y: random(),
-        radius: 0.7 + random() * 1.6,
-        speed: 0.004 + random() * 0.013,
-        phase: random() * Math.PI * 2,
-        depth: 0.35 + random() * 0.65,
-      }));
-    };
-
     const resize = (): void => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       width = canvas.offsetWidth;
@@ -213,7 +211,6 @@ export function MarketScene() {
       canvas.width = Math.max(1, Math.floor(width * ratio));
       canvas.height = Math.max(1, Math.floor(height * ratio));
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      seedMotes();
     };
 
     /**
@@ -285,24 +282,32 @@ export function MarketScene() {
       context.stroke();
     };
 
-    /** The candles standing along the front, like a skyline. */
-    const drawSkyline = (
+    /**
+     * The chart along the front.
+     *
+     * Proper candlesticks: a wick from high to low, a body between open and
+     * close, wide enough that the two are legible. Green above its open, red
+     * below, the same way every other chart on this site is drawn, so the
+     * foreground says what the product is without a label.
+     */
+    const drawChart = (
       from: Candle[],
       to: Candle[],
       t: number,
       offset: number,
     ): void => {
-      const dx = width / POINTS;
+      const dx = width / CANDLES;
       const shift = offset % width;
-      const bodyWidth = Math.max(2.5, dx * 0.34);
-      const floor = height * 1.04;
-      const scale = height * 0.3;
+      const body = Math.max(4, dx * 0.5);
+      const wick = Math.max(1, body * 0.14);
+      const floor = height * 0.99;
+      const scale = height * 0.34;
 
       for (let pass = 0; pass < 2; pass += 1) {
         const originX = pass * width - shift;
-        for (let i = 0; i < POINTS; i += 1) {
-          const x = originX + i * dx;
-          if (x < -dx * 2 || x > width + dx * 2) continue;
+        for (let i = 0; i < CANDLES; i += 1) {
+          const left = originX + i * dx + (dx - body) / 2;
+          if (left < -dx * 2 || left > width + dx * 2) continue;
 
           const a = from[i]!;
           const b = to[i]!;
@@ -315,38 +320,16 @@ export function MarketScene() {
           const rising = close >= open;
           const colour: [number, number, number] = rising ? [63, 224, 138] : [255, 95, 86];
 
-          // Near-black bodies with a lit edge, so the skyline belongs to the
-          // same world as the ranges rather than sitting on top of them.
-          context.strokeStyle = rgb(mixColour(INK, colour, 0.42), 0.75);
-          context.lineWidth = 1;
-          context.beginPath();
-          context.moveTo(x + bodyWidth / 2, y(high));
-          context.lineTo(x + bodyWidth / 2, y(low));
-          context.stroke();
+          context.fillStyle = rgb(colour, 0.34);
+          context.fillRect(left + body / 2 - wick / 2, y(high), wick, Math.max(1, y(low) - y(high)));
 
           const top = y(Math.max(open, close));
-          const bodyHeight = Math.max(2, Math.abs(y(open) - y(close)));
-          context.fillStyle = rgb(mixColour(INK, colour, 0.3), 0.92);
-          context.fillRect(x, top, bodyWidth, bodyHeight);
-          context.fillStyle = rgb(colour, 0.65);
-          context.fillRect(x, top, bodyWidth, 1.4);
+          const tall = Math.max(2, Math.abs(y(open) - y(close)));
+          context.fillStyle = rgb(colour, 0.46);
+          context.fillRect(left, top, body, tall);
+          context.fillStyle = rgb(colour, 0.8);
+          context.fillRect(left, top, body, 1.5);
         }
-      }
-    };
-
-    const drawMotes = (elapsed: number, colour: [number, number, number]): void => {
-      const seconds = elapsed / 1000;
-      for (const mote of motes) {
-        const drifted = (mote.y - seconds * mote.speed) % 1;
-        const top = (drifted + 1) % 1;
-        const sway = Math.sin(seconds * 0.28 + mote.phase) * 0.012;
-        const x = (((mote.x + sway) % 1) + 1) % 1;
-        const fade = Math.sin(top * Math.PI);
-
-        context.beginPath();
-        context.arc(x * width, top * height * 0.9, mote.radius * mote.depth, 0, Math.PI * 2);
-        context.fillStyle = rgb(colour, 0.04 + fade * 0.26 * mote.depth);
-        context.fill();
       }
     };
 
@@ -389,8 +372,6 @@ export function MarketScene() {
       context.fillStyle = sun;
       context.fillRect(0, 0, width, height);
 
-      drawMotes(elapsed, accent);
-
       const seconds = elapsed / 1000;
       // Far to near, so each range is drawn over the one behind it.
       RANGES.forEach((range, layer) => {
@@ -411,7 +392,7 @@ export function MarketScene() {
         );
       });
 
-      drawSkyline(a.candles, b.candles, t, seconds * 26);
+      drawChart(a.candles, b.candles, t, seconds * 14);
     };
 
     const loop = (now: number): void => {

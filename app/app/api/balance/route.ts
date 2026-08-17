@@ -28,10 +28,15 @@ export async function GET(request: Request): Promise<Response> {
     const client = await db();
     const { account } = await activeSeason(client, user.pubkey, Date.now());
 
-    return Response.json({
-      balance: account.solBalance,
-      startingBalance: account.startingBalance,
-    });
+    return Response.json(
+      {
+        balance: account.solBalance,
+        startingBalance: account.startingBalance,
+      },
+      // Never cached, anywhere. A balance is only worth showing if it is the
+      // one the account holds right now.
+      { headers: { 'Cache-Control': 'no-store, must-revalidate' } },
+    );
   } catch (error) {
     // A header that shows nothing is the symptom of a 500 nobody is looking at,
     // so the reason is logged and answered rather than thrown away.

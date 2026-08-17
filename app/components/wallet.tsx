@@ -210,18 +210,32 @@ export function WalletButton() {
       //
       // From the one-row endpoint rather than the positions one, which prices
       // every holding from chain and shares the chain-read budget with trading.
-      void fetch('/api/balance')
-        .then((response) => (response.ok ? response.json() : null))
-        .then((data: { balance?: string } | null) => {
+      // `no-store`, because a balance answered once and then replayed from the
+      // browser's cache is a stale number presented as a live one — and a 401
+      // cached from before signing in would keep the pill empty for the whole
+      // session, which is exactly how this looked.
+      void fetch('/api/balance', { cache: 'no-store', credentials: 'same-origin' })
+        .then(async (response) => {
+          if (!response.ok) {
+            console.error('[wallet] balance read failed', response.status);
+            return null;
+          }
+          return (await response.json()) as { balance?: string };
+        })
+        .then((data) => {
           if (!cancelled && data?.balance) setBalance(data.balance);
         })
-        .catch(() => undefined);
+        .catch((error) => console.error('[wallet] balance read failed', error));
     };
     read();
+    // A first read that lands before the session cookie is in play would
+    // otherwise leave the pill empty until the next tick.
+    const retry = setTimeout(read, 1_500);
     // Refreshed on a timer so a fill from another tab still shows here.
     const timer = setInterval(read, 15_000);
     return () => {
       cancelled = true;
+      clearTimeout(retry);
       clearInterval(timer);
     };
   }, [status]);
