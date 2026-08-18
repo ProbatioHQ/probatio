@@ -599,6 +599,25 @@ export function PriceChart({
       rsiRef.current = null;
       macdRef.current = null;
     };
+    /*
+     * Built once, not once per height.
+     *
+     * This used to depend on `height`, and its cleanup calls `instance.remove()`
+     * — so any change to the height tore the whole chart down and built a new
+     * one. That was survivable while the height was a constant. It stopped
+     * being one when the phone layout started measuring the viewport, because
+     * iOS changes `window.innerHeight` every time the URL bar collapses or
+     * expands, which happens continuously while scrolling. The chart was being
+     * destroyed and rebuilt as you scrolled past it, which is the flicker.
+     *
+     * A height change is now applied to the living chart instead, below.
+     */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Resizing is not rebuilding.
+  useEffect(() => {
+    chart.current?.applyOptions({ height });
   }, [height]);
 
   useEffect(() => {
@@ -681,6 +700,19 @@ export function PriceChart({
   const change =
     last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
 
+  /*
+   * Whether the phone is showing the timeframe row.
+   *
+   * Ten timeframes is right for a desk, where they are a single strip of small
+   * buttons along the top of the chart. On a phone that strip does not fit, so
+   * it broke onto its own lines and pushed the chart most of a screen down: ten
+   * full-width rows of one word each before you could see a candle. Closed by
+   * default, opened by the button beside Indicators, and closed again the
+   * moment a choice is made, because picking a timeframe is the only reason to
+   * have it open.
+   */
+  const [timesOpen, setTimesOpen] = useState(false);
+
   // Handed up whenever either number moves. onQuote has to be stable in the
   // parent or this runs every render.
   const quoteValue = last?.close ?? null;
@@ -693,14 +725,21 @@ export function PriceChart({
       {/* Timeframes and controls across the top, the way a terminal keeps them. */}
       <div className="chart-top">
         {timeframes && timeframes.length > 0 && (
-          <div role="group" aria-label="Timeframe" className="chart-times">
+          <div
+            role="group"
+            aria-label="Timeframe"
+            className={timesOpen ? 'chart-times open' : 'chart-times'}
+          >
             {timeframes.map((frame) => (
               <button
                 key={frame}
                 type="button"
                 className={frame === timeframe ? 'time-btn on' : 'time-btn'}
                 aria-pressed={frame === timeframe}
-                onClick={() => onTimeframe?.(frame)}
+                onClick={() => {
+                  onTimeframe?.(frame);
+                  setTimesOpen(false);
+                }}
               >
                 {TIMEFRAME_LABELS[frame] ?? frame}
               </button>
@@ -709,6 +748,18 @@ export function PriceChart({
         )}
 
         <div className="chart-top-actions">
+          {/* Only a phone shows this; on a desk the row it opens is already
+              there and this would be a button that hides something useful. */}
+          {timeframes && timeframes.length > 0 && (
+            <button
+              type="button"
+              className={timesOpen ? 'chart-top-btn times-toggle on' : 'chart-top-btn times-toggle'}
+              aria-expanded={timesOpen}
+              onClick={() => setTimesOpen((was) => !was)}
+            >
+              {TIMEFRAME_LABELS[timeframe] ?? timeframe}
+            </button>
+          )}
           <div className="chart-menu-wrap" ref={indicatorsWrap}>
             <button
               type="button"

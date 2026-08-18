@@ -1,6 +1,6 @@
 import 'server-only';
 import { RpcClient } from '@probatio/pools';
-import { Keeper, SolanaGateway, checkIdentity, runOnce } from '@probatio/keeper';
+import { Keeper, PROGRAM_ID, SolanaGateway, checkIdentity, runOnce } from '@probatio/keeper';
 import { db } from './db';
 import { rpcEndpoint } from './env';
 import { parseSecretKey } from './season-onchain';
@@ -20,6 +20,13 @@ import { parseSecretKey } from './season-onchain';
 
 const CYCLE_MS = 60_000;
 let started = false;
+
+/** The programs that own a deployed BPF program's account. */
+const LOADERS = new Set([
+  'BPFLoader1111111111111111111111111111111111',
+  'BPFLoader2111111111111111111111111111111111',
+  'BPFLoaderUpgradeab1e11111111111111111111111',
+]);
 
 function keeperSecret(): Uint8Array | null {
   const configured = process.env['KEEPER_KEYPAIR'];
@@ -60,7 +67,61 @@ export function startKeeper(): void {
   // chain, once a minute, forever.
   let keeper: Keeper | null = null;
 
+  /*
+   * Whether the program this writes to exists on the chain it is pointed at.
+   *
+   * It does not, and it is not going to: deploying it costs SOL that is not
+   * being spent. Left alone the keeper built, signed and sent a transaction
+   * every single cycle, had it rejected at simulation with "Attempt to load a
+   * program that does not exist", discarded the intent, and did the whole thing
+   * again a minute later. Forever, and loudly.
+   *
+   * Nothing was at risk — a discarded intent means the batch never landed and
+   * is safely re-planned, so no trade is lost and nothing is double-written —
+   * but an error every minute is an error that stops being read, which is how
+   * a real failure gets missed later.
+   *
+   * So it is checked once, cheaply, before any of that. Absent, the keeper
+   * stands down and says so once. Re-checked hourly rather than never, so
+   * deploying the program later starts committing without a redeploy of this.
+   */
+  let programSeenAt = 0;
+  let programMissing = false;
+  const PROGRAM_RECHECK_MS = 60 * 60 * 1000;
+
+  const programIsDeployed = async (): Promise<boolean> => {
+    const now = Date.now();
+    if (programMissing && now - programSeenAt < PROGRAM_RECHECK_MS) return false;
+    try {
+      const account = await rpc.getAccount(PROGRAM_ID);
+      // Owned by a loader, not merely present. `getAccount` here does not carry
+      // the executable flag, and an ordinary account sitting at that address
+      // would accept no instruction, so it is as good as absent for this.
+      const deployed = account !== null && LOADERS.has(account.owner);
+      programSeenAt = now;
+      if (!deployed && !programMissing) {
+        programMissing = true;
+        console.log(
+          `[keeper] program ${PROGRAM_ID} is not deployed: standing down. ` +
+            'Trades are still recorded and sealed locally, and will commit once it exists.',
+        );
+      }
+      if (deployed && programMissing) {
+        programMissing = false;
+        console.log(`[keeper] program ${PROGRAM_ID} is live: committing again`);
+      }
+      return deployed;
+    } catch (error) {
+      // A failed lookup is not evidence of absence. Say so and try the work,
+      // rather than standing down because one RPC call timed out.
+      console.error('[keeper] could not check whether the program is deployed', error);
+      return true;
+    }
+  };
+
   const tick = async (): Promise<void> => {
+    if (!(await programIsDeployed())) return;
+
     const client = await db();
     keeper ??= new Keeper(client, gateway);
 

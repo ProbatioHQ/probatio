@@ -5881,9 +5881,20 @@ body:has(main.home) .glow {
     margin-bottom: 2px;
     background: var(--ink);
   }
+  /*
+    * Sized so all three fit, rather than scrolling out of sight.
+    *
+    * They were 15px text in 18px of padding with two 38px icons beside them,
+    * which comes to about 372px of content inside 342px of shell. The overflow
+    * was real and completely invisible, because the scrollbar is hidden: Soon
+    * and Graduated were off the right edge with nothing on screen saying they
+    * existed, so the feed looked like it only had a New lane. The row still
+    * scrolls if a translation makes a word longer, but at these sizes it does
+    * not have to.
+    */
   .lane-pills {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
@@ -5892,13 +5903,13 @@ body:has(main.home) .glow {
 
   .lane-pill {
     flex: 0 0 auto;
-    padding: 10px 18px;
+    padding: 9px 15px;
     border-radius: 999px;
     border: 1px solid transparent;
     background: var(--ink-sunken);
     color: var(--text-dim);
     font-family: inherit;
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 500;
     line-height: 1;
     cursor: pointer;
@@ -5916,16 +5927,18 @@ body:has(main.home) .glow {
 
   .lane-tools {
     display: flex;
-    gap: 8px;
+    flex: 0 0 auto;
+    gap: 6px;
     margin-left: auto;
+    padding-left: 4px;
   }
   .lane-tool {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     border: 1px solid transparent;
     border-radius: 999px;
@@ -5959,8 +5972,23 @@ body:has(main.home) .glow {
   .lanes .lane-head { display: none; }
   .lanes { border: 0; background: none; border-radius: 0; }
   .lanes .lane { background: none; }
+  /*
+    * The list scrolls inside itself rather than making the page do it.
+    *
+    * Taking the cap off gave sixty rows at ninety pixels each a page five and a
+    * half thousand pixels tall, about fourteen screens, with the only way back
+    * to the lane buttons being all of it. Capped to what is left of the
+    * viewport under the header and the buttons. dvh rather than vh because vh
+    * on iOS means the height with the URL bar hidden, which is not the height
+    * you have while it is showing.
+    */
   .lanes .feed,
-  .lanes.tall .feed { max-height: none; }
+  .lanes.tall .feed {
+    max-height: calc(100dvh - 172px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0;
+  }
   .lane-cols { display: none; }
 
   /*
@@ -6048,6 +6076,9 @@ body:has(main.home) .glow {
   .feed-age,
   .feed-progress { display: none; }
 }
+
+/* The timeframe opener is a phone control: on a desk the row is always there. */
+.times-toggle { display: none; }
 
 /*
  * The phone's own furniture on a token page: absent where there is a pointer.
@@ -6233,29 +6264,49 @@ body:has(main.home) .glow {
   }
   .token-quote-move { font-size: 12.5px; }
 
-  /* Timeframes are the row under the chart, evenly spread, not a scroll strip
-     of a terminal's worth of them. */
-  .chart-times {
-    display: flex;
+  /*
+   * The timeframe row is closed, and opens from the button beside Indicators.
+   *
+   * Ten of them in a wrapping row is a strip on a desk. Here it broke to one
+   * per line, full width, ten rows of a single word each, pushing the chart
+   * most of a screen down on the page whose entire job is the chart. It only
+   * appears when asked for, and it lays out as a grid so ten choices are two
+   * rows rather than ten.
+   */
+  .chart-times { display: none; }
+  .chart-times.open {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    width: 100%;
+    order: 3;
+    margin-top: 8px;
   }
-  .chart-times::-webkit-scrollbar { display: none; }
   .chart-times .time-btn {
-    flex: 0 0 auto;
-    min-height: 34px;
-    padding: 0 13px;
-    border-radius: 999px;
-    background: none;
-    border: 0;
+    min-height: 38px;
+    padding: 0 4px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--ink-sunken);
     box-shadow: none;
     color: var(--text-dim);
-    font-size: 14px;
+    font-size: 13px;
   }
   .chart-times .time-btn.on {
-    background: var(--ink-sunken);
+    border-color: var(--text);
+    background: none;
     color: var(--text);
+  }
+
+  /* The opener carries the timeframe it would open on, so what the chart is
+     set to is readable without opening anything. */
+  .times-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 13px;
   }
 
   /* The chart's own change reading is now in the head, and MCAP/PRICE is a
@@ -6275,8 +6326,14 @@ body:has(main.home) .glow {
   }
   .token-back {
     display: flex;
+    /* Reset, because `button { align-self: flex-start }` is global and this
+       sits in a row that centres its items. Left alone it threw the arrow to
+       the top of the bar, out of line with the ticker beside it. Fourth global
+       button property to leak through a reset that looked complete. */
+    align-self: center;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
     width: 40px;
     height: 40px;
     margin-left: -10px;
@@ -6289,7 +6346,12 @@ body:has(main.home) .glow {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
+  /* min-width: 0, or the ellipsis never fires: a flex item defaults to
+     min-width: auto and simply refuses to shrink below its own text, so a long
+     name pushed the age out of the row instead of truncating. */
   .token-bar-sym {
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 500;
     letter-spacing: 0.02em;
     white-space: nowrap;
@@ -6298,6 +6360,7 @@ body:has(main.home) .glow {
   }
   .token-bar-age {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 5px;
     font-size: 14px;

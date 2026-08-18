@@ -242,13 +242,35 @@ export function TokenView({
 
   const [chartHeight, setChartHeight] = useState(560);
   useEffect(() => {
+    /*
+     * Re-measured on a width change, never on a height change.
+     *
+     * The first version watched `resize` and read `window.innerHeight`. On iOS
+     * that value moves every time the URL bar collapses or expands, which is
+     * constantly while scrolling, so the chart's height changed on every scroll
+     * frame. Paired with a chart that rebuilt itself on a height change, that
+     * was the flicker.
+     *
+     * Width is the only thing worth reacting to here: it changes on rotation
+     * and on nothing else, and rotation genuinely is a different chart. The
+     * height is derived from the viewport once, at that width.
+     */
+    let lastWidth = -1;
     const measure = (): void => {
-      const wide = window.innerWidth > 860;
-      setChartHeight(wide ? 560 : Math.round(Math.min(420, Math.max(260, window.innerHeight * 0.44))));
+      const width = window.innerWidth;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      setChartHeight(
+        width > 860 ? 560 : Math.round(Math.min(420, Math.max(260, window.innerHeight * 0.44))),
+      );
     };
     measure();
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+    };
   }, []);
 
   const changed = quote.change;
