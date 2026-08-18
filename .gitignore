@@ -35,3 +35,15 @@ id.json
 *.db-wal
 *.db-journal
 backups/
+
+# The account snapshot, which is the database in another coat.
+#
+# `.db` and its sidecars are ignored above for carrying wallet addresses and
+# trade history. This file is that same data exported to JSON by the backup
+# worker, written next to the database it snapshots, and it was tracked: 26
+# commits of real users, accounts, positions and trades.
+accounts-snapshot.json
+
+# Brand assets and the script that renders them. Local only.
+brand/
+scripts/make-header.mjs
