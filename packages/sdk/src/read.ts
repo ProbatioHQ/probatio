@@ -21,7 +21,7 @@ export class ProbatioError extends Error {
 }
 
 export interface ReadOptions {
-  /** Base URL of a Probatio instance. Defaults to https://probatio.app. */
+  /** Base URL of a Probatio instance. Defaults to https://probatiotrade.com. */
   readonly apiBase?: string | undefined;
   /** Injected fetch, for tests or a non-browser runtime. Defaults to global fetch. */
   readonly fetchImpl?: typeof fetch | undefined;

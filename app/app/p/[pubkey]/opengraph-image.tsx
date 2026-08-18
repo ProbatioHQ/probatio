@@ -52,7 +52,7 @@ export default async function ProfileCard({
   // Not the address again, and never a truncated one. The full key is already
   // on the card above; a shortened one in a URL is an instruction nobody can
   // follow, which defeats the only reason this line exists.
-  const verifyText = 'Check it yourself at probatio.app/verify';
+  const verifyText = 'Check it yourself at probatiotrade.com/verify';
 
   return new ImageResponse(
     (

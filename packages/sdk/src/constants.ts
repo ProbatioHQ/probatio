@@ -8,7 +8,7 @@
  */
 
 /** The default Probatio instance the read endpoints are served from. */
-export const DEFAULT_API_BASE = 'https://probatio.app';
+export const DEFAULT_API_BASE = 'https://probatiotrade.com';
 
 /** The on-chain program that holds the records. */
 export const PROGRAM_ID = 'HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA';

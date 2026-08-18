@@ -10,7 +10,7 @@ import type { ProfileRecord, ProofBundle, SeasonInfo, Standings, VerifiedRecord 
  */
 
 export interface ToolConfig {
-  /** A Probatio instance. Defaults to https://probatio.app. */
+  /** A Probatio instance. Defaults to https://probatiotrade.com. */
   readonly apiBase?: string | undefined;
   /** A Solana RPC endpoint, used by verify_record when the call omits one. */
   /** Injected fetch, for tests. */

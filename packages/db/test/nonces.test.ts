@@ -18,8 +18,8 @@ function challenge(nonce: string, expiresAt = NOW + 300_000, issuedAt = NOW) {
   return {
     nonce,
     pubkey: PUBKEY,
-    domain: 'probatio.app',
-    uri: 'https://probatio.app',
+    domain: 'probatiotrade.com',
+    uri: 'https://probatiotrade.com',
     issuedAt,
     expiresAt,
   };

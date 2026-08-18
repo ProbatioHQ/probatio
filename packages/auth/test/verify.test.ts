@@ -16,8 +16,8 @@ function challengeFor(address: string, overrides: Partial<Challenge> = {}): Chal
   return {
     pubkey: address,
     nonce: 'test-nonce-value',
-    domain: 'probatio.app',
-    uri: 'https://probatio.app',
+    domain: 'probatiotrade.com',
+    uri: 'https://probatiotrade.com',
     issuedAt: NOW,
     expiresAt: NOW + 5 * 60 * 1000,
     ...overrides,
@@ -123,7 +123,7 @@ describe('verifySignIn', () => {
   it('rejects a signature made for a different domain', () => {
     const { secretKey, address } = keypair();
     const signed = challengeFor(address, { domain: 'evil.example' });
-    const presented = challengeFor(address, { domain: 'probatio.app' });
+    const presented = challengeFor(address, { domain: 'probatiotrade.com' });
     const signature = signChallenge(secretKey, signed);
 
     expect(() =>

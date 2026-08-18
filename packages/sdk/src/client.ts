@@ -16,7 +16,7 @@ import type { ProfileRecord, ProofBundle, SeasonInfo, Standings, VerifiedRecord 
  * to hold an instance.
  */
 export interface ProbatioConfig {
-  /** Base URL of a Probatio instance. Defaults to https://probatio.app. */
+  /** Base URL of a Probatio instance. Defaults to https://probatiotrade.com. */
   readonly apiBase?: string | undefined;
   /** A Solana RPC endpoint, used by `verifyRecord`. */
   readonly rpc?: string | undefined;

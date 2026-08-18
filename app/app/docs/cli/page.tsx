@@ -73,7 +73,7 @@ probatio proof <wallet>            # the raw inputs verify recomputes from, as J
         <pre>
           <code>{`--season <n>    a specific season ordinal, default the trader's latest   (verify, proof)
 --limit <n>     how many standings to return   (standings)
---api <url>     a Probatio instance, default https://probatio.app
+--api <url>     a Probatio instance, default https://probatiotrade.com
 --json          print the raw JSON result instead of a summary`}</code>
         </pre>
         <p>

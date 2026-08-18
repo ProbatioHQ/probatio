@@ -32,7 +32,7 @@ Usage
 Options
   --season <n>    a specific season ordinal, default the latest committed
   --limit <n>     how many standings to return
-  --api <url>     a Probatio instance, default https://probatio.app
+  --api <url>     a Probatio instance, default https://probatiotrade.com
   --json          print the raw JSON result instead of a summary
 
 verify exits 0 when every fill rehashes to the seal recorded with it, 1 when one does not.`;
