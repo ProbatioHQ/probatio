@@ -86,6 +86,7 @@ export function FeedPortfolio() {
           to Phantom's browser exactly as it is everywhere else.
         */}
         <span className="feed-portfolio-say">
+          Every pump.fun launch as it happens, priced against the real curve.{' '}
           <button
             type="button"
             className="linklike feed-portfolio-connect"
@@ -94,7 +95,8 @@ export function FeedPortfolio() {
           >
             {status === 'working' ? 'Waiting for your wallet…' : 'Connect a wallet'}
           </button>{' '}
-          to trade any of these with 10 SOL of practice money.
+          to trade any of them with 10 SOL of practice money. It signs a message
+          to prove the record is yours, and nothing is ever asked to move real funds.
         </span>
       </div>
     );

@@ -3662,17 +3662,39 @@ body:has(main.wide) .site-footer .shell {
 }
 
 /* A button that reads as a link, for an action inside a sentence. */
+/*
+ * A button that is a word, not a box.
+ *
+ * The reset has to be complete, because three separate global rules paint every
+ * plain button and each one has to be undone by name. This cleared background,
+ * border, padding and alignment and stopped there, so `border-radius: 8px` and
+ * `box-shadow: inset 0 1px 0 #fff, 0 0 24px -6px accent` still applied and drew
+ * a rounded rectangle with a green halo around a piece of running text.
+ *
+ * That is the fifth time a global button property has survived a reset that
+ * looked finished: background, border, radius, align-self and now shadow. The
+ * lesson is to undo the whole set rather than the part that was noticed, so
+ * every one of them is listed here even where the value looks redundant.
+ */
 .linklike {
   align-self: auto;
   display: inline;
+  width: auto;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: none;
+  box-shadow: none;
   color: var(--accent);
   font: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+.linklike:hover {
+  background: none;
+  box-shadow: none;
+  opacity: 1;
 }
 
 /* A source that has no data yet is offered but not pretended to work. */
@@ -6435,38 +6457,51 @@ body:has(main.home) .glow {
 
   .chart-source { display: block; }
   .chart-source .segmented {
-    height: 34px;
+    height: 29px;
     border-radius: 999px;
     overflow: hidden;
   }
   .chart-source .segmented button {
-    padding: 0 13px;
-    font-size: 11.5px;
-    letter-spacing: 0.03em;
+    padding: 0 10px;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
   }
 
+  /*
+   * Wrapping, not nowrap. Nowrap is what stacked the timeframes on top of the
+   * buttons.
+   *
+   * `nowrap` was set to keep the four controls on one line, and it did, but the
+   * timeframe grid that opens underneath is `width: 100%` and depends on being
+   * allowed to wrap onto a line of its own. Forbidden to wrap, it was squeezed
+   * onto the same line and its buttons overflowed their own box across the
+   * timeframe pill and Indicators.
+   *
+   * The controls stay on one line by being small enough to, which is the honest
+   * way to do it, and the grid gets its own row back.
+   */
   .chart-top {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 10px;
     padding-bottom: 0;
     border-bottom: 0;
   }
   .chart-top-actions {
-    gap: 8px;
+    gap: 6px;
     margin-left: auto;
     min-width: 0;
   }
   .chart-top-btn {
-    min-height: 34px;
-    padding: 0 13px;
+    min-height: 29px;
+    padding: 0 10px;
     border-radius: 999px;
-    font-size: 13px;
+    font-size: 11.5px;
   }
   /* A status, at the size of one, rather than a fourth control. */
   .chart-loading {
-    font-size: 11px;
+    font-size: 10.5px;
     letter-spacing: 0.02em;
     white-space: nowrap;
   }
@@ -6484,6 +6519,20 @@ body:has(main.home) .glow {
     right: 0;
     min-width: 0;
     max-width: none;
+    /*
+     * Bounded and scrollable.
+     *
+     * Neither the base rule nor the mobile one capped its height, so seven
+     * indicators simply ran off the bottom of the screen with the last of them
+     * unreachable. Half the viewport, and it scrolls inside that.
+     */
+    max-height: 50dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .chart-menu button {
+    min-height: 40px;
+    font-size: 13px;
   }
 
   /* The footnote under the chart is a paragraph explaining where the candles
