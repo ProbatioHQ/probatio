@@ -1,5 +1,5 @@
 import 'server-only';
-import { TIMEFRAMES, buildCandles, observationFromEvent, type Observation, type Timeframe } from '@probatio/candles';
+import { STORED_TIMEFRAMES, buildCandles, observationFromEvent, type Observation, type Timeframe } from '@probatio/candles';
 import { writeCandles } from '@probatio/db';
 import type { TradeEvent } from '@probatio/pools';
 import { db } from './db';
@@ -122,7 +122,7 @@ async function flush(): Promise<void> {
     const client = await db();
     for (const [mint, observations] of batch) {
       if (observations.length === 0) continue;
-      for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
+      for (const timeframe of STORED_TIMEFRAMES) {
         try {
           await writeCandles(client, mint, timeframe, buildCandles(observations, timeframe));
         } catch (error) {

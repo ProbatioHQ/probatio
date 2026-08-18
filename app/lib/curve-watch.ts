@@ -9,7 +9,7 @@ import {
   type CurveWrite,
 } from '@probatio/db';
 import {
-  TIMEFRAMES,
+  STORED_TIMEFRAMES,
   buildCandles,
   priceFromReserves,
   type Observation,
@@ -148,7 +148,7 @@ async function recordPrices(observations: Map<string, Observation>): Promise<voi
   const client = await db();
 
   for (const [mint, observation] of observations) {
-    for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
+    for (const timeframe of STORED_TIMEFRAMES) {
       const candles = buildCandles([observation], timeframe);
       try {
         await writeCandles(

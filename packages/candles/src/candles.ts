@@ -23,6 +23,18 @@ export const TIMEFRAMES = {
 
 export type Timeframe = keyof typeof TIMEFRAMES;
 
+/**
+ * The timeframes actually worth storing.
+ *
+ * The chart offers fifteen seconds and up. One-second and five-second candles
+ * were written anyway, for every token being watched, and never shown to
+ * anybody: a one-second candle is a row per second per token, which on a feed
+ * this size is the single largest thing on the disk and is spent entirely on
+ * buckets no interface can select. They are still derivable if anything ever
+ * wants them; they are simply not kept.
+ */
+export const STORED_TIMEFRAMES = ['s15', 'm1', 'm5', 'm15', 'h1'] as const satisfies readonly Timeframe[];
+
 export function timeframeSeconds(timeframe: Timeframe): number {
   return TIMEFRAMES[timeframe];
 }

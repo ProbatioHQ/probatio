@@ -140,6 +140,25 @@ export interface RetentionResult {
  * bounded. One statement, ranking every candle within its (mint, timeframe)
  * newest-first and deleting past the cap.
  */
+/**
+ * Timeframes nothing can display, dropped outright.
+ *
+ * The chart offers fifteen seconds and up. One-second and five-second candles
+ * were written for every watched token and shown to nobody, and a row per
+ * second per token is the largest thing that has ever been on this disk. They
+ * are no longer written; these are the ones already there.
+ */
+const UNUSED_TIMEFRAMES = ['s1', 's5'];
+
+export async function pruneUnusedTimeframes(db: Client): Promise<number> {
+  const marks = UNUSED_TIMEFRAMES.map(() => '?').join(',');
+  const result = await db.execute({
+    sql: `DELETE FROM candles WHERE timeframe IN (${marks})`,
+    args: UNUSED_TIMEFRAMES,
+  });
+  return Number(result.rowsAffected ?? 0);
+}
+
 export async function pruneCandles(db: Client): Promise<number> {
   // One statement per timeframe, because each keeps a different depth and a
   // single cap would either strand the short ones or starve the long ones.
@@ -211,7 +230,10 @@ export async function pruneLaunches(db: Client, now: number): Promise<number> {
 /** Run every retention pass there is. Safe to call as often as you like. */
 export async function runRetention(db: Client, now: number): Promise<RetentionResult> {
   return {
-    candlesDeleted: (await pruneIdleMints(db, now)) + (await pruneCandles(db)),
+    candlesDeleted:
+      (await pruneUnusedTimeframes(db)) +
+      (await pruneIdleMints(db, now)) +
+      (await pruneCandles(db)),
     poolSnapshotsDeleted: await prunePoolSnapshots(db, now),
     launchesDeleted: await pruneLaunches(db, now),
   };

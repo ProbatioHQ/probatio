@@ -12,6 +12,7 @@ export type { ScaledPrice } from './price';
 
 export {
   CandleError,
+  STORED_TIMEFRAMES,
   TIMEFRAMES,
   bucketStart,
   buildCandles,

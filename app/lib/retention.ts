@@ -2,6 +2,7 @@ import 'server-only';
 import { runRetention } from '@probatio/db';
 import { snapshotAccounts } from './account-backup';
 import { db } from './db';
+import { reclaimIfTight } from './db-reclaim';
 
 /**
  * Keeps the database from growing until it fills the disk.
@@ -38,6 +39,18 @@ const SWEEP_MS = 8 * 60 * 1_000;
 const SNAPSHOT_MS = 3 * 60 * 1_000;
 
 async function sweep(): Promise<void> {
+  /*
+   * Reclaim first, on every sweep rather than only at boot.
+   *
+   * It used to run once as the process started, so a volume that filled while
+   * the process was up stayed full: deleting rows needs somewhere to write the
+   * journal, and with nothing free even the pruning below cannot run. The
+   * reclaim compacts off the volume, where there is room, and is the only thing
+   * that can dig the database out once it is genuinely full. It returns
+   * immediately unless the disk is actually tight.
+   */
+  await reclaimIfTight().catch((error) => console.error('[retention] reclaim failed', error));
+
   const client = await db();
   const result = await runRetention(client, Date.now());
   if (result.candlesDeleted > 0 || result.poolSnapshotsDeleted > 0 || result.launchesDeleted > 0) {

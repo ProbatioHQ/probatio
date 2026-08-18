@@ -64,6 +64,7 @@ export {
   compact,
   pruneCandles,
   pruneIdleMints,
+  pruneUnusedTimeframes,
   pruneLaunches,
   prunePoolSnapshots,
   runRetention,

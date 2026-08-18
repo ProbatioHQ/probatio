@@ -1,6 +1,6 @@
 import 'server-only';
 import {
-  TIMEFRAMES,
+  STORED_TIMEFRAMES,
   backfillFromCurve,
   buildCandles,
   priceFromReserves,
@@ -151,7 +151,7 @@ async function writeObservationCandles(
   observations: readonly Observation[],
 ): Promise<void> {
   if (observations.length === 0) return;
-  for (const timeframe of Object.keys(TIMEFRAMES) as Timeframe[]) {
+  for (const timeframe of STORED_TIMEFRAMES) {
     await writeCandles(client, mint, timeframe, buildCandles(observations, timeframe));
   }
 }
