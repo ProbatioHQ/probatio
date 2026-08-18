@@ -7,6 +7,7 @@ import { driftStatus } from '@/lib/drift-watch';
 import { priceStreamStatus } from '@/lib/price-stream';
 import { seasonProbe, storageStats, writeProbe } from '@/lib/db-reclaim';
 import { snapshotState } from '@/lib/account-backup';
+import { seasonReadiness } from '@/lib/prize';
 
 /**
  * What the site can currently do.
@@ -43,6 +44,8 @@ export async function GET(request: Request): Promise<Response> {
       season: await seasonProbe(),
       /* The account safety net: that it exists, and what it is holding. */
       backup: snapshotState(),
+      /* Whether a ranked season could commit and could pay. */
+      readiness: seasonReadiness(),
       capabilities: states.filter((state) => state.level !== 'ok'),
       /*
        * The live subsystems, counted rather than assumed.

@@ -68,3 +68,23 @@ export async function sendPayout(
   }
   return sent;
 }
+
+/**
+ * Whether a season could actually pay, for the health endpoint.
+ *
+ * Both of these are configured by environment variable and both do nothing at
+ * all when unset: the keeper commits no trades, and the payout worker pays no
+ * winners. Neither failure announces itself, so a season can be opened, entered
+ * and traded under the impression that records are landing and prizes will be
+ * paid when neither is true. Reported so it can be seen before anybody pays to
+ * enter, and it names only whether a key is present, never the key.
+ */
+export function seasonReadiness(): {
+  prizeWallet: string | null;
+  keeperConfigured: boolean;
+} {
+  return {
+    prizeWallet: prizeAddress(),
+    keeperConfigured: Boolean(process.env['KEEPER_KEYPAIR']),
+  };
+}
