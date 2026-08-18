@@ -5469,9 +5469,9 @@ body:has(main.home) .glow {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  margin-right: -12px;
+  width: 52px;
+  height: 52px;
+  margin-right: -13px;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -5491,26 +5491,30 @@ body:has(main.home) .glow {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  /* 17x13 was drawn to sit inside a 38px bordered tile, where the box gave it
-     the presence. With the box gone it was three faint hairlines in a corner
-     of a dark bar, which is what "very small" meant. */
-  gap: 6px;
-  width: 24px;
-  height: 18px;
+  /*
+   * 17x13 was drawn to sit inside a 38px bordered tile, where the box supplied
+   * the presence and the bars only had to hint at a menu. With the box gone
+   * the bars are the whole control, so they carry it themselves: wider,
+   * thicker, and with real air between them. Three lines crammed into 13px
+   * read as one smudge at arm's length.
+   */
+  gap: 7px;
+  width: 30px;
+  height: 25px;
 }
 .nav-bars i {
   display: block;
-  height: 2.5px;
+  height: 3.5px;
   border-radius: 2px;
   background: var(--text);
   transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms ease;
 }
 /* Open, the bars become the cross that closes them. */
-/* 8.5px, not 6px: the bars are 2.5 tall with 6 between them now, so that is
-   how far the outer two travel to meet in the middle. */
-.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(8.5px) rotate(45deg); }
+/* Bars are 3.5 tall with 7 between them, so the outer two travel 10.5px to
+   meet the middle one. Recompute this whenever either number moves. */
+.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(10.5px) rotate(45deg); }
 .nav-toggle.open .nav-bars i:nth-child(2) { opacity: 0; }
-.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-8.5px) rotate(-45deg); }
+.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-10.5px) rotate(-45deg); }
 
 .nav-panel {
   position: absolute;
@@ -5602,6 +5606,27 @@ body:has(main.home) .glow {
 .hero-cinema .display .reveal > span {
   /* Nothing to promote: the compositing is what broke the paint above. */
   will-change: auto;
+}
+
+@media (max-width: 860px) {
+  /*
+   * No accent glow on the mark, because iOS draws it as a box.
+   *
+   * The mark carried `drop-shadow(0 0 26px accent)`, which is meant to be a
+   * soft green halo following the logo's own alpha. It sits inside a parallax
+   * translate3d, and WebKit rasterises a filter under a 3D transform into its
+   * own layer clipped to the element's box, so instead of a halo around the P
+   * you get a flat green rectangle behind it with four hard edges. It is the
+   * same class of bug as the headline that would not paint: a compositing
+   * boundary the effect does not survive.
+   *
+   * The dark shadow stays. It is clipped in exactly the same way, but a dark
+   * rectangle on a near-black ground is invisible, so it costs nothing.
+   */
+  .hero-mark img,
+  .hero-mark-float img {
+    filter: drop-shadow(0 10px 22px rgb(0 0 0 / 0.55));
+  }
 }
 
 @media (max-width: 720px) {
