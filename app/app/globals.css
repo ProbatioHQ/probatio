@@ -5807,27 +5807,35 @@ body:has(main.home) .glow {
 }
 
 /* ================================================================== *
- * The feed on a phone: one lane, at a size a thumb can use.
+ * The feed on a phone.
  * ================================================================== */
 
-/* The picker does not exist where all three lanes fit. */
-.lane-picker { display: none; }
+/* Neither exists where all three lanes fit side by side. */
+.lane-picker,
+.feed-sub { display: none; }
 
-@media (max-width: 860px) {
+@media (max-width: 860px) and (pointer: coarse) {
   /*
-   * The terminal frame comes off.
+   * Gated on a finger, not on a width.
    *
-   * On a wide screen the chrome is the point: a title bar reading ~/feed
-   * pump.fun with a streaming light and three dots says what this thing is and
-   * that it is alive. On a phone it is a hundred and twenty pixels of
-   * decoration above the only content, followed by a search field, a Filters
-   * button and a Pause button, and then finally the tokens. Everything above
-   * the list goes, and the list starts at the top of the screen.
-   *
-   * The controls are not lost, they are on the same page one size up. Filters
-   * are a desk tool: nobody sets a minimum market cap and a creator-launch
-   * floor with a thumb on a train.
+   * `max-width` alone turned a narrowed desktop window into this layout, so
+   * dragging a browser narrower on a PC replaced the terminal with the phone
+   * feed. `pointer: coarse` is true of a touchscreen and false of a mouse, so
+   * a desktop keeps the terminal at every width and only a phone gets this.
    */
+
+  /*
+   * Everything above the list goes.
+   *
+   * The reference starts at the pills and goes straight into tokens. This had
+   * a page heading, a two line explanation, a terminal title bar with a
+   * streaming light and three window dots, a search field and two buttons
+   * stacked above the first row. On a wide screen that is orientation; on a
+   * phone it is four screenfuls of throat-clearing.
+   */
+  .feed-page .page-head,
+  .feed-page > p.dim { display: none; }
+
   .feed-term.term {
     border: 0;
     background: none;
@@ -5837,72 +5845,109 @@ body:has(main.home) .glow {
   .feed-term > .term-body { padding: 0; }
   .feed-controls .preset { display: none; }
 
-  /*
-   * Search stays, above everything, on its own.
-   *
-   * Asked for twice: not inside the list, but reachable. One field, no label,
-   * nothing beside it.
-   */
-  .feed-controls {
+  /* Search is behind the icon in the lane row, and appears only when asked. */
+  .feed-controls { display: none; }
+  .feed-controls.search-open {
     display: block;
-    margin-bottom: 2px;
+    margin-bottom: 10px;
   }
-  .feed-search {
-    display: block;
-    width: 100%;
-  }
+  .feed-search { display: block; width: 100%; }
   .feed-search > span { display: none; }
   .feed-search input {
     width: 100%;
     height: 44px;
     padding: 0 14px;
     border-radius: 12px;
-    /* 16px or larger, or iOS zooms the whole page in on focus and leaves the
+    /* 16px or larger, or iOS zooms the page in on focus and leaves the
        viewport scrolled sideways when it is done. */
     font-size: 16px;
   }
 
   /*
-   * The three buttons, filling the width and following the list down.
+   * The lane row: three pills left, the tools right.
    *
-   * One segmented row, each button an equal third, because they are three
-   * choices of the same kind and any of them could be the one somebody wants.
-   * Stuck under the header so changing lane never means scrolling back up to
-   * find the control: giving the chosen lane the whole screen removed the
-   * per-lane scroll cap, which made New long enough to lose the buttons off
-   * the top.
+   * Pills sized to their own text rather than an even third each, which is
+   * what the reference does and what stops "Graduated" and "New" claiming the
+   * same width when they are nothing like the same word.
    */
   .lane-picker {
     display: flex;
+    align-items: center;
+    gap: 10px;
     position: sticky;
     top: 56px;
     z-index: 5;
-    gap: 6px;
     padding: 10px 0;
     margin-bottom: 2px;
     background: var(--ink);
   }
+  .lane-pills {
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .lane-pills::-webkit-scrollbar { display: none; }
 
   .lane-pill {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 11px 6px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
+    flex: 0 0 auto;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid transparent;
     background: var(--ink-sunken);
     color: var(--text-dim);
-    font-size: 14px;
-    font-weight: 550;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
     line-height: 1;
     cursor: pointer;
     white-space: nowrap;
+    box-shadow: none;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Chosen is an outline, not a fill. A solid green pill was the loudest thing
+     on a screen whose job is to let a list be read. */
   .lane-pill.on {
-    color: var(--ink);
-    border-color: var(--accent);
+    background: none;
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  .lane-tools {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .lane-tool {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--ink-sunken);
+    box-shadow: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lane-tool.on {
+    background: none;
+    border-color: var(--text);
+    color: var(--text);
+  }
+  .lane-tool .tool-dot {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
     background: var(--accent);
-    font-weight: 650;
   }
 
   /* Only the chosen lane, at the full width of the screen. */
@@ -5911,44 +5956,50 @@ body:has(main.home) .glow {
   .lanes[data-shown='bonded'] .lane:not([data-lane='bonded']) {
     display: none;
   }
-  /* The lane names its own contents in the pill above it. */
   .lanes .lane-head { display: none; }
   .lanes { border: 0; background: none; border-radius: 0; }
   .lanes .lane { background: none; }
   .lanes .feed,
   .lanes.tall .feed { max-height: none; }
+  .lane-cols { display: none; }
 
   /*
-   * A row a thumb can hit and an eye can read.
+   * A row: picture, name over ticker and age, market cap.
    *
-   * The desktop row is a table line: a thirty pixel picture, a name and a
-   * ticker squeezed onto one line, a market cap and an age in columns. At this
-   * width that is four things fighting over three hundred pixels. The picture
-   * gets big enough to recognise, the name gets its own line at a size worth
-   * reading, and everything supporting it goes underneath.
+   * Set in the body face rather than the monospace the terminal uses. The mono
+   * is most of what makes the wide version read as an instrument and this one
+   * read as somebody else's app, and a phone is the one place this has to look
+   * like the thing it is competing with.
    */
   .feed-row a {
-    grid-template-columns: 56px minmax(0, 1fr) auto !important;
+    grid-template-columns: 72px minmax(0, 1fr) auto !important;
     gap: 14px;
     align-items: center;
-    padding: 12px 4px;
+    padding: 10px 2px;
   }
+  .feed-row + .feed-row { border-top: 0; }
   .feed-row .token-image,
   .feed-row .token-image img {
-    width: 56px;
-    height: 56px;
-    border-radius: 12px;
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
   }
+
   .feed-name {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 3px;
+    gap: 5px;
     min-width: 0;
   }
-  .feed-name strong {
-    font-size: 16.5px;
-    font-weight: 650;
+  /* The name is the headline and the ticker moves underneath, which is the
+     other way round from the terminal. A row here is one name and one number. */
+  .feed-name > strong { display: none; }
+  .feed-name > .dim {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 18.5px;
+    font-weight: 600;
+    line-height: 1.15;
     color: var(--text);
     letter-spacing: -0.01em;
     white-space: nowrap;
@@ -5956,30 +6007,85 @@ body:has(main.home) .glow {
     text-overflow: ellipsis;
     max-width: 100%;
   }
-  .feed-name .dim {
-    font-size: 13px;
+
+  .feed-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .feed-sub-sym {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
+    max-width: 60%;
   }
+  .feed-sub .sprout { flex: 0 0 auto; }
+  /* Green while a launch is still minutes old, grey once it is hours old. */
+  .feed-sub-age.new,
+  .feed-sub-age.new ~ .sprout { color: var(--accent); }
+  .feed-sub:has(.feed-sub-age.new) .sprout { color: var(--accent); }
+
   .feed-cap {
-    font-size: 16.5px !important;
+    font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+    font-size: 18.5px !important;
     font-weight: 650;
     color: var(--text);
     text-align: right;
     min-width: 0 !important;
   }
-  /* The age rides with the name rather than taking a column of its own. */
-  .feed-age { display: none; }
-  .lane-cols { display: none; }
+
+  /* The age has its own place on the second line now, and the bonding bar is
+     not something to read on a phone. */
+  .feed-age,
+  .feed-progress { display: none; }
+}
+
+/*
+ * The market cap and its move, at the end of the token's head row.
+ *
+ * Pushed to the far end so the row reads name on the left, worth on the right,
+ * which is the order every client that shows both puts them in.
+ */
+.token-quote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  text-align: right;
+}
+.token-quote-cap {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.token-quote-move {
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.token-quote-move.gain {
+  background: color-mix(in srgb, var(--gain, var(--accent)) 18%, transparent);
+  color: var(--accent);
+}
+.token-quote-move.loss {
+  background: color-mix(in srgb, var(--loss) 20%, transparent);
+  color: var(--loss);
 }
 
 /* ================================================================== *
  * A token on a phone: the chart first, and big enough to read.
  * ================================================================== */
 
-@media (max-width: 860px) {
+@media (max-width: 860px) and (pointer: coarse) {
   /*
    * The head shrinks to what identifies the token.
    *
@@ -6070,4 +6176,65 @@ body:has(main.home) .glow {
      they get read as figures rather than as a settings list. */
   .trade .holdings { gap: 10px; }
   .trade .holdings .mono { font-size: 15px; }
+
+  /*
+   * The head row: logo, name over mint, market cap and its move on the right.
+   *
+   * The name goes sans and loses the second copy of itself. The wide layout
+   * shows "CUCK Cuck Coin", the ticker then the name, which is two ways of
+   * saying one thing and more width than a phone has for it.
+   */
+  .token-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .token-title { min-width: 0; }
+  .token-title h1 {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .token-title h1 .dim { display: none; }
+
+  .token-quote-cap {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 27px;
+  }
+  .token-quote-move { font-size: 12.5px; }
+
+  /* Timeframes are the row under the chart, evenly spread, not a scroll strip
+     of a terminal's worth of them. */
+  .chart-times {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .chart-times::-webkit-scrollbar { display: none; }
+  .chart-times .time-btn {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 13px;
+    border-radius: 999px;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .chart-times .time-btn.on {
+    background: var(--ink-sunken);
+    color: var(--text);
+  }
+
+  /* The chart's own change reading is now in the head, and MCAP/PRICE is a
+     desk control. */
+  .chart-change,
+  .chart-seg { display: none; }
 }

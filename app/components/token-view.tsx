@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DexChart } from '@/components/dex-chart';
 import { PriceChart } from '@/components/price-chart';
 import { useWallet } from '@/components/wallet';
@@ -59,13 +59,31 @@ function fitTimeframe(candles: number, spanSeconds: number): string | null {
   return best;
 }
 
+export interface TokenHead {
+  readonly name: string;
+  readonly symbol: string | null;
+  readonly image: string | null;
+  readonly launchedAt: number | null;
+  readonly shortMint: string;
+}
+
 export function TokenView({
   mint,
   dexIndexed,
+  head,
 }: {
   mint: string;
   /** Whether DEX Screener has a pair for this token yet. */
   dexIndexed: boolean;
+  /**
+   * Who this token is, resolved on the server.
+   *
+   * Rendered here rather than by the page above it so that the live market cap
+   * can sit on the same row as the name, which is where a phone needs it. The
+   * page still resolves the facts; it just hands them down instead of drawing
+   * them, because only this component knows what the price is doing.
+   */
+  head: TokenHead;
 }) {
   const { status } = useWallet();
   const signedIn = status === 'signed-in';
@@ -205,6 +223,22 @@ export function TokenView({
    * Measured rather than guessed at through a breakpoint, and re-measured on
    * rotate, since a phone turned sideways is a different chart entirely.
    */
+  /*
+   * The latest market cap and its move, as the chart sees them.
+   *
+   * Taken from the chart rather than read again, so the figure beside the name
+   * and the last candle can never disagree. Held in a ref-stable callback or
+   * the chart would report on every render of this component.
+   */
+  const [quote, setQuote] = useState<{ value: number | null; change: number | null }>({
+    value: null,
+    change: null,
+  });
+  const onQuote = useCallback(
+    (next: { value: number | null; change: number | null }) => setQuote(next),
+    [],
+  );
+
   const [chartHeight, setChartHeight] = useState(560);
   useEffect(() => {
     const measure = (): void => {
@@ -216,7 +250,62 @@ export function TokenView({
     return () => window.removeEventListener('resize', measure);
   }, []);
 
+  const changed = quote.change;
+
   return (
+    <>
+      {/*
+        Who the token is, and what it is worth, on one row.
+
+        The market cap and its move sit at the end of that row rather than
+        under the chart, because on a phone they are the two things somebody
+        opens a token to see and the chart is what they look at afterwards.
+      */}
+      <div className="token-head">
+        {head.image ? (
+          // Not next/image: an arbitrary host chosen by whoever launched the
+          // token, rendered by the browser and never fetched by this server.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="token-hero" src={head.image} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="token-hero placeholder" aria-hidden="true" />
+        )}
+
+        <div className="token-title">
+          <h1>
+            {head.symbol ?? head.name}
+            {head.symbol && head.name !== head.symbol && <span className="dim"> {head.name}</span>}
+          </h1>
+          <p className="mono dim token-meta">
+            <span>{head.shortMint}</span>
+            {head.launchedAt !== null && (
+              <>
+                <span className="sep" aria-hidden="true" />
+                <span>launched {new Date(head.launchedAt * 1_000).toLocaleDateString()}</span>
+              </>
+            )}
+            <span className="sep" aria-hidden="true" />
+            <a href={`https://pump.fun/coin/${mint}`} target="_blank" rel="noopener noreferrer">
+              pump.fun
+            </a>
+          </p>
+        </div>
+
+        {/* Only once the chart has something to say. An empty slot holding a
+            dash where a market cap goes reads as a token worth nothing. */}
+        {quote.value !== null && (
+          <div className="token-quote">
+            <span className="token-quote-cap">{formatQuote(quote.value)}</span>
+            {changed !== null && (
+              <span className={changed >= 0 ? 'token-quote-move gain' : 'token-quote-move loss'}>
+                {changed >= 0 ? '+' : ''}
+                {changed.toFixed(1)}%
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
     <div className="trade-layout">
       <section className="term chart-panel">
         <div className="term-bar">
@@ -283,6 +372,7 @@ export function TokenView({
                 onUnit={setUnit}
                 entryPrice={entryPrice}
                 height={chartHeight}
+                onQuote={onQuote}
                 onHistory={({ candles, spanSeconds, backfilling }) => {
                   // The reader's own pick wins and ends the fitting for good.
                   if (timeframeChosen) return;
@@ -343,5 +433,20 @@ export function TokenView({
         </div>
       )}
     </div>
+    </>
   );
+}
+
+/**
+ * The market cap beside a token's name.
+ *
+ * Abbreviated the way every other client abbreviates it, because the row it
+ * sits on has a name competing for the same width and "$1,412,338" would win
+ * that fight for no benefit.
+ */
+function formatQuote(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  if (value >= 1) return `$${value.toFixed(0)}`;
+  return `$${value.toFixed(2)}`;
 }

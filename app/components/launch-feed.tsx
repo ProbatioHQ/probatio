@@ -158,6 +158,22 @@ const FILTER_KEY = 'probatio.feed.filters';
  * exchange rate can be had, because a figure in the wrong unit is honest and a
  * wrong dollar number is not.
  */
+/**
+ * What a pump.fun token is worth before anybody has traded it.
+ *
+ * Every curve starts at the same place: 30 SOL of virtual SOL reserve against
+ * 1,073,000,000,000,000 base units of virtual token reserve, with a billion
+ * tokens minted. That puts the opening market cap at 30 / 1.073 SOL, and it is
+ * the same number for every launch, which is why a wall of fresh tokens on
+ * pump.fun all show the same figure.
+ *
+ * Used when the feed has not read a curve yet. That used to render "n/a", which
+ * is both ugly and wrong: the value is not unknown, it is the one every token
+ * has until someone buys. The first curve read replaces it with the real
+ * number seconds later.
+ */
+const OPENING_MARKET_CAP = '27959000000';
+
 function marketCapLabel(lamports: string, solUsd: number | null): string {
   const sol = Number(BigInt(lamports)) / 1e9;
 
@@ -183,6 +199,43 @@ function age(launchedAt: number, now: number): string {
   if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3_600)}h`;
   return `${Math.floor(seconds / 86_400)}d`;
+}
+
+/**
+ * Whether a launch is new enough to be worth marking.
+ *
+ * Under an hour reads green, older reads grey. The line it draws is the one
+ * that matters in this feed: a token minutes old is still being decided, and
+ * one from yesterday has already been.
+ */
+function freshAge(launchedAt: number, now: number): boolean {
+  if (launchedAt <= 0) return false;
+  return Math.floor(now / 1000) - launchedAt < 3_600;
+}
+
+/**
+ * The sprout beside a token's age.
+ *
+ * Drawn rather than set as an emoji: an emoji is a different typeface on every
+ * platform, cannot take the colour of the text it sits with, and would be the
+ * one thing on the page rendered by somebody else's font.
+ */
+function Sprout() {
+  return (
+    <svg
+      className="sprout"
+      viewBox="0 0 16 16"
+      width="11"
+      height="11"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      {/* A stem, and a leaf either side of it. */}
+      <path d="M7.4 14.6V8.2h1.2v6.4z" />
+      <path d="M7.6 8.1C7.6 5.9 6 4.2 3.6 3.6c-.5-.1-.8.2-.7.7.5 2.3 2.2 3.9 4.4 3.9z" />
+      <path d="M8.4 7.6c0-2.2 1.6-3.9 4-4.5.5-.1.8.2.7.7-.5 2.3-2.2 3.9-4.4 3.9z" />
+    </svg>
+  );
 }
 
 /**
@@ -255,18 +308,32 @@ function Row({
               {token.creatorLaunches}x
             </span>
           )}
+          {/*
+            The phone's second line, which the terminal has no room for.
+
+            A wide row can afford the ticker in bold with the name beside it and
+            the age off in a column of its own. A phone row is one name and one
+            number, so the name becomes the headline and everything supporting
+            it goes underneath: ticker, then how old the thing is. Rendered
+            here rather than assembled from the pieces above because the two
+            layouts want the same facts in a different order, and CSS can hide
+            a line but it cannot move one out of a grid cell.
+          */}
+          <span className="feed-sub">
+            <span className="feed-sub-sym">{token.symbol || '???'}</span>
+            <Sprout />
+            <span className={freshAge(token.launchedAt, now) ? 'feed-sub-age new' : 'feed-sub-age'}>
+              {age(token.launchedAt, now)}
+            </span>
+          </span>
         </span>
 
         {/* What a token is worth is the one figure worth having in every lane,
-            so it sits in the same place in all three. A dash rather than a
-            zero while the curve has not been read: unknown and worthless are
-            different, and a column of zeroes would say the wrong one. */}
+            so it sits in the same place in all three. A curve nobody has read
+            yet shows the opening market cap every launch starts at rather than
+            "n/a": that value is known, and it is what pump.fun shows too. */}
         <span className="feed-cap mono">
-          {token.marketCap ? (
-            marketCapLabel(token.marketCap, solUsd)
-          ) : (
-            <span className="dim">n/a</span>
-          )}
+          {marketCapLabel(token.marketCap ?? OPENING_MARKET_CAP, solUsd)}
         </span>
 
         {/* And then whichever second figure the lane is actually about: how far
@@ -309,6 +376,17 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
    */
   const [shownLane, setShownLane] = useState<LaneKey>('new');
   const [showFilters, setShowFilters] = useState(false);
+  /*
+   * Whether the phone is showing the search field.
+   *
+   * On a wide screen search is a field at the top of the feed and costs
+   * nothing. On a phone the reference layout has no search bar at all: the
+   * list starts at the top of the screen and search lives behind an icon. So
+   * it does here, next to the lane buttons, and the field appears under them
+   * only once it is asked for. Ignored entirely above the breakpoint, where
+   * the field is always shown.
+   */
+  const [searchOpen, setSearchOpen] = useState(false);
   /** Which lane the open panel is editing. */
   const [filterTab, setFilterTab] = useState<LaneKey>('new');
   /** Pausing the arrival of new rows is a feed-wide choice, not a per-lane one. */
@@ -536,9 +614,21 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
           next[belongs].push(token);
         }
 
-        // Order within each lane is the lane's own: newest, closest, latest.
+        /*
+         * Order within each lane is the lane's own: newest, closest, biggest.
+         *
+         * Graduated had no sort at all and sat in whatever order the stream
+         * happened to deliver, so the lane that is entirely about which tokens
+         * made it was the one lane with no ranking in it. Sorted by what they
+         * are worth, largest first.
+         */
         next.new.sort((a, b) => b.launchedAt - a.launchedAt);
         next.bonding.sort((a, b) => (b.progressBps ?? 0) - (a.progressBps ?? 0));
+        next.bonded.sort((a, b) => {
+          const left = BigInt(a.marketCap ?? OPENING_MARKET_CAP);
+          const right = BigInt(b.marketCap ?? OPENING_MARKET_CAP);
+          return right > left ? 1 : right < left ? -1 : 0;
+        });
 
         if (promoted.size > 0) {
           setArrived((was) => new Set([...was, ...promoted]));
@@ -661,7 +751,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
       </div>
 
       <div className="term-body">
-        <div className="feed-controls">
+        <div className={searchOpen ? 'feed-controls search-open' : 'feed-controls'}>
           <label className="field feed-search">
             <span>Search</span>
             <input
@@ -849,19 +939,55 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             cap. The lanes become a choice instead, and the chosen one gets the
             full width. Hidden entirely where there is room for all three.
           */}
-          <div className="lane-picker" role="tablist" aria-label="Feed">
-            {LANES.map((lane) => (
+          <div className="lane-picker">
+            <div className="lane-pills" role="tablist" aria-label="Feed">
+              {LANES.map((lane) => (
+                <button
+                  key={lane.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={shownLane === lane.key}
+                  className={shownLane === lane.key ? 'lane-pill on' : 'lane-pill'}
+                  onClick={() => setShownLane(lane.key)}
+                >
+                  {lane.short}
+                </button>
+              ))}
+            </div>
+
+            {/* The phone's controls, in the space the reference gives to one
+                button on the right of the same row. Search opens the field
+                under the buttons; filters open the same panel the terminal
+                uses, since a market cap floor is worth having on a phone even
+                if setting one is fiddly. */}
+            <div className="lane-tools">
               <button
-                key={lane.key}
                 type="button"
-                role="tab"
-                aria-selected={shownLane === lane.key}
-                className={shownLane === lane.key ? 'lane-pill on' : 'lane-pill'}
-                onClick={() => setShownLane(lane.key)}
+                className={searchOpen ? 'lane-tool on' : 'lane-tool'}
+                aria-expanded={searchOpen}
+                aria-label="Search tokens"
+                onClick={() => setSearchOpen((was) => !was)}
               >
-                {lane.short}
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.6-3.6" />
+                </svg>
               </button>
-            ))}
+              {terminal && (
+                <button
+                  type="button"
+                  className={showFilters || totalActiveFilters > 0 ? 'lane-tool on' : 'lane-tool'}
+                  aria-expanded={showFilters}
+                  aria-label="Filters"
+                  onClick={() => setShowFilters((was) => !was)}
+                >
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 6h16M7 12h10M10 18h4" />
+                  </svg>
+                  {totalActiveFilters > 0 && <span className="tool-dot" aria-hidden="true" />}
+                </button>
+              )}
+            </div>
           </div>
 
           <div

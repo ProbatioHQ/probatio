@@ -20,7 +20,7 @@ export const metadata: Metadata = {
  */
 export default function FeedPage() {
   return (
-    <main className="wide">
+    <main className="wide feed-page">
       <div className="page-head">
         <h1>Terminal</h1>
         <p className="dim">

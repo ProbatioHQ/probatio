@@ -85,39 +85,20 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
 
   return (
     <main className="token-page wide">
-      <div className="token-head">
-        {image ? (
-          // Not next/image: an arbitrary host chosen by whoever launched the
-          // token, rendered by the browser and never fetched by this server.
-          <img className="token-hero" src={image} alt="" referrerPolicy="no-referrer" />
-        ) : (
-          <span className="token-hero placeholder" aria-hidden="true" />
-        )}
-
-        <div className="token-title">
-          <h1>
-            {token.symbol ?? token.name}
-            {token.symbol && token.name !== token.symbol && (
-              <span className="dim"> {token.name}</span>
-            )}
-          </h1>
-          <p className="mono dim token-meta">
-            <span>{shortMint(mint)}</span>
-            {launch && (
-              <>
-                <span className="sep" aria-hidden="true" />
-                <span>launched {new Date(launch.launchedAt * 1_000).toLocaleDateString()}</span>
-              </>
-            )}
-            <span className="sep" aria-hidden="true" />
-            <a href={`https://pump.fun/coin/${mint}`} target="_blank" rel="noopener noreferrer">
-              pump.fun
-            </a>
-          </p>
-        </div>
-      </div>
-
-      <TokenView mint={mint} dexIndexed={false} />
+      {/* The head is drawn by TokenView rather than here, so the live market
+          cap can sit on the same row as the name. This page still resolves who
+          the token is; it just hands the facts down. */}
+      <TokenView
+        mint={mint}
+        dexIndexed={false}
+        head={{
+          name: token.name,
+          symbol: token.symbol,
+          image,
+          launchedAt: launch?.launchedAt ?? null,
+          shortMint: shortMint(mint),
+        }}
+      />
 
       {/* Below the trading surface, not above it. Somebody who navigated to a
           token came to trade it, and putting the explainer first pushed the

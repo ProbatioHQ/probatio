@@ -111,6 +111,7 @@ export function PriceChart({
   timeframes,
   onTimeframe,
   onHistory,
+  onQuote,
   unit = 'market-cap',
   onUnit,
   entryPrice = null,
@@ -135,6 +136,15 @@ export function PriceChart({
    * fills well under one percent of its slots and draws as scattered dashes.
    */
   onHistory?: (info: { candles: number; spanSeconds: number; backfilling: boolean }) => void;
+  /**
+   * The latest value on the chart and how far it has moved across it.
+   *
+   * Reported rather than only drawn, so the page above can show the same figure
+   * beside the token's name without opening a second price stream and risking
+   * two numbers on one screen that disagree. `value` is already in whichever
+   * unit the chart is set to.
+   */
+  onQuote?: (quote: { value: number | null; change: number | null }) => void;
   unit?: PriceUnit;
   onUnit?: (unit: PriceUnit) => void;
   height?: number;
@@ -670,6 +680,13 @@ export function PriceChart({
   const first = points.at(0);
   const change =
     last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
+
+  // Handed up whenever either number moves. onQuote has to be stable in the
+  // parent or this runs every render.
+  const quoteValue = last?.close ?? null;
+  useEffect(() => {
+    onQuote?.({ value: quoteValue, change });
+  }, [quoteValue, change, onQuote]);
 
   return (
     <div className="chart">
