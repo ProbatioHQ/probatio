@@ -194,6 +194,28 @@ export function TokenView({
   }, [indexed, mint]);
   const [unit, setUnit] = useState<PriceUnit>('market-cap');
 
+  /*
+   * The chart's height, which a phone cannot take a fixed number for.
+   *
+   * It was hard-coded at 560, chosen for a desktop where the panel sits beside
+   * the chart rather than under it. On a 390x844 screen that is two thirds of
+   * the viewport before the token's own name, so the price and the buy button
+   * were both below the fold and the page opened on a wall of candles.
+   *
+   * Measured rather than guessed at through a breakpoint, and re-measured on
+   * rotate, since a phone turned sideways is a different chart entirely.
+   */
+  const [chartHeight, setChartHeight] = useState(560);
+  useEffect(() => {
+    const measure = (): void => {
+      const wide = window.innerWidth > 860;
+      setChartHeight(wide ? 560 : Math.round(Math.min(420, Math.max(260, window.innerHeight * 0.44))));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
   return (
     <div className="trade-layout">
       <section className="term chart-panel">
@@ -237,7 +259,7 @@ export function TokenView({
         <div className="term-body">
           {source === 'tradingview' ? (
             <>
-              <DexChart mint={mint} height={620} />
+              <DexChart mint={mint} height={chartHeight + 60} />
               <p className="dim chart-note">
                 TradingView charts, with pump.fun and PumpSwap trades, served by DEX Screener.
                 Your fills are quoted against the reserves this site reads directly, and you can{' '}
@@ -260,7 +282,7 @@ export function TokenView({
                 unit={unit}
                 onUnit={setUnit}
                 entryPrice={entryPrice}
-                height={560}
+                height={chartHeight}
                 onHistory={({ candles, spanSeconds, backfilling }) => {
                   // The reader's own pick wins and ends the fitting for good.
                   if (timeframeChosen) return;

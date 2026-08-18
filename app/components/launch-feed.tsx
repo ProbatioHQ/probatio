@@ -52,10 +52,31 @@ interface Lanes {
 
 type LaneKey = keyof Lanes;
 
-const LANES: { key: LaneKey; title: string; prompt: string; blurb: string }[] = [
-  { key: 'new', title: 'New', prompt: '~/new', blurb: 'Just created' },
-  { key: 'bonding', title: 'About to bond', prompt: '~/bonding', blurb: 'Half the curve sold' },
-  { key: 'bonded', title: 'Bonded', prompt: '~/bonded', blurb: 'Graduated to the AMM' },
+/**
+ * `short` is what the phone's three buttons say.
+ *
+ * A column heading has a whole column to explain itself, so "About to bond"
+ * and "Bonded" are worth the words there. Three buttons side by side on a
+ * 390px screen do not have that room, and these are the names every other
+ * pump.fun client uses for the same three piles, so they are the ones somebody
+ * arriving already knows.
+ */
+const LANES: { key: LaneKey; title: string; short: string; prompt: string; blurb: string }[] = [
+  { key: 'new', title: 'New', short: 'New', prompt: '~/new', blurb: 'Just created' },
+  {
+    key: 'bonding',
+    title: 'About to bond',
+    short: 'Soon',
+    prompt: '~/bonding',
+    blurb: 'Half the curve sold',
+  },
+  {
+    key: 'bonded',
+    title: 'Bonded',
+    short: 'Graduated',
+    prompt: '~/bonded',
+    blurb: 'Graduated to the AMM',
+  },
 ];
 
 /** Kept bounded. A feed left open all day should not grow without limit. */
@@ -838,7 +859,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
                 className={shownLane === lane.key ? 'lane-pill on' : 'lane-pill'}
                 onClick={() => setShownLane(lane.key)}
               >
-                {lane.title}
+                {lane.short}
               </button>
             ))}
           </div>
