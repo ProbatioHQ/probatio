@@ -5507,3 +5507,89 @@ body:has(main.home) .glow {
   .nav-bars i { transition: none; }
   .nav-panel { animation: none; }
 }
+
+/* ================================================================== *
+ * The front page on a phone.
+ * ================================================================== */
+
+/*
+ * The headline paints itself, rather than being a hole cut in a gradient.
+ *
+ * It was drawn by clipping a gradient to the text, and the text sits inside
+ * spans that are transformed and marked will-change so they can be uncovered
+ * a line at a time. A transformed descendant is composited on its own, and the
+ * ancestor's clipped background does not follow it there, so on a phone the
+ * headline was simply not painted: transparent text over the page behind it.
+ * The gradient was worth very little and has now cost the single most important
+ * sentence on the site twice.
+ */
+.hero-cinema .display {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #fff;
+}
+.hero-cinema .display .reveal > span {
+  /* Nothing to promote: the compositing is what broke the paint above. */
+  will-change: auto;
+}
+
+@media (max-width: 720px) {
+  /*
+   * No header over the hero.
+   *
+   * The mark is the first thing in the middle of the page at full size, and a
+   * second copy of it sat forty pixels above, beside a menu button and two
+   * social icons and a connect button, on a screen where the hero is the whole
+   * point. Everything in that bar is reachable from the page itself or from the
+   * menu on any other page.
+   */
+  body:has(main.home) .site-header {
+    display: none;
+  }
+
+  .home .hero-cinema {
+    min-height: 100svh;
+    padding-top: 28px;
+    padding-bottom: 40px;
+    place-items: center;
+  }
+
+  .home .hero-mark {
+    width: 92px;
+    height: 92px;
+  }
+
+  .home .display {
+    font-size: clamp(38px, 11.5vw, 54px);
+    line-height: 0.98;
+  }
+
+  .home .hero-tagline {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    gap: 4px 10px;
+  }
+
+  /* Full width and thumb-sized, in the order somebody would use them. */
+  .home .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: 340px;
+    gap: 10px;
+  }
+  .home .cta-row .button-link,
+  .home .cta-row .ghost-link,
+  .home .cta-row .wallet-connect {
+    width: 100%;
+    justify-content: center;
+    padding: 15px 20px;
+    font-size: 15.5px;
+  }
+}
+
+/* The outside links move into the menu where the header runs out of width. */
+@media (max-width: 860px) {
+  .site-right .icon-link { display: none; }
+}

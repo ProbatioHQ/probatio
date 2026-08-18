@@ -101,6 +101,23 @@ export function SiteNav() {
               whole page, and which are the ones arguing against the product. */}
           <a href="/verify">Verify a record</a>
           <a href="/trust">What you have to trust</a>
+
+          {/*
+            The outside links, in here at the width the icons came out of.
+            
+            They sat loose in the header beside the menu button, so a narrow
+            header was a mark, a button, two icons and a wallet, which is four
+            separate things competing in a strip meant to carry one. Written
+            out, because an icon needs a tooltip to say what it is and a phone
+            has no cursor to show one with.
+          */}
+          <span className="nav-panel-rule" aria-hidden="true" />
+          <a href="https://github.com/ProbatioHQ/probatio" target="_blank" rel="noreferrer noopener">
+            GitHub
+          </a>
+          <a href="https://x.com" target="_blank" rel="noreferrer noopener">
+            X
+          </a>
         </div>
       )}
     </div>
