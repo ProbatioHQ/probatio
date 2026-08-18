@@ -5484,8 +5484,8 @@ body:has(main.home) .glow {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   /*
    * Every one of these matters, and box-shadow is the one that was missing.
@@ -5535,20 +5535,20 @@ body:has(main.home) .glow {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 .nav-bars i {
   display: block;
-  width: 16px;
-  height: 1px;
+  width: 20px;
+  height: 1.5px;
   background: var(--text);
   transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms ease;
 }
-/* Open, the bars become the cross that closes them. 1px bars 5px apart put the
-   outer two 6px from the middle, which is Axon's number too. */
-.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+/* Open, the bars become the cross that closes them. 1.5px bars 6px apart put
+   the outer two 7.5px from the middle. Recompute if either number moves. */
+.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
 .nav-toggle.open .nav-bars i:nth-child(2) { opacity: 0; }
-.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
 
 /* ================================================================== *
  * The drawer, matched to Axon's.

@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import bs58 from 'bs58';
-import { PHANTOM_INSTALL_URL, getPhantom } from '@/lib/phantom';
+import { PHANTOM_INSTALL_URL, getPhantom, isHandheld, phantomBrowseUrl } from '@/lib/phantom';
 
 /**
  * One wallet, shared by everything that needs it.
@@ -102,6 +102,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (signingIn.current) return;
     const phantom = getPhantom();
     if (!phantom) {
+      /*
+       * On a phone there is no extension, so no provider is ever going to
+       * appear in this browser and the download page is the wrong answer: it
+       * tells somebody who already has Phantom to install it, and once they
+       * have, they are still in Safari with nothing injected and the button
+       * fails again.
+       *
+       * The universal link hands this exact page to Phantom's own browser,
+       * which does inject a provider, so the site comes back up inside the
+       * wallet and connecting works normally from there.
+       *
+       * Assigned rather than opened in a tab: a phone browser blocks
+       * window.open often enough, and this is a navigation away rather than
+       * something to read alongside.
+       */
+      if (isHandheld()) {
+        window.location.href = phantomBrowseUrl();
+        return;
+      }
       window.open(PHANTOM_INSTALL_URL, '_blank', 'noopener,noreferrer');
       return;
     }

@@ -26,6 +26,42 @@ declare global {
 
 export const PHANTOM_INSTALL_URL = 'https://phantom.app/download';
 
+/**
+ * A phone, where there is no extension to inject a provider.
+ *
+ * iPads have reported themselves as Macs since iPadOS 13, so the touch count is
+ * asked as well: a Mac reports zero touch points and an iPad reports five.
+ */
+export function isHandheld(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (/Android|iPhone|iPod/i.test(navigator.userAgent)) return true;
+  return /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+}
+
+/**
+ * The link that reopens this page inside Phantom's own browser.
+ *
+ * A phone browser has no extension, so there is no provider to connect to and
+ * nothing for a connect button to do. Sending somebody to the download page is
+ * the wrong answer for the many people who already have Phantom installed: they
+ * are told to install what they have, and even after installing it they are
+ * still in Safari with no provider, so the button fails again.
+ *
+ * Phantom's universal link takes a URL and opens it in the wallet's in-app
+ * browser, which does inject a provider. So the page comes back up inside
+ * Phantom with the connect button working normally. `ref` is the origin asking,
+ * which Phantom shows in its own UI so somebody can see who is asking before
+ * they approve anything.
+ *
+ * Both parameters have to be encoded or Phantom reads the target's own query
+ * string as its.
+ */
+export function phantomBrowseUrl(target?: string): string {
+  const here = target ?? window.location.href;
+  const ref = window.location.origin;
+  return `https://phantom.app/ul/browse/${encodeURIComponent(here)}?ref=${encodeURIComponent(ref)}`;
+}
+
 /** The injected provider, or null when Phantom is not installed. */
 export function getPhantom(): PhantomProvider | null {
   if (typeof window === 'undefined') return null;
