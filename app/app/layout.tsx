@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env['APP_URI'] ?? 'http://localhost:3000'),
   title: { default: 'Probatio', template: '%s' },
   description:
-    'Trade live Solana markets with practice money. Honest fills, and a record anyone can check.',
+    'Trade live Solana markets with practice money. Honest fills, and a record kept honestly.',
 };
 
 /**
@@ -131,7 +131,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
 
         <footer className="site-footer">
           <div className="shell">
-            <span>Practice money. Real prices. Records anyone can check.</span>
+            <span>Practice money. Real prices. Records kept honestly.</span>
             <span>
               <a href="/docs">How it works</a> · <a href="/roadmap">Roadmap</a> ·{' '}
               <a href="/verify">Verify a record</a> · <a href="/trust">What you have to trust</a>

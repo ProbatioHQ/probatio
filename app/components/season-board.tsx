@@ -149,7 +149,7 @@ export function SeasonBoard() {
         <div className="term-body">
           <p className="dim">
             No ranked season is running. Free play is always open, and trades made in it are
-            committed the same way. They just are not ranked for a prize.
+            recorded the same way. They just are not ranked for a prize.
           </p>
         </div>
       </section>

@@ -35,7 +35,7 @@ export default function SeasonPage() {
             Highest return wins. Everyone starts with the same balance, trades against the same
             live markets, and gets the same fill conditions: the same latency, the same slippage
             limit, the same maximum price impact. Those conditions are hashed into the season&apos;s
-            ruleset and recorded on chain before anybody enters, so they cannot be changed partway
+            ruleset and published before anybody enters, so they cannot be changed partway
             through without the change being visible.
           </p>
           <p>

@@ -98,7 +98,7 @@ export function Hero() {
         <p className="hero-tagline" aria-hidden="true">
           <span>Real prices</span>
           <span>Honest fills</span>
-          <span>Provable record</span>
+          <span>Honest record</span>
         </p>
 
         <div className="cta-row">

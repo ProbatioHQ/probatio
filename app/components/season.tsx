@@ -184,7 +184,7 @@ export function Season() {
           /* The server's reason, not one guessed here. See season-board. */
           <p className="dim">
             {season.entryUnavailableReason ??
-              'Entry is not open on this server yet. Free play is, and trades made in it are committed the same way.'}
+              'Entry is not open on this server yet. Free play is, and trades made in it are recorded the same way.'}
           </p>
         ) : (
           !closed && <p className="dim">Entries are closed for this season. Free play is always open.</p>

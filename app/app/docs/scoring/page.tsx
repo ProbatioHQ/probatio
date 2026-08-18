@@ -74,8 +74,8 @@ export default function ScoringDoc() {
       <p>
         A season&apos;s entire ruleset, the scoring, the tie-breaks, the payout shape, the entry
         cost, the simulation conditions, and the conditions under which the season does not count
-       , is encoded and hashed before anybody enters, and that hash is recorded on chain with
-        the season.
+       , is encoded and hashed before anybody enters, and that hash is published with the
+        season, so the rules it ran under can be recomputed and compared.
       </p>
 
       <p>
