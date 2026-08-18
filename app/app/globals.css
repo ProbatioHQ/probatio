@@ -1556,7 +1556,16 @@ button,
  * the right side of the header reads as one group: where you go, and who you
  * are.
  */
-.site-header .shell > .site-nav { margin-left: auto; }
+/*
+ * The nav sits against the wallet rather than being spread across the bar.
+ *
+ * This used to say `.shell > .site-nav`, and then the nav was wrapped in
+ * `.site-nav-wrap` so it could carry the menu button and the panel too. The
+ * child of `.shell` became the wrapper, this selector stopped matching
+ * anything, and the whole group fell back to sitting immediately after the
+ * mark: on a phone, a menu button stranded in the middle of the header.
+ */
+.site-header .shell > .site-nav-wrap { margin-left: auto; }
 
 /* Holds the width while the session is being read, so the header does not
    jump when the answer arrives. */
@@ -1745,12 +1754,20 @@ button,
  * header grows by a line, which is the honest cost of having five destinations.
  */
 @media (max-width: 860px) {
+  /*
+   * One line, one fixed height.
+   *
+   * It wrapped to a second row so the five nav links could have one of their
+   * own. They fold behind the menu button at this width now, so there is
+   * nothing left to wrap, and a header of a known height is what lets the feed
+   * stick its lane picker directly underneath it.
+   */
   .site-header .shell {
-    flex-wrap: wrap;
-    height: auto;
-    padding-top: 10px;
-    padding-bottom: 8px;
-    gap: 8px 16px;
+    flex-wrap: nowrap;
+    height: 56px;
+    padding-top: 0;
+    padding-bottom: 0;
+    gap: 12px;
   }
 
   .site-header .shell > .site-nav {
@@ -5427,21 +5444,33 @@ body:has(main.home) .glow {
   min-width: 0;
 }
 
-/* The button does not exist until the row cannot. */
+/*
+ * The button does not exist until the row cannot.
+ *
+ * No box around it. It was a bordered, filled 38px tile, which put a second
+ * piece of furniture in a header that is already a bar with a line under it,
+ * and read as a button inside a button. Three bars on the ground are a menu
+ * everywhere else; the hit area stays 44px whether or not anything is drawn
+ * around it.
+ */
 .nav-toggle {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
   padding: 0;
+  border: 0;
   border-radius: 10px;
-  border: 1px solid var(--line-bright);
-  background: var(--ink-sunken);
+  background: none;
+  color: inherit;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.nav-toggle:hover {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--line-bright));
+.nav-toggle:hover .nav-bars i,
+.nav-toggle.open .nav-bars i {
+  background: var(--text);
 }
 
 /* Three bars, drawn rather than set in a font, so they take the header's
@@ -5536,16 +5565,27 @@ body:has(main.home) .glow {
 
 @media (max-width: 720px) {
   /*
-   * No header over the hero.
+   * The header over the hero keeps the menu and gives up everything else.
    *
-   * The mark is the first thing in the middle of the page at full size, and a
-   * second copy of it sat forty pixels above, beside a menu button and two
-   * social icons and a connect button, on a screen where the hero is the whole
-   * point. Everything in that bar is reachable from the page itself or from the
-   * menu on any other page.
+   * The last pass hid the whole bar, on the grounds that the mark is already
+   * the first thing in the middle of the page at full size and a second copy
+   * forty pixels above it is noise. That was true of the mark and wrong about
+   * the rest: it took the menu button with it, so the front page on a phone
+   * had no way to reach any other page at all.
+   *
+   * So the bar stays and empties out. No mark, no rule, no ground, nothing to
+   * see against the hero. Just the three bars in the corner, which is the one
+   * thing on it that goes somewhere.
    */
-  body:has(main.home) .site-header {
+  body:has(main.home) .site-header .wordmark {
     display: none;
+  }
+  body:has(main.home) .site-header,
+  body:has(main.home) .site-header.stuck {
+    background: none;
+    border-bottom-color: transparent;
+    backdrop-filter: none;
+    mask-image: none;
   }
 
   .home .hero-cinema {
@@ -5589,9 +5629,35 @@ body:has(main.home) .glow {
   }
 }
 
-/* The outside links move into the menu where the header runs out of width. */
+/*
+ * The right of the header moves into the menu where there is no width for it.
+ *
+ * Below this the header carries the mark and the menu button and nothing else,
+ * so it is one line with one control on it rather than a mark, a button, two
+ * social icons and a wallet fighting over 390 pixels. The wallet is not lost:
+ * the panel renders it at the top, at full width, where it is easier to hit
+ * than the pill ever was.
+ */
+.nav-panel-wallet { display: none; }
+
 @media (max-width: 860px) {
-  .site-right .icon-link { display: none; }
+  .site-right { display: none; }
+
+  .nav-panel { min-width: 244px; }
+  .nav-panel-wallet { display: block; }
+  /* The wallet's own controls fill the panel rather than sitting at the
+     natural width of a header pill. */
+  .nav-panel-wallet > * {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+  }
+  .nav-panel-wallet button {
+    width: 100%;
+    justify-content: center;
+    padding: 11px 14px;
+    font-size: 14.5px;
+  }
 }
 
 /* ================================================================== *
@@ -5602,12 +5668,62 @@ body:has(main.home) .glow {
 .lane-picker { display: none; }
 
 @media (max-width: 860px) {
+  /*
+   * Search is its own thing, above the feed rather than inside it.
+   *
+   * It was a labelled field sharing a strip with Filters and Pause at the top
+   * of the terminal box, which on a phone reads as part of the list rather
+   * than as the way to find something that is not in it. Here it is a single
+   * full-width bar sitting above the lanes, with its label dropped, since the
+   * placeholder already says what to type and a phone has no room for both.
+   */
+  .feed-controls {
+    display: block;
+    padding-bottom: 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .feed-search {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .feed-search > span { display: none; }
+  .feed-search input {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border-radius: 12px;
+    /* 16px or larger, or iOS zooms the whole page in on focus and leaves the
+       viewport scrolled sideways when it is done. */
+    font-size: 16px;
+  }
+  .feed-controls .preset {
+    min-height: 40px;
+    padding: 0 16px;
+  }
+
+  /*
+   * The picker follows the list down.
+   *
+   * Each lane used to scroll inside its own box; giving the chosen one the
+   * whole screen took that cap off, so New is now a very long page and the
+   * pills scrolled off the top of it. Changing lane meant scrolling all the
+   * way back up to do it, which is the same complaint the three columns
+   * caused. Stuck under the header, the choice is wherever you are in the
+   * list.
+   */
   .lane-picker {
     display: flex;
+    position: sticky;
+    top: 56px;
+    z-index: 5;
     gap: 8px;
-    margin-bottom: 12px;
+    padding: 10px 0;
+    margin-bottom: 4px;
     overflow-x: auto;
     scrollbar-width: none;
+    background: var(--ink);
   }
   .lane-picker::-webkit-scrollbar { display: none; }
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { WalletButton } from '@/components/wallet';
 
 /**
  * The site's own links, laid out for the width there is.
@@ -86,6 +87,25 @@ export function SiteNav() {
 
       {open && (
         <div className="nav-panel">
+          {/*
+            The wallet, at the top, where there is no room for it beside the
+            button.
+
+            It sat loose in the header next to the menu, so a phone header was
+            a mark, a menu button and a wallet all competing in one strip. In
+            here it is the first thing the menu offers, which is right: on a
+            page you are not signed in to, connecting is the only thing worth
+            doing. It also brings the account switcher somewhere a thumb can
+            reach it, instead of inside a dropdown hanging off a 100px pill.
+
+            Only mounts when the panel is open, so the header pays nothing for
+            it until somebody asks.
+          */}
+          <div className="nav-panel-wallet">
+            <WalletButton />
+          </div>
+          <span className="nav-panel-rule" aria-hidden="true" />
+
           {LINKS.map((link) => (
             <a
               key={link.href}
