@@ -41,9 +41,21 @@ export async function db(): Promise<Client> {
    * reads an account before the restore has had its turn. It does nothing at
    * all when the database has accounts on it, which is every ordinary boot.
    */
+  /*
+   * A failed start is retried, not remembered.
+   *
+   * This promise is shared by every caller, so a rejection is kept and handed
+   * to all of them for the life of the process: a volume that was full for the
+   * one moment this ran left every request failing long after there was room
+   * again. Cleared on failure so the next caller tries afresh.
+   */
   ready ??= migrate(opened)
     .then(() => restoreAccountsIfEmpty(opened))
-    .then(() => undefined);
+    .then(() => undefined)
+    .catch((error) => {
+      ready = undefined;
+      throw error;
+    });
   await ready;
   return opened;
 }

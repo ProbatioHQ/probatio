@@ -164,6 +164,28 @@ export async function reclaimIfTight(): Promise<void> {
 
   console.warn(`[reclaim] ${Math.round(free / 1e6)}MB free; compacting the database off-volume`);
 
+  /*
+   * The dead weight goes first, because it costs nothing and may be all that
+   * is needed.
+   *
+   * A database set aside as corrupt is renamed rather than deleted, so it sits
+   * on the volume at full size for ever, and a compacted copy left behind by a
+   * reclaim that could not finish sits there too. Neither is ever read again.
+   * Removing them is the one way to free space on a volume with nothing free,
+   * and everything below needs somewhere to write.
+   */
+  for (const dead of ['.corrupt', '.corrupt-wal', '.corrupt-shm', '.compacted']) {
+    const stale = `${path}${dead}`;
+    if (!existsSync(stale)) continue;
+    try {
+      const size = statSync(stale).size;
+      rmSync(stale, { force: true });
+      console.warn(`[reclaim] removed ${dead}, freeing ${Math.round(size / 1e6)}MB`);
+    } catch (error) {
+      console.error(`[reclaim] could not remove ${dead}`, error);
+    }
+  }
+
   try {
     // What must survive this, so the copy can be checked against it before it
     // is allowed to replace anything.
