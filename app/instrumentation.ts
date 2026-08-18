@@ -66,6 +66,10 @@ export async function register(): Promise<void> {
   const { startSeasonPayout } = await import('./lib/season-payout');
   safely('season payout', startSeasonPayout);
 
+  // Opens each season after the first, on the operator's weekly hours.
+  const { startSeasonRollover } = await import('./lib/season-rollover');
+  safely('season rollover', startSeasonRollover);
+
   // Drops chart candles too old to draw and reclaims the space, so the one
   // table that grows on a timer cannot fill the disk and take the database down.
   const { startRetention } = await import('./lib/retention');
