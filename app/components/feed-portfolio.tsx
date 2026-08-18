@@ -74,25 +74,28 @@ export function FeedPortfolio() {
     return (
       <div className="feed-portfolio out">
         <span className="feed-portfolio-k">Practice money, real prices</span>
-        <span className="feed-portfolio-say">
-          Trade any of these with 10 SOL of practice money.
-        </span>
         {/*
-          The action, here, rather than a sentence pointing at the menu.
+          The action inside the sentence, not underneath it.
           
-          Telling somebody where the button is, on a screen with room for the
-          button, is the wrong half of the job. This is the same signIn every
-          other connect control calls, so on a phone with no injected provider
-          it hands the page to Phantom's browser exactly as they do.
+          This was a full-width button, which is a second call to action on a
+          screen whose job is to list tokens, and louder than the row it sits
+          in. The words that name the action carry it instead. Still a real
+          button underneath, so it is reachable by keyboard and announced as
+          something that does a thing, and it calls the same signIn as every
+          other connect control, so a phone with no injected provider is handed
+          to Phantom's browser exactly as it is everywhere else.
         */}
-        <button
-          type="button"
-          className="feed-portfolio-connect"
-          disabled={status === 'working'}
-          onClick={() => void signIn()}
-        >
-          {status === 'working' ? 'Waiting for your wallet…' : 'Connect Phantom'}
-        </button>
+        <span className="feed-portfolio-say">
+          <button
+            type="button"
+            className="linklike feed-portfolio-connect"
+            disabled={status === 'working'}
+            onClick={() => void signIn()}
+          >
+            {status === 'working' ? 'Waiting for your wallet…' : 'Connect a wallet'}
+          </button>{' '}
+          to trade any of these with 10 SOL of practice money.
+        </span>
       </div>
     );
   }

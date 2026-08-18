@@ -5904,11 +5904,25 @@ body:has(main.home) .glow {
   .feed-page .page-head,
   .feed-page > p.dim { display: none; }
 
+  /*
+   * The frame comes off, the corners stay on.
+   *
+   * Stripping the terminal chrome was meant to remove the title bar, the
+   * streaming light and the window dots. It also set `border-radius: 0`, which
+   * is why raising --radius to 16px afterwards changed nothing here: this rule
+   * is further down the sheet and was explicitly telling the one surface that
+   * matters most to have no corners at all.
+   *
+   * It keeps a rounded surface with a hairline edge, which is what a card is,
+   * without any of the chrome that made it a terminal.
+   */
   .feed-term.term {
-    border: 0;
-    background: none;
-    border-radius: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--ink-sunken);
+    box-shadow: none;
   }
+  .feed-term > .term-body { padding: 12px; }
   .feed-term > .term-bar { display: none; }
   .feed-term > .term-body { padding: 0; }
   .feed-controls .preset { display: none; }
@@ -5990,15 +6004,24 @@ body:has(main.home) .glow {
    * what the reference does and what stops "Graduated" and "New" claiming the
    * same width when they are nothing like the same word.
    */
+  /*
+   * Not sticky. Sticky is what was hiding the first token.
+   *
+   * The pills stuck to the page's scroll while the list beneath them scrolls
+   * inside its own box. Two scroll contexts, one floating over the other: as
+   * soon as the page moved at all, the list slid up underneath the pills and
+   * its top row went behind them, which is why the first token could only be
+   * reached by dragging the list back down.
+   *
+   * They do not need to stick. The list is capped to the viewport and scrolls
+   * internally, so the pills stay on screen the whole time you are reading it
+   * without being pinned over anything.
+   */
   .lane-picker {
     display: flex;
     align-items: center;
     gap: 10px;
-    position: sticky;
-    top: 56px;
-    z-index: 5;
-    padding: 10px 0;
-    margin-bottom: 2px;
+    padding: 4px 0 10px;
     background: var(--ink);
   }
   /*
@@ -6090,7 +6113,7 @@ body:has(main.home) .glow {
     display: none;
   }
   .lanes .lane-head { display: none; }
-  .lanes { border: 0; background: none; border-radius: 0; }
+  .lanes { border: 0; background: none; border-radius: 0; padding: 0; }
   .lanes .lane { background: none; }
   /*
     * The list scrolls inside itself rather than making the page do it.
@@ -6104,7 +6127,7 @@ body:has(main.home) .glow {
     */
   .lanes .feed,
   .lanes.tall .feed {
-    max-height: calc(100dvh - 172px);
+    max-height: calc(100dvh - 168px);
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 0;
@@ -6197,6 +6220,9 @@ body:has(main.home) .glow {
   .feed-progress { display: none; }
 }
 
+/* The chart's second copy of the source switch is a phone control. */
+.chart-source { display: none; }
+
 /* The timeframe opener is a phone control: on a desk the row is always there. */
 .times-toggle { display: none; }
 
@@ -6250,6 +6276,90 @@ body:has(main.home) .glow {
 }
 
 /* ================================================================== *
+ * Tables on a phone: rows, not a sideways scroll.
+ * ================================================================== */
+
+@media (max-width: 860px) and (pointer: coarse) {
+  /*
+   * A six-column table does not fit 342px, and pretending it does by letting it
+   * scroll sideways means the first column is clipped at the left edge and half
+   * the data is behind a drag nobody knows to do.
+   *
+   * Each row becomes its own small block instead, two columns wide, with every
+   * value beside the name of the column it came from. Nothing is dropped and
+   * nothing needs dragging.
+   *
+   * The heading row goes, since every cell now carries its own heading, but it
+   * is removed with a clip rather than `display: none` so the table keeps a
+   * header for anything reading the page aloud.
+   */
+  .scroller table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .scroller { overflow-x: visible; }
+
+  .scroller table,
+  .scroller tbody,
+  .scroller tr,
+  .scroller td {
+    display: block;
+    width: auto;
+  }
+
+  .scroller tr {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--ink-sunken);
+  }
+  .scroller tr:last-child { margin-bottom: 0; }
+
+  .scroller td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 5px 0;
+    border: 0;
+    text-align: right;
+  }
+  .scroller td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-align: left;
+  }
+  /* A cell with no label is a layout cell, not a fact; it keeps the full row. */
+  .scroller td:not([data-label])::before { content: none; }
+
+  /* Which way the trade went is the first thing you look for, so it leads the
+     block rather than sitting in the list as one fact among six. */
+  .scroller td[data-label='Side'] {
+    padding-top: 0;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 15px;
+    font-weight: 650;
+    text-transform: capitalize;
+  }
+
+  /* The log is a list of blocks now, so its own scrollbox can breathe. */
+  .trade-log { max-height: 60dvh; overflow-y: auto; }
+}
+
+/* ================================================================== *
  * A token on a phone: the chart first, and big enough to read.
  * ================================================================== */
 
@@ -6290,15 +6400,16 @@ body:has(main.home) .glow {
    */
   .chart-panel.term,
   .trade.term {
-    border: 0;
-    background: none;
-    border-radius: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--ink-sunken);
+    box-shadow: none;
   }
   .chart-panel > .term-bar .prompt,
   .chart-panel > .term-bar .lights,
   .trade > .term-bar { display: none; }
   .chart-panel > .term-body,
-  .trade > .term-body { padding: 0; }
+  .trade > .term-body { padding: 12px; }
 
   /*
    * The chart's controls as one band, not two stray rows.
@@ -6313,44 +6424,66 @@ body:has(main.home) .glow {
    * between them goes, the vertical gap closes to almost nothing, and all of it
    * lines up on the same left edge at the same height.
    */
-  .chart-panel > .term-bar {
-    padding: 0;
-    border-bottom: 0;
-    background: none;
-  }
-  .chart-controls { margin: 0; }
-  .chart-panel .segmented {
+  /*
+   * One row: source on the left, timeframe, Indicators and status on the right.
+   *
+   * The panel's title bar goes entirely, taking its copy of the source switch
+   * with it, and the chart's own copy takes the head of the controls row. Four
+   * controls, one line, one left edge.
+   */
+  .chart-panel > .term-bar { display: none; }
+
+  .chart-source { display: block; }
+  .chart-source .segmented {
     height: 34px;
     border-radius: 999px;
     overflow: hidden;
   }
-  .chart-panel .segmented button {
-    padding: 0 14px;
-    font-size: 12px;
-    letter-spacing: 0.04em;
+  .chart-source .segmented button {
+    padding: 0 13px;
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
   }
+
   .chart-top {
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 8px;
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     padding-bottom: 0;
     border-bottom: 0;
   }
   .chart-top-actions {
     gap: 8px;
-    margin-left: 0;
-    margin-right: auto;
+    margin-left: auto;
+    min-width: 0;
   }
   .chart-top-btn {
     min-height: 34px;
-    padding: 0 14px;
+    padding: 0 13px;
     border-radius: 999px;
     font-size: 13px;
   }
   /* A status, at the size of one, rather than a fourth control. */
   .chart-loading {
-    font-size: 11.5px;
+    font-size: 11px;
     letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  /*
+   * The Indicators menu, kept on the screen.
+   *
+   * It anchors with `right: 0` and asks for 240px. That is fine hanging off a
+   * control at the right of a wide panel and wrong on a 390px screen, where it
+   * ran off the edge. Pinned to both edges of the panel instead, so it is as
+   * wide as there is room for and never wider.
+   */
+  .chart-menu {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-width: none;
   }
 
   /* The footnote under the chart is a paragraph explaining where the candles

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   CandlestickSeries,
   HistogramSeries,
@@ -112,6 +112,7 @@ export function PriceChart({
   onTimeframe,
   onHistory,
   onQuote,
+  sourceSwitch,
   unit = 'market-cap',
   onUnit,
   entryPrice = null,
@@ -145,6 +146,15 @@ export function PriceChart({
    * unit the chart is set to.
    */
   onQuote?: (quote: { value: number | null; change: number | null }) => void;
+  /**
+   * The chart-source switch, rendered at the head of the controls row.
+   *
+   * Passed in rather than built here because the choice belongs to the page:
+   * this component only draws one of the two sources. A phone shows this copy
+   * so all four controls share one line; a wide screen shows the panel's own
+   * copy in its title bar and hides this one.
+   */
+  sourceSwitch?: ReactNode;
   unit?: PriceUnit;
   onUnit?: (unit: PriceUnit) => void;
   height?: number;
@@ -724,6 +734,7 @@ export function PriceChart({
     <div className="chart">
       {/* Timeframes and controls across the top, the way a terminal keeps them. */}
       <div className="chart-top">
+        {sourceSwitch && <div className="chart-source">{sourceSwitch}</div>}
         {timeframes && timeframes.length > 0 && (
           <div
             role="group"

@@ -158,17 +158,19 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
           <tbody>
             {snapshot.positions.map((position) => (
               <tr key={position.mint}>
-                <td>
+                <td data-label="Token">
                   <a href={`/t/${position.mint}`}>{short(position.mint)}</a>
                 </td>
-                <td>{tokens(position.tokenAmount)}</td>
-                <td>{sol(position.costBasis)}</td>
-                <td>
+                <td data-label="Held">{tokens(position.tokenAmount)}</td>
+                <td data-label="Cost">{sol(position.costBasis)}</td>
+                <td data-label="Value">
                   {/* A price that could not be read is said so, not shown as
                       zero, because a failed RPC call must never look like a wipeout. */}
                   {position.value === null ? 'price unavailable' : `${sol(position.value)} SOL`}
                 </td>
-                <td>{position.unrealized === null ? '·' : `${signedSol(position.unrealized)} SOL`}</td>
+                <td data-label="Unrealized">
+                  {position.unrealized === null ? '·' : `${signedSol(position.unrealized)} SOL`}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -210,16 +212,28 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
             </tr>
           </thead>
           <tbody>
+            {/*
+              Every cell carries the name of its own column.
+
+              Six columns do not fit a phone. They were left to a sideways
+              scroll inside a rounded box, which clipped "side" at the left edge
+              and hid three of the six until you dragged. On a narrow screen CSS
+              turns each row into a small block instead, and a value with no
+              heading above it is unreadable, so each one brings its heading
+              with it.
+            */}
             {trades.map((trade) => (
               <tr key={trade.id}>
-                <td className={trade.side === 'buy' ? 'gain' : 'loss'}>{trade.side}</td>
-                <td>
+                <td data-label="Side" className={trade.side === 'buy' ? 'gain' : 'loss'}>
+                  {trade.side}
+                </td>
+                <td data-label="Token">
                   <a href={`/t/${trade.mint}`}>{short(trade.mint)}</a>
                 </td>
-                <td>{sol(trade.solAmount)}</td>
-                <td>{tokens(trade.tokenAmount)}</td>
-                <td>{sol(trade.fee)}</td>
-                <td title={`sealed as ${trade.leafHash}`}>
+                <td data-label="SOL">{sol(trade.solAmount)}</td>
+                <td data-label="Tokens">{tokens(trade.tokenAmount)}</td>
+                <td data-label="Fee">{sol(trade.fee)}</td>
+                <td data-label="Slippage" title={`sealed as ${trade.leafHash}`}>
                   {slippage(trade.priceImpactBps)}
                   {trade.partial && ' · partial'}
                 </td>

@@ -273,6 +273,46 @@ export function TokenView({
     };
   }, []);
 
+  /*
+   * The source switch, defined once and rendered in two places.
+   *
+   * On a wide screen it belongs in the panel's title bar, at the top of the
+   * chart's own furniture. On a phone that bar is a row of its own above a
+   * second row holding the timeframe and Indicators, which is two lines and
+   * three groups for four controls that are all about the same chart.
+   *
+   * It cannot be one element in both positions: the bar belongs to this
+   * component and the row belongs to the chart. So it is one definition
+   * rendered twice, and CSS shows whichever one suits the width. Both drive
+   * the same state, so they can never disagree.
+   */
+  const sourceSwitch = (
+    <div role="group" aria-label="Chart source" className="segmented">
+      <button
+        type="button"
+        className={source === 'tradingview' ? 'on' : undefined}
+        aria-pressed={source === 'tradingview'}
+        disabled={!indexed}
+        title={
+          indexed
+            ? undefined
+            : 'DEX Screener has not indexed this token yet. It usually takes a few minutes after launch'
+        }
+        onClick={() => setSource('tradingview')}
+      >
+        TRADINGVIEW
+      </button>
+      <button
+        type="button"
+        className={source === 'native' ? 'on' : undefined}
+        aria-pressed={source === 'native'}
+        onClick={() => setSource('native')}
+      >
+        NATIVE
+      </button>
+    </div>
+  );
+
   const changed = quote.change;
 
   /* Ticks so the age in the bar stays honest on a page left open. */
@@ -375,31 +415,8 @@ export function TokenView({
       <section className="term chart-panel">
         <div className="term-bar">
           <span className="prompt">~/chart</span>
-          <div className="chart-controls">
-            <div role="group" aria-label="Chart source" className="segmented">
-              <button
-                type="button"
-                className={source === 'tradingview' ? 'on' : undefined}
-                aria-pressed={source === 'tradingview'}
-                disabled={!indexed}
-                title={
-                  indexed
-                    ? undefined
-                    : 'DEX Screener has not indexed this token yet. It usually takes a few minutes after launch'
-                }
-                onClick={() => setSource('tradingview')}
-              >
-                TRADINGVIEW
-              </button>
-              <button
-                type="button"
-                className={source === 'native' ? 'on' : undefined}
-                aria-pressed={source === 'native'}
-                onClick={() => setSource('native')}
-              >
-                NATIVE
-              </button>
-            </div>
+          <div className="chart-controls chart-controls-bar">
+            {sourceSwitch}
             {/* Timeframe, unit, and indicators live in the chart's own left rail
                 now, the way a trading terminal keeps them, so they are not
                 repeated here. TradingView carries its own. */}
@@ -438,6 +455,7 @@ export function TokenView({
                 entryPrice={entryPrice}
                 height={chartHeight}
                 onQuote={onQuote}
+                sourceSwitch={sourceSwitch}
                 onHistory={({ candles, spanSeconds, backfilling }) => {
                   // The reader's own pick wins and ends the fitting for good.
                   if (timeframeChosen) return;
