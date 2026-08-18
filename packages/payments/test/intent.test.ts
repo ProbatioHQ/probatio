@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import bs58 from 'bs58';
-import { buildPaymentMessage, buildPaymentTransaction, createIntent } from '../src/intent';
+import {
+  buildPaymentMessage,
+  buildPaymentMessageBase58,
+  buildPaymentTransaction,
+  createIntent,
+} from '../src/intent';
 import { MEMO_PROGRAM_ID, SYSTEM_PROGRAM_ID, decodeMessage } from '../src/message';
 
 const PAYER = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
@@ -98,5 +103,62 @@ describe('the transaction a wallet is handed', () => {
 
     expect(index).toBeGreaterThanOrEqual(message.numRequiredSignatures);
     expect(index).toBeGreaterThanOrEqual(size - message.numReadonlyUnsignedAccounts);
+  });
+});
+
+
+/*
+ * The bytes a wallet actually reads.
+ *
+ * Every other test here decodes the payload with this package's own decoder,
+ * which is why they all passed while the store was unusable: the payload was a
+ * bare message, our decoder reads bare messages, and it agreed with itself.
+ *
+ * A wallet does not. It reads what it is handed as a transaction, so byte 0 is
+ * a signature count, not a header. Handed a bare message it read the leading
+ * `numRequiredSignatures` of 1 as "one signature", skipped 64 bytes it believed
+ * were that signature, and started parsing the message from the middle of the
+ * account-key array. Whichever pubkey byte landed there became the version, and
+ * Phantom refused with "Transaction message version 3 deserialization is not
+ * supported" — a version number that was one byte of an address.
+ *
+ * So this decodes the way a wallet does, not the way we do.
+ */
+describe('the payload a wallet is handed', () => {
+  function walletView(payload: string) {
+    const bytes = bs58.decode(payload);
+    const signatureCount = bytes[0]!;
+    const messageStart = 1 + signatureCount * 64;
+    return {
+      signatureCount,
+      slotsAreEmpty: bytes.slice(1, messageStart).every((byte) => byte === 0),
+      firstMessageByte: bytes[messageStart]!,
+    };
+  }
+
+  it('is a transaction, so byte 0 is a signature count with room after it', () => {
+    const view = walletView(buildPaymentMessageBase58(intent(), BLOCKHASH));
+
+    expect(view.signatureCount).toBe(1);
+    expect(view.slotsAreEmpty).toBe(true);
+  });
+
+  it('leaves a legacy message where the wallet looks for one', () => {
+    const view = walletView(buildPaymentMessageBase58(intent(), BLOCKHASH));
+
+    // The high bit is the versioned-message marker. Set, and the wallet reports
+    // a version it cannot deserialise and refuses to sign.
+    expect(view.firstMessageByte & 0x80).toBe(0);
+    // Clear, it is `numRequiredSignatures`, which is one: the payer.
+    expect(view.firstMessageByte).toBe(1);
+  });
+
+  it('still decodes as the message it claims to be', () => {
+    const bytes = bs58.decode(buildPaymentMessageBase58(intent(), BLOCKHASH));
+    const message = decodeMessage(bytes.slice(1 + 64));
+
+    expect(message.numRequiredSignatures).toBe(1);
+    expect(message.accountKeys[0]).toBe(PAYER);
+    expect(message.recentBlockhash).toBe(BLOCKHASH);
   });
 });

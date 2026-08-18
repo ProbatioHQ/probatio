@@ -89,17 +89,25 @@ export function buildPaymentMessage(intent: PaymentIntent, recentBlockhash: stri
 }
 
 /**
- * The message to hand Phantom, base58 encoded.
+ * The payload to hand Phantom, base58 encoded.
  *
- * Phantom's `request` API takes a serialized *message* rather than a
- * transaction object, which is what lets this work without web3.js: the wallet
- * adds the signature itself, so there is no empty slot to leave room for.
+ * A whole transaction with its signature slots left empty, not a bare message.
+ * The distinction is the entire bug this replaced: Phantom deserialises what it
+ * is given as a transaction, so it reads byte 0 as a signature count. A bare
+ * message starts with `numRequiredSignatures`, which is 1, so the wallet
+ * obligingly skipped 64 bytes it thought were a signature and began reading the
+ * message from the middle of the account-key array. Whatever pubkey byte landed
+ * at that offset became the "version", and the wallet refused with
+ * "Transaction message version 3 deserialization is not supported" — a version
+ * number that was really one byte of somebody's address.
+ *
+ * The empty slots are what make it a transaction. The wallet fills them.
  */
 export function buildPaymentMessageBase58(intent: PaymentIntent, recentBlockhash: string): string {
-  return bs58.encode(encodeMessage(buildPaymentMessage(intent, recentBlockhash)));
+  return bs58.encode(serializeUnsigned(buildPaymentMessage(intent, recentBlockhash)));
 }
 
-/** The transaction to hand a wallet, base64 encoded. */
+/** The same transaction, base64 encoded, for callers that want it that way. */
 export function buildPaymentTransaction(intent: PaymentIntent, recentBlockhash: string): string {
   const bytes = serializeUnsigned(buildPaymentMessage(intent, recentBlockhash));
   return Buffer.from(bytes).toString('base64');
