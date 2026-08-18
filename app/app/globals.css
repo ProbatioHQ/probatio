@@ -5465,134 +5465,193 @@ body:has(main.home) .glow {
  * everywhere else; the hit area stays 44px whether or not anything is drawn
  * around it.
  */
+/*
+ * The menu button, matched to Axon's.
+ *
+ * Axon draws a 36px rounded square with a 1px border and three 16x1px hairline
+ * bars, 5px apart. That is the reference asked for, so those are the numbers,
+ * translated only in colour: its gray-700 border and gray-300 bars become this
+ * site's own line and text tokens.
+ *
+ * The border is deliberate and it is Axon's. What was wanted gone is the box
+ * that used to appear the moment the button was tapped, which was never this
+ * border: it was the site-wide focus ring, 2px of accent at 2px offset, which
+ * a button that opens a menu keeps for as long as the menu is open. That is
+ * handled below.
+ */
 .nav-toggle {
   display: none;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 52px;
-  margin-right: -9px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  border: 0;
-  border-radius: 10px;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
   background: none;
   color: inherit;
   cursor: pointer;
+  transition: border-color 140ms ease;
   -webkit-tap-highlight-color: transparent;
 }
-.nav-toggle:hover .nav-bars i,
-.nav-toggle.open .nav-bars i {
-  background: var(--text);
+.nav-toggle:hover {
+  border-color: color-mix(in srgb, var(--text) 45%, var(--line-bright));
 }
 
 /*
- * The box around the hamburger, found at last.
+ * No focus ring on this one control.
  *
- * It was never a border or a background on the button; both of those came off
- * two commits ago. It is the site-wide focus ring: `:focus-visible` draws a
- * 2px accent outline at 2px offset, and a button that opens a menu keeps focus
- * after it is tapped, so on a phone the ring appeared the moment the thing was
- * used and stayed. It is also the thin arc that has been sitting above the
- * bars in every screenshot: the top edge of that ring, clipped by the header.
- *
- * The ring goes and the focus signal moves onto the bars themselves, which is
- * better anyway. A ring around a control is only needed when the control has
- * no other way to say it is focused, and three bars that turn accent green
- * say it plainly without drawing the box that was never wanted.
+ * `:focus-visible` draws 2px of accent at 2px offset site-wide. A button that
+ * opens a menu holds focus while the menu is open, so on a phone that ring
+ * appeared as soon as the button was used and stayed for as long as it was
+ * needed. It is also the thin arc that sat above the bars in every screenshot:
+ * the top edge of that ring, clipped by the header. The focus signal moves to
+ * the bars, which is a real indicator without a second box around the first.
  */
-.nav-toggle:focus-visible {
-  outline: none;
-}
-.nav-toggle:focus-visible .nav-bars i {
-  background: var(--accent);
-}
+.nav-toggle:focus-visible { outline: none; }
+.nav-toggle:focus-visible .nav-bars i { background: var(--accent); }
 
 /* Three bars, drawn rather than set in a font, so they take the header's
-   own colour and cannot fail to arrive. */
+   own colour and cannot fail to arrive. Axon puts the spans straight in the
+   button; they are wrapped here so the aria-hidden sits on one node, and the
+   wrapper carries the same column and gap rather than relying on
+   `display: contents` to pass them through. */
 .nav-bars {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  /*
-   * 17x13 was drawn to sit inside a 38px bordered tile, where the box supplied
-   * the presence and the bars only had to hint at a menu. With the box gone
-   * the bars are the whole control, so they carry it themselves: wider,
-   * thicker, and with real air between them. Three lines crammed into 13px
-   * read as one smudge at arm's length.
-   */
-  gap: 7px;
-  width: 38px;
-  height: 26px;
+  align-items: center;
+  gap: 5px;
 }
 .nav-bars i {
   display: block;
-  height: 4px;
-  border-radius: 2px;
+  width: 16px;
+  height: 1px;
   background: var(--text);
   transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms ease;
 }
-/* Open, the bars become the cross that closes them. */
-/* Bars are 4 tall with 7 between them, so the outer two travel 11px to meet
-   the middle one. Recompute this whenever either number moves. */
-.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(11px) rotate(45deg); }
+/* Open, the bars become the cross that closes them. 1px bars 5px apart put the
+   outer two 6px from the middle, which is Axon's number too. */
+.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
 .nav-toggle.open .nav-bars i:nth-child(2) { opacity: 0; }
-.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-11px) rotate(-45deg); }
+.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
-.nav-panel {
+/* ================================================================== *
+ * The drawer, matched to Axon's.
+ * ================================================================== */
+
+/*
+ * Full width under the header, behind a scrim, rather than a card hanging off
+ * the top right corner.
+ *
+ * The corner menu was 216px of translucent sheet with eleven rows spaced for a
+ * mouse, floating over a bright hero, which is why the text in it looked washed
+ * out and the whole thing looked cheap. Axon drops a solid panel across the
+ * whole screen with a dimmed page behind it, and every row is then as wide as
+ * the phone: a thumb cannot miss one, and it is obvious the page is waiting
+ * rather than gone.
+ */
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 0.45);
+  animation: scrim-in 140ms ease both;
+}
+
+.nav-drawer {
   position: absolute;
-  top: calc(100% + 10px);
+  left: 0;
   right: 0;
-  z-index: 30;
-  min-width: 216px;
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid var(--line-bright);
-  background: color-mix(in srgb, var(--ink-raised) 96%, transparent);
-  backdrop-filter: blur(14px) saturate(140%);
-  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.9);
-  animation: menu-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.nav-panel a {
-  padding: 11px 12px;
-  border-radius: 8px;
-  color: var(--text-dim);
-  text-decoration: none;
-  font-size: 14.5px;
-}
-.nav-panel a:hover { background: var(--ink-sunken); color: var(--text); }
-/* Where they already are, so a menu does not offer it as somewhere to go. */
-.nav-panel a.here { color: var(--accent); }
-.nav-panel-rule {
-  height: 1px;
-  margin: 6px 4px;
-  background: var(--line);
+  /* Under the header, whatever the notch does to it. */
+  top: calc(56px + env(safe-area-inset-top, 0px));
+  padding: 8px 20px 16px;
+  background: var(--ink-raised);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 24px 48px -24px rgb(0 0 0 / 0.9);
+  animation: drawer-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /*
- * The two outside links, as a row of marks rather than two more list items.
+ * A row per destination, separated by hairlines rather than by gaps.
  *
- * Everything above them in the panel is somewhere on this site. These two are
- * not, so they are laid out as a different kind of thing: side by side, evenly
- * split, each a mark with its name beside it.
+ * Axon's shape, and it is the right one for a list somebody is scanning with a
+ * thumb: the rule tells you where one target ends and the next begins, which a
+ * gap on a flat background does not.
  */
-.nav-panel-social {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-.nav-panel-social a {
+.nav-drawer > a {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  font-size: 13px;
+  justify-content: space-between;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
 }
-.nav-panel-social svg { flex: 0 0 auto; }
+.nav-drawer > a:last-of-type { border-bottom: 0; }
+.nav-drawer > a:hover { color: var(--text); }
+/* Where they already are, so a menu does not offer it as somewhere to go. */
+.nav-drawer > a.here {
+  color: var(--text);
+  font-weight: 550;
+}
+.nav-drawer > a .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The action and the two outside links, on one row at the foot. */
+.nav-drawer-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+}
+.nav-drawer-wallet {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nav-drawer-wallet > * {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+.nav-drawer-wallet button {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 14px;
+  font-size: 15px;
+}
+.nav-icon-button {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  color: var(--text-dim);
+  transition: color 140ms ease, border-color 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-icon-button:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 45%, var(--line-bright));
+}
+
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 @media (max-width: 860px) {
   .site-nav { display: none; }
@@ -5601,7 +5660,8 @@ body:has(main.home) .glow {
 
 @media (prefers-reduced-motion: reduce) {
   .nav-bars i { transition: none; }
-  .nav-panel { animation: none; }
+  .nav-scrim,
+  .nav-drawer { animation: none; }
 }
 
 /* ================================================================== *
@@ -5718,57 +5778,16 @@ body:has(main.home) .glow {
 }
 
 /*
- * The right of the header moves into the menu where there is no width for it.
+ * The right of the header moves into the drawer where there is no width for it.
  *
  * Below this the header carries the mark and the menu button and nothing else,
  * so it is one line with one control on it rather than a mark, a button, two
- * social icons and a wallet fighting over 390 pixels. The wallet is not lost:
- * the panel renders it at the top, at full width, where it is easier to hit
- * than the pill ever was.
+ * social icons and a wallet fighting over 390 pixels. None of it is lost: the
+ * drawer's foot row carries the wallet at full width with GitHub and X as
+ * square buttons beside it.
  */
-.nav-panel-wallet { display: none; }
-
 @media (max-width: 860px) {
   .site-right { display: none; }
-
-  /*
-   * The panel, denser and actually opaque.
-   *
-   * It was a translucent sheet at 216px minimum floating over a bright hero,
-   * with eleven items spaced for a mouse. The page showing through it is what
-   * made the text look washed out, so the ground goes solid; the rows tighten;
-   * and it reaches nearly the full width rather than hanging off the corner,
-   * which is where a phone menu belongs anyway.
-   */
-  .nav-panel {
-    width: calc(100vw - 32px);
-    max-width: 320px;
-    padding: 10px;
-    border-radius: 14px;
-    background: var(--ink-raised);
-    backdrop-filter: none;
-  }
-  .nav-panel a {
-    padding: 12px 12px;
-    font-size: 15px;
-    font-weight: 500;
-  }
-  .nav-panel-rule { margin: 8px 4px; }
-
-  .nav-panel-wallet { display: block; }
-  /* The wallet's own controls fill the panel rather than sitting at the
-     natural width of a header pill. */
-  .nav-panel-wallet > * {
-    display: flex;
-    width: 100%;
-    justify-content: center;
-  }
-  .nav-panel-wallet button {
-    width: 100%;
-    justify-content: center;
-    padding: 13px 14px;
-    font-size: 15px;
-  }
 }
 
 /* ================================================================== *
