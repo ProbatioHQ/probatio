@@ -93,9 +93,28 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
         params: { message: intent.message },
       });
       signature = result.signature;
-    } catch {
-      // Declining is a decision, not a failure.
-      setStage('idle');
+    } catch (error) {
+      /*
+       * Declining is a decision. Everything else is a failure.
+       *
+       * This swallowed both, so a wallet that was locked, or not connected to
+       * this site, or that rejected the request outright, all looked exactly
+       * like somebody changing their mind: the button reset and nothing was
+       * said. The one report of this was "I click buy and nothing happens",
+       * which is precisely what a silent catch produces.
+       *
+       * Phantom signals a real decline with 4001, the same code the sign-in
+       * flow already checks for. Anything else is worth saying out loud.
+       */
+      const code = (error as { code?: number } | null)?.code;
+      const detail = error instanceof Error ? error.message : String(error);
+      if (code === 4001 || /user rejected|declined/i.test(detail)) {
+        setStage('idle');
+        return;
+      }
+      console.error('[store] the wallet refused the transaction', error);
+      setStage('error');
+      setMessage(`Your wallet could not send that: ${detail}`);
       return;
     }
 
@@ -193,14 +212,18 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
 
         <hr />
 
-        {/* Said here rather than in small print, because it is the reason the
-            leaderboard means anything. */}
+        {/* One line, where somebody is deciding whether to buy.
+            
+            It was a paragraph arguing the case: that a season fixes everybody's
+            balance, that buying in would let a trader down fifty percent buy
+            the loss away, that the board would then measure spending. All true,
+            and all reasoning about a decision already taken, sitting under a
+            price list where the only question is what this money is for. The
+            argument lives on the scoring page, where somebody asking why can
+            find it. */}
         <p className="dim" style={{ fontSize: 13.5 }}>
-          <strong>This is free play only.</strong> A ranked season starts every entrant on the same
-          balance, fixed in the ruleset published with that season, and purchased balance cannot
-          go into one. Seasons are ranked by percentage return, so if buying were allowed there a
-          trader who was down could buy the loss away, and the board would measure spending rather
-          than trading.
+          <strong>Free play only.</strong> Ranked seasons start everybody on the same balance, so
+          none of this goes into one. <a href="/docs/scoring">Why</a>.
         </p>
 
         {!getPhantomSigner() && (
