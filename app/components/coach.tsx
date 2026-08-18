@@ -33,6 +33,21 @@ interface CoachState {
   reason: string | null;
 }
 
+/**
+ * The same rewrite the checks now apply, for reports saved before they did.
+ *
+ * A report is written once and read for as long as it stands, so a dash that
+ * got through before is one somebody keeps seeing. Cheap enough to run on every
+ * render, and it does nothing to text that never had one.
+ */
+function houseStyle(text: string): string {
+  return text
+    .replace(/\s*[\u2014\u2013]\s*/g, ', ')
+    .replace(/,\s*,/g, ',')
+    .replace(/,\s*([.!?])/g, '$1')
+    .trim();
+}
+
 function when(timestamp: number): string {
   const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1_000));
   if (seconds < 60) return 'just now';
@@ -95,7 +110,7 @@ export function Coach() {
       {state.report ? (
         <article className="report">
           {/* The finding leads, at the size a finding deserves. */}
-          <p className="report-headline">{state.report.headline}</p>
+          <p className="report-headline">{houseStyle(state.report.headline)}</p>
           <p className="report-meta">
             <span>
               On {state.report.tripsAtReport} closed{' '}
@@ -114,7 +129,7 @@ export function Coach() {
                 <span className="report-n" aria-hidden="true">
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <p>{observation.text}</p>
+                <p>{houseStyle(observation.text)}</p>
               </li>
             ))}
           </ol>
@@ -122,7 +137,7 @@ export function Coach() {
           {state.report.focus && (
             <p className="report-focus">
               <span className="report-focus-k">Work on this next</span>
-              <span className="report-focus-v">{state.report.focus}</span>
+              <span className="report-focus-v">{houseStyle(state.report.focus)}</span>
             </p>
           )}
         </article>

@@ -69,6 +69,25 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+/**
+ * Punctuation the house style does not use, rewritten rather than requested.
+ *
+ * The prompt asks for no em dashes, and asking is not the same as knowing. A
+ * model that slips once puts a character into somebody's saved report that
+ * stays there for good, because a report is written once and read afterwards.
+ * The dash almost always joins two clauses, which a comma does as well, and
+ * where it was doing the work of brackets a comma still reads.
+ */
+function houseStyle(text: string): string {
+  return text
+    .replace(/\s*[\u2014\u2013]\s*/g, ', ')
+    // A comma the dash was already followed by, and one it introduced before a
+    // conjunction, both leave a doubled comma behind.
+    .replace(/,\s*,/g, ',')
+    .replace(/,\s*([.!?])/g, '$1')
+    .trim();
+}
+
 /** Parse and check a model response. Never throws. */
 export function reviewResponse(raw: string, brief: Brief): ReviewResult {
   const problems: string[] = [];
@@ -122,14 +141,14 @@ export function reviewResponse(raw: string, brief: Brief): ReviewResult {
       continue;
     }
 
-    observations.push({ metric: metric as FactKey, text: text.trim() });
+    observations.push({ metric: metric as FactKey, text: houseStyle(text) });
   }
 
   if (observations.length === 0) {
     return { report: null, problems: [...problems, 'nothing survived checking'], dropped };
   }
 
-  const headline = body['headline'].trim();
+  const headline = houseStyle(body['headline']);
   if (unsupportedFigures(headline, brief).length > 0) {
     return {
       report: null,
@@ -139,7 +158,7 @@ export function reviewResponse(raw: string, brief: Brief): ReviewResult {
   }
 
   const focusValue = body['focus'];
-  const focus = isNonEmptyString(focusValue) ? focusValue.trim() : '';
+  const focus = isNonEmptyString(focusValue) ? houseStyle(focusValue) : '';
   const focusClean = focus !== '' && unsupportedFigures(focus, brief).length === 0 ? focus : '';
 
   return {
