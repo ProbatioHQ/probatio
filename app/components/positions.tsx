@@ -111,7 +111,9 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
     try {
       const [positionsResponse, tradesResponse] = await Promise.all([
         fetch('/api/positions'),
-        fetch('/api/trades?limit=25'),
+        // More history now that the log scrolls in place: it was held to
+        // twenty-five because every extra row made the page taller.
+        fetch('/api/trades?limit=100'),
       ]);
 
       const positionsBody = (await positionsResponse.json()) as Snapshot | { error: string };
@@ -184,7 +186,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
           Record shows whether the trade has been written to Solana yet, which is what makes it
           checkable by anyone.
         </p>
-        <div className="scroller">
+        <div className="scroller trade-log">
         <table>
           <thead>
             <tr>
