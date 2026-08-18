@@ -279,6 +279,14 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   const [now, setNow] = useState(() => Date.now());
   const [solUsd, setSolUsd] = useState<number | null>(null);
   const [laneFilters, setLaneFilters] = useState<LaneFilters>(DEFAULT_LANE_FILTERS);
+  /*
+   * Which lane a narrow screen is showing.
+   *
+   * Only read by the stylesheet, which hides the other two below the width all
+   * three fit at. Held here rather than in a media query alone because the
+   * choice has to survive a re-render and be reflected in the pills.
+   */
+  const [shownLane, setShownLane] = useState<LaneKey>('new');
   const [showFilters, setShowFilters] = useState(false);
   /** Which lane the open panel is editing. */
   const [filterTab, setFilterTab] = useState<LaneKey>('new');
@@ -810,11 +818,39 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
             </ul>
           )
         ) : (
-          <div className={terminal ? 'lanes tall' : 'lanes'}>
+          <>
+          {/*
+            One lane at a time, on a phone.
+            
+            Three columns side by side is the whole point of this on a desktop
+            and unusable on a screen a thumb wide: each column ends up about a
+            hundred pixels across, which is not enough for a name and a market
+            cap. The lanes become a choice instead, and the chosen one gets the
+            full width. Hidden entirely where there is room for all three.
+          */}
+          <div className="lane-picker" role="tablist" aria-label="Feed">
+            {LANES.map((lane) => (
+              <button
+                key={lane.key}
+                type="button"
+                role="tab"
+                aria-selected={shownLane === lane.key}
+                className={shownLane === lane.key ? 'lane-pill on' : 'lane-pill'}
+                onClick={() => setShownLane(lane.key)}
+              >
+                {lane.title}
+              </button>
+            ))}
+          </div>
+
+          <div
+            className={terminal ? 'lanes tall' : 'lanes'}
+            data-shown={shownLane}
+          >
             {LANES.map((lane) => {
               const rows = visible(lane.key);
               return (
-                <div className="lane" key={lane.key}>
+                <div className="lane" data-lane={lane.key} key={lane.key}>
                   <div className="lane-head">
                     <span className="prompt">{lane.prompt}</span>
                     {/* h2: these sit directly under the page heading, and as
@@ -860,6 +896,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
               );
             })}
           </div>
+          </>
         )}
 
         {!terminal && (

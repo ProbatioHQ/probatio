@@ -5593,3 +5593,108 @@ body:has(main.home) .glow {
 @media (max-width: 860px) {
   .site-right .icon-link { display: none; }
 }
+
+/* ================================================================== *
+ * The feed on a phone: one lane, at a size a thumb can use.
+ * ================================================================== */
+
+/* The picker does not exist where all three lanes fit. */
+.lane-picker { display: none; }
+
+@media (max-width: 860px) {
+  .lane-picker {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .lane-picker::-webkit-scrollbar { display: none; }
+
+  .lane-pill {
+    flex: 0 0 auto;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--line-bright);
+    background: var(--ink-sunken);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 550;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .lane-pill.on {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  /* Only the chosen lane, at the full width of the screen. */
+  .lanes[data-shown='new'] .lane:not([data-lane='new']),
+  .lanes[data-shown='bonding'] .lane:not([data-lane='bonding']),
+  .lanes[data-shown='bonded'] .lane:not([data-lane='bonded']) {
+    display: none;
+  }
+  /* The lane names its own contents in the pill above it. */
+  .lanes .lane-head { display: none; }
+  .lanes { border: 0; background: none; border-radius: 0; }
+  .lanes .lane { background: none; }
+  .lanes .feed,
+  .lanes.tall .feed { max-height: none; }
+
+  /*
+   * A row a thumb can hit and an eye can read.
+   *
+   * The desktop row is a table line: a thirty pixel picture, a name and a
+   * ticker squeezed onto one line, a market cap and an age in columns. At this
+   * width that is four things fighting over three hundred pixels. The picture
+   * gets big enough to recognise, the name gets its own line at a size worth
+   * reading, and everything supporting it goes underneath.
+   */
+  .feed-row a {
+    grid-template-columns: 56px minmax(0, 1fr) auto !important;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 4px;
+  }
+  .feed-row .token-image,
+  .feed-row .token-image img {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+  .feed-name {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+  }
+  .feed-name strong {
+    font-size: 16.5px;
+    font-weight: 650;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .feed-name .dim {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .feed-cap {
+    font-size: 16.5px !important;
+    font-weight: 650;
+    color: var(--text);
+    text-align: right;
+    min-width: 0 !important;
+  }
+  /* The age rides with the name rather than taking a column of its own. */
+  .feed-age { display: none; }
+  .lane-cols { display: none; }
+}
