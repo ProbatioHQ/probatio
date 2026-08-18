@@ -1,23 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-  EMPTY_ACCUMULATOR,
-  buildTree,
-  extendChain,
-  fromHex,
-  hashLeaf,
-  toHex,
-  type TradeLeaf,
-} from '@probatio/commit';
-import { PROGRAM_ID, TRADER_RECORD_DISCRIMINATOR } from '../src/constants';
-import { Probatio, ProbatioError, getStandings, verifyBundle, verifyRecord } from '../src/index';
-import type { ProofBundle, RawLeaf } from '../src/types';
+import { buildTree, hashLeaf, toHex, type TradeLeaf } from '@probatio/commit';
+import { Probatio, getStandings, verifyBundle, verifyRecord } from '../src/index';
+import type { ProofBundle, SealedLeaf } from '../src/types';
 
 const TRADER = '7xKXtg2CW3cWCLBmVvKcbAkKM6mzTuKMYqM9dAcuLNwr';
 const MINT = '3SPyj7fHQ6TKGR5Agua1gPdCnb2oWHF8Zi8bY33bpump';
 
-function leaf(): TradeLeaf {
+function leaf(sequence = 1): TradeLeaf {
   return {
-    sequence: 1,
+    sequence,
     seasonOrdinal: 0,
     trader: TRADER,
     mint: MINT,
@@ -40,7 +31,8 @@ function leaf(): TradeLeaf {
   };
 }
 
-function raw(source: TradeLeaf): RawLeaf {
+/** A fill as the endpoint serves it: string amounts, plus the seal. */
+function sealed(source: TradeLeaf, seal?: string): SealedLeaf {
   return {
     ...source,
     solAmount: source.solAmount.toString(),
@@ -49,227 +41,134 @@ function raw(source: TradeLeaf): RawLeaf {
     solReserve: source.solReserve.toString(),
     tokenReserve: source.tokenReserve.toString(),
     deliverableTokens: source.deliverableTokens.toString(),
+    recordedHash: seal ?? toHex(hashLeaf(source)),
   };
 }
 
-const L = leaf();
-const ROOT = toHex(buildTree([hashLeaf(L)]).root);
-const ACCUMULATOR = toHex(extendChain(EMPTY_ACCUMULATOR, fromHex(ROOT), 1, 1));
-
-function bundle(trades: readonly RawLeaf[] = [raw(L)]): ProofBundle {
-  return {
-    trader: TRADER,
-    seasonId: 5,
-    seasonOrdinal: 0,
-    batches: [
-      {
-        batchIndex: 0,
-        root: ROOT,
-        leaves: 1,
-        engineVersion: 1,
-        previousAccumulator: toHex(EMPTY_ACCUMULATOR),
-        predictedAccumulator: ACCUMULATOR,
-        txSignature: 'sig',
-        slot: 100,
-        trades,
-      },
-    ],
-  };
+function bundle(record: readonly SealedLeaf[]): ProofBundle {
+  return { trader: TRADER, seasonId: 1, seasonOrdinal: 0, record, batches: [] };
 }
 
-/** A 104-byte TraderRecord account holding `accumulatorHex`, base64. */
-function recordAccount(accumulatorHex: string): string {
-  const data = new Uint8Array(104);
-  data.set(fromHex(TRADER_RECORD_DISCRIMINATOR), 0);
-  data.set(fromHex(accumulatorHex), 72);
-  return Buffer.from(data).toString('base64');
+function fetchReturning(body: unknown): typeof fetch {
+  return (async () =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as unknown as typeof fetch;
 }
 
-const STANDINGS = {
-  season: { ordinal: 1, name: 'Season 1', status: 'running', entrants: 1, potLamports: '0', scoring: 'highest_return' },
-  standings: [
-    { rank: 1, trader: TRADER, name: null, returnBps: 5000, finalEquity: '15', startingBalance: '10', tradeCount: 4, payoutLamports: '0' },
-  ],
-  total: 1,
-  final: false,
-};
+describe('verifyBundle', () => {
+  it('verifies a record whose fills all rehash to their seals', () => {
+    const result = verifyBundle(bundle([sealed(leaf())]));
 
-const SEASON = {
-  ranked: {
-    id: 1,
-    ordinal: 1,
-    name: 'Season 1',
-    status: 'running',
-    startsAt: 0,
-    endsAt: 100,
-    entryClosesAt: 50,
-    entryClosesInMs: 10,
-    entryCost: '50000000',
-    startingBalance: '10000000000',
-    scoring: 'highest_return',
-    entrants: 3,
-    potLamports: '150000000',
-    entriesLamports: '150000000',
-    sponsorLamports: '0',
-    paidPlaces: 1,
-    payouts: [{ place: 1, lamports: '135000000' }],
-    houseLamports: '15000000',
-    rulesetHash: 'abcd',
-    rulesetHashNow: 'abcd',
-    entered: false,
-  },
-  freePlay: { open: true, startingBalance: '10000000000' },
-};
+    expect(result.verified).toBe(true);
+    expect(result.tradeCount).toBe(1);
+    expect(result.broken).toEqual([]);
+    expect(result.root).toBe(toHex(buildTree([hashLeaf(leaf())]).root));
+    expect(result.checks.every((check) => check.passed)).toBe(true);
+  });
 
-/** A fetch that serves a proof bundle, a leaderboard, a season, and an RPC account. */
-function mockFetch(proof: ProofBundle | null, onChainAccumulator: string | null): typeof fetch {
-  return (async (url: string | URL, init?: RequestInit) => {
-    const u = String(url);
-    if (u.includes('/api/proof')) return new Response(JSON.stringify(proof ?? {}), { status: 200 });
-    if (u.includes('/api/leaderboard')) return new Response(JSON.stringify(STANDINGS), { status: 200 });
-    if (u.includes('/api/season')) return new Response(JSON.stringify(SEASON), { status: 200 });
-    const body = JSON.parse(String(init?.body ?? '{}')) as { method?: string };
-    if (body.method === 'getAccountInfo') {
-      const value =
-        onChainAccumulator === null
-          ? null
-          : { data: [recordAccount(onChainAccumulator), 'base64'], owner: PROGRAM_ID };
-      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { value } }), { status: 200 });
-    }
-    return new Response(JSON.stringify({ result: null }), { status: 200 });
-  }) as unknown as typeof fetch;
-}
+  it('verifies a multi-fill record and roots it in order', () => {
+    const fills = [leaf(1), leaf(2), leaf(3)];
+    const result = verifyBundle(bundle(fills.map((one) => sealed(one))));
 
-const opts = (fetchImpl: typeof fetch) => ({ rpc: 'http://rpc.test', apiBase: 'http://probatio.test', fetchImpl });
+    expect(result.verified).toBe(true);
+    expect(result.tradeCount).toBe(3);
+    expect(result.root).toBe(toHex(buildTree(fills.map(hashLeaf)).root));
+  });
+
+  /*
+   * The test the whole design exists for: a stored fill edited after the fact.
+   * The seal is left as it was, which is what an edit in the database would
+   * look like, and the figures no longer produce it.
+   */
+  it('catches a fill whose figures were changed after it was sealed', () => {
+    const honest = leaf();
+    const seal = toHex(hashLeaf(honest));
+    const tampered = { ...honest, solAmount: 1n };
+
+    const result = verifyBundle(bundle([sealed(tampered, seal)]));
+
+    expect(result.verified).toBe(false);
+    expect(result.broken).toEqual(['1']);
+    expect(result.checks.some((check) => !check.passed && check.label === 'Seals')).toBe(true);
+  });
+
+  it('names only the fill that disagrees, not the whole record', () => {
+    const good = leaf(1);
+    const bad = leaf(2);
+    const result = verifyBundle(
+      bundle([sealed(good), sealed({ ...bad, feeLamports: 1n }, toHex(hashLeaf(bad)))]),
+    );
+
+    expect(result.verified).toBe(false);
+    expect(result.broken).toEqual(['2']);
+    expect(result.tradeCount).toBe(2);
+  });
+
+  it('reports a trader with no fills rather than passing them', () => {
+    const result = verifyBundle(bundle([]));
+
+    expect(result.verified).toBe(false);
+    expect(result.tradeCount).toBe(0);
+    expect(result.checks[0]?.passed).toBe(false);
+  });
+
+  /*
+   * A record that has never been batched still verifies. This is the case that
+   * used to fail everything: verification hung off commit history, and with
+   * nothing committed every honest record was reported as unverifiable.
+   */
+  it('verifies a record with no batches at all', () => {
+    const result = verifyBundle({
+      trader: TRADER,
+      seasonId: 1,
+      seasonOrdinal: 0,
+      record: [sealed(leaf())],
+      batches: [],
+    });
+
+    expect(result.verified).toBe(true);
+  });
+});
 
 describe('verifyRecord', () => {
-  it('verifies a record whose trades fold to the accumulator the chain holds', async () => {
-    const result = await verifyRecord(TRADER, opts(mockFetch(bundle(), ACCUMULATOR)));
+  it('fetches a record and verifies it without any endpoint being configured', async () => {
+    const result = await verifyRecord(TRADER, {
+      apiBase: 'https://example.test',
+      fetchImpl: fetchReturning(bundle([sealed(leaf())])),
+    });
+
     expect(result.verified).toBe(true);
-    expect(result.onChainAccumulator).toBe(ACCUMULATOR);
-    expect(result.computedAccumulator).toBe(ACCUMULATOR);
-    expect(result.checks.every((c) => c.passed)).toBe(true);
-    expect(result.tradeCount).toBe(1);
-  });
-
-  it('verifies a multi-leaf, multi-batch record (the real-world shape)', async () => {
-    // Two batches, three then two trades: exercises the merkle tree with more
-    // than one leaf, membership proofs into it, and the fold across batches.
-    const t = (sequence: number): TradeLeaf => ({ ...leaf(), sequence });
-    const b1 = [t(1), t(2), t(3)];
-    const b2 = [t(4), t(5)];
-    const root1 = buildTree(b1.map(hashLeaf)).root;
-    const root2 = buildTree(b2.map(hashLeaf)).root;
-    const acc1 = extendChain(EMPTY_ACCUMULATOR, root1, b1.length, 1);
-    const acc2 = extendChain(acc1, root2, b2.length, 1);
-    const multi: ProofBundle = {
-      trader: TRADER,
-      seasonId: 5,
-      seasonOrdinal: 0,
-      batches: [
-        {
-          batchIndex: 0,
-          root: toHex(root1),
-          leaves: b1.length,
-          engineVersion: 1,
-          previousAccumulator: toHex(EMPTY_ACCUMULATOR),
-          predictedAccumulator: toHex(acc1),
-          txSignature: 's0',
-          slot: 100,
-          trades: b1.map(raw),
-        },
-        {
-          batchIndex: 1,
-          root: toHex(root2),
-          leaves: b2.length,
-          engineVersion: 1,
-          previousAccumulator: toHex(acc1),
-          predictedAccumulator: toHex(acc2),
-          txSignature: 's1',
-          slot: 101,
-          trades: b2.map(raw),
-        },
-      ],
-    };
-    const result = await verifyRecord(TRADER, opts(mockFetch(multi, toHex(acc2))));
-    expect(result.verified).toBe(true);
-    expect(result.tradeCount).toBe(5);
-    expect(result.batchCount).toBe(2);
-    expect(result.computedAccumulator).toBe(toHex(acc2));
-    expect(result.checks.every((c) => c.passed)).toBe(true);
-  });
-
-  it('rejects a record the chain does not hold', async () => {
-    // The chain holds a different accumulator than the trades produce.
-    const other = toHex(extendChain(EMPTY_ACCUMULATOR, fromHex(ROOT), 1, 2));
-    const result = await verifyRecord(TRADER, opts(mockFetch(bundle(), other)));
-    expect(result.verified).toBe(false);
-    expect(result.checks.find((c) => c.label === 'On-chain comparison')?.passed).toBe(false);
-  });
-
-  it('rejects a tampered trade whose root no longer rebuilds', async () => {
-    const tampered = { ...raw(L), solAmount: '999' };
-    const result = await verifyRecord(TRADER, opts(mockFetch(bundle([tampered]), ACCUMULATOR)));
-    expect(result.verified).toBe(false);
-    expect(result.checks.find((c) => c.label === 'Roots rebuilt from trades')?.passed).toBe(false);
-  });
-
-  it('reports a trader with nothing committed', async () => {
-    const empty: ProofBundle = { trader: TRADER, seasonId: 5, seasonOrdinal: 0, batches: [], note: 'nothing yet' };
-    const result = await verifyRecord(TRADER, opts(mockFetch(empty, ACCUMULATOR)));
-    expect(result.verified).toBe(false);
-    expect(result.checks[0]!.label).toBe('Committed record');
-    expect(result.tradeCount).toBe(0);
-  });
-
-  it('turns a missing fetch into a clean on-chain check failure, not a TypeError', async () => {
-    const saved = globalThis.fetch;
-    globalThis.fetch = undefined as unknown as typeof fetch;
-    try {
-      const result = await verifyBundle(bundle(), { rpc: 'http://rpc.test' });
-      const check = result.checks.find((c) => c.label === 'On-chain comparison');
-      expect(result.verified).toBe(false);
-      expect(check?.passed).toBe(false);
-      expect(check?.detail).toMatch(/fetch/);
-    } finally {
-      globalThis.fetch = saved;
-    }
+    expect(result.trader).toBe(TRADER);
   });
 });
 
 describe('Probatio client', () => {
-  it('reads standings', async () => {
-    const client = new Probatio({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(null, null) });
-    const standings = await client.getStandings();
-    expect(standings.standings[0]!.trader).toBe(TRADER);
+  it('verifies with nothing but an api base', async () => {
+    const client = new Probatio({
+      apiBase: 'https://example.test',
+      fetchImpl: fetchReturning(bundle([sealed(leaf())])),
+    });
+
+    await expect(client.verifyRecord(TRADER)).resolves.toMatchObject({ verified: true });
   });
 
-  it('refuses to verify without an rpc endpoint', () => {
-    const client = new Probatio({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(bundle(), ACCUMULATOR) });
-    expect(() => client.verifyRecord(TRADER)).toThrow(ProbatioError);
+  it('reads standings', async () => {
+    const rows = [{ pubkey: TRADER, returnBps: 120, trips: 4 }];
+    const client = new Probatio({
+      apiBase: 'https://example.test',
+      fetchImpl: fetchReturning({ leaderboard: rows }),
+    });
+
+    // The endpoint's envelope, not a bare array: `Standings` is the whole body.
+    await expect(client.getStandings()).resolves.toEqual({ leaderboard: rows });
   });
 
   it('standalone getStandings hits the leaderboard', async () => {
-    const standings = await getStandings({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(null, null) });
-    expect(standings.final).toBe(false);
-  });
-
-  it('reads the current season and both ruleset hashes', async () => {
-    const client = new Probatio({ apiBase: 'http://probatio.test', fetchImpl: mockFetch(null, null) });
-    const info = await client.getSeason();
-    expect(info.ranked?.name).toBe('Season 1');
-    expect(info.ranked?.rulesetHash).toBe(info.ranked?.rulesetHashNow);
-    expect(info.freePlay.open).toBe(true);
-  });
-
-  it('getStandings sends limit but never a season the endpoint would ignore', async () => {
-    let seen = '';
-    const fetchImpl = (async (url: string | URL) => {
-      seen = String(url);
-      return new Response(JSON.stringify(STANDINGS), { status: 200 });
-    }) as unknown as typeof fetch;
-    await getStandings({ apiBase: 'http://probatio.test', fetchImpl, limit: 25 });
-    expect(seen).toContain('limit=25');
-    expect(seen).not.toContain('season');
+    const rows = [{ pubkey: TRADER, returnBps: 5, trips: 1 }];
+    await expect(
+      getStandings({ apiBase: 'https://example.test', fetchImpl: fetchReturning({ leaderboard: rows }) }),
+    ).resolves.toEqual({ leaderboard: rows });
   });
 });

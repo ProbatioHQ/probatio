@@ -19,26 +19,22 @@ export default function McpDocs() {
       <section className="panel">
         <h2>Connect it</h2>
         <p>
-          Point an MCP client at the <code>probatio-mcp</code> binary. The RPC it verifies
-          against is read from the environment, so a call does not have to carry one.
+          Point an MCP client at the <code>probatio-mcp</code> binary. Nothing else is needed:
+          verification is arithmetic, so there is no endpoint to configure.
         </p>
         <pre>
           <code>{`{
   "mcpServers": {
     "probatio": {
       "command": "npx",
-      "args": ["-y", "@probatio/mcp"],
-      "env": {
-        "PROBATIO_RPC": "https://api.mainnet-beta.solana.com"
-      }
+      "args": ["-y", "@probatio/mcp"]
     }
   }
 }`}</code>
         </pre>
         <p>
-          <code>PROBATIO_RPC</code> is the endpoint <code>verify_record</code> checks against when
-          a call omits one; <code>PROBATIO_API</code> points at a specific instance, and defaults
-          to the hosted one.
+          <code>PROBATIO_API</code> points at a specific instance and defaults to the hosted one.
+          It is the only setting there is.
         </p>
       </section>
 
@@ -46,9 +42,10 @@ export default function McpDocs() {
         <h2>The tools</h2>
         <p>Five, each a plain wrapper over the SDK.</p>
         <pre>
-          <code>{`verify_record   { wallet, rpc?, season? }
-    Rebuild a trader's committed trades, fold the accumulator, and
-    compare it to the one on chain. Returns verified plus every check.
+          <code>{`verify_record   { wallet, season? }
+    Rebuild every fill from the figures it was priced from and compare
+    each hash to the seal recorded with it. Returns verified, the record
+    root, any fills that disagree, and every check.
 
 get_record      { wallet }
     The public record: name, the seasons traded, and where to prove it.
@@ -58,28 +55,28 @@ get_standings   { limit? }
 
 get_season      { }
     The current ranked season: status, pot, projected payouts, and the
-    ruleset hash recorded on chain versus the one recomputed now.
+    ruleset hash recorded for the season versus the one recomputed now.
 
 get_proof       { wallet, season? }
-    The raw inputs verify_record recomputes from: every committed
-    trade, its batch, and the roots.`}</code>
+    The raw inputs verify_record recomputes from: every fill, the
+    figures it was priced from, and the seal written with it.`}</code>
         </pre>
         <p>
-          <code>verify_record</code> is the one that matters. It needs an RPC, from the call or
-          from <code>PROBATIO_RPC</code>, and it returns the verdict along with each step, so an
-          agent can show its work rather than assert a result.
+          <code>verify_record</code> is the one that matters. It needs nothing but a wallet,
+          and it returns the verdict along with each step, so an agent can show its work rather
+          than assert a result.
         </p>
       </section>
 
       <section className="panel">
         <h2>Why an agent can trust it</h2>
         <p>
-          For the same reason a person can. The server reads a trader&apos;s trades from a
+          For the same reason a person can. The server reads a trader&apos;s fills from a
           Probatio instance, because the data lives somewhere, but it does not read the{' '}
-          <em>verdict</em> from anywhere. The record&apos;s on-chain address is derived from
-          constants in the package, the accumulator is fetched from the RPC, and the comparison
-          happens in the server. An instance that served a record it never committed fails{' '}
-          <code>verify_record</code> rather than being believed by it.
+          <em>verdict</em> from anywhere. It rehashes every fill with the same open-source
+          function the engine seals with, and compares. An instance that altered a stored fill
+          has to hand over the altered figures, which no longer produce the seal beside them, so
+          it fails <code>verify_record</code> rather than being believed by it.
         </p>
       </section>
 

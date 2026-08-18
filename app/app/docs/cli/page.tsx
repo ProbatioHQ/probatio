@@ -10,14 +10,14 @@ export default function CliDocs() {
       <h1>CLI</h1>
 
       <p>
-        Checking a record from a terminal, against an RPC you name, is the plainest form of
-        &quot;do not trust us, check&quot;. <code>@probatio/cli</code> is the SDK as a command.
-        It reads the trades a trader committed, rebuilds them, and compares the result to the
-        accumulator on Solana. Nothing about the verdict comes from a server.
+        Checking a record from a terminal is the plainest form of &quot;do not trust us,
+        check&quot;. <code>@probatio/cli</code> is the SDK as a command. It reads the figures
+        every fill was priced from, rehashes each one, and compares against the seal recorded
+        beside it. The verdict is arithmetic done on your machine.
       </p>
 
       <pre>
-        <code>{`npx @probatio/cli verify <wallet> --rpc https://api.mainnet-beta.solana.com`}</code>
+        <code>{`npx @probatio/cli verify <wallet>`}</code>
       </pre>
 
       <section className="panel">
@@ -28,23 +28,31 @@ export default function CliDocs() {
           output.
         </p>
         <pre>
-          <code>{`$ probatio verify 7xKXtg2CW3cWCLBmVvKcbAkKM6mzTuKMYqM9dAcuLNwr \\
-    --rpc https://api.mainnet-beta.solana.com
+          <code>{`$ probatio verify 7xKXtg2CW3cWCLBmVvKcbAkKM6mzTuKMYqM9dAcuLNwr
 
-  PASS  roots rebuilt: 3 batch root(s) recomputed from the trades
-  PASS  membership: every trade proven under its batch root
-  PASS  chain fold: roots fold to the claimed accumulator
-  PASS  on-chain: the account holds that accumulator
+  PASS  Seals: all 9 fills rehash to exactly the seal recorded with them
+  PASS  Membership: every fill proves it belongs to the record, in the order it was made
 
-VERIFIED  ace in season 1, 9 trade(s) checked`}</code>
+VERIFIED  7xKXtg2CW3cWCLBmVvKcbAkKM6mzTuKMYqM9dAcuLNwr, 9 fill(s) checked
+ROOT      4f2c9a1d8b3e57069c4a1f8d2e6b03571a9c4e8f2d6b0357194c8ea3f7d20b6c1`}</code>
         </pre>
         <p>
-          <code>verify</code> exits <code>0</code> when the record holds against the chain,{' '}
-          <code>1</code> when it does not, and <code>2</code> on a usage error. So a guard is
+          A record with a fill that was edited after it was sealed fails, and the failing fill is
+          named rather than the whole record:
+        </p>
+        <pre>
+          <code>{`  FAIL  Seals: 1 of 9 fills do not match their seal
+  FAIL  Fill 4: its figures hash to 91c04ae7f2b6…, but 3d8f1c6b0a45… was recorded
+
+NOT VERIFIED  7xKXtg…, fill(s) 4 do not match their seal`}</code>
+        </pre>
+        <p>
+          <code>verify</code> exits <code>0</code> when every fill matches its seal,{' '}
+          <code>1</code> when one does not, and <code>2</code> on a usage error. So a guard is
           just:
         </p>
         <pre>
-          <code>{`probatio verify "$WALLET" --rpc "$RPC" || echo "record did not check out"`}</code>
+          <code>{`probatio verify "$WALLET" || echo "record did not check out"`}</code>
         </pre>
       </section>
 
@@ -63,16 +71,15 @@ probatio proof <wallet>            # the raw inputs verify recomputes from, as J
         <h2>Options</h2>
         <p>A small, shared set of flags.</p>
         <pre>
-          <code>{`--rpc <url>     Solana RPC endpoint to check against   (verify)
---season <n>    a specific season ordinal, default the latest committed   (verify, proof)
+          <code>{`--season <n>    a specific season ordinal, default the trader's latest   (verify, proof)
 --limit <n>     how many standings to return   (standings)
 --api <url>     a Probatio instance, default https://probatio.app
 --json          print the raw JSON result instead of a summary`}</code>
         </pre>
         <p>
-          <code>--api</code> is how you point the command at your own instance;{' '}
-          <code>--rpc</code> is the endpoint it checks that instance against. The two are
-          separate on purpose: the data comes from one, the truth from the other.
+          <code>--api</code> is how you point the command at your own instance. There is no
+          endpoint flag: verification needs nothing beyond the record itself, so the only
+          network call is fetching it.
         </p>
       </section>
 

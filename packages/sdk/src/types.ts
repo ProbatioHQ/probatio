@@ -20,6 +20,12 @@ export type AmountField =
 
 export type RawLeaf = Omit<TradeLeaf, AmountField> & Record<AmountField, string>;
 
+/** A fill as recorded, with the seal written beside it at the time. */
+export interface SealedLeaf extends RawLeaf {
+  /** The hash written when this fill landed. */
+  readonly recordedHash: string;
+}
+
 export interface ProofBatch {
   readonly batchIndex: number;
   /** The merkle root over this batch's trades, hex. */
@@ -38,6 +44,13 @@ export interface ProofBundle {
   readonly trader: string;
   readonly seasonId: number;
   readonly seasonOrdinal: number;
+  /**
+   * Every fill, with the figures it was priced from and the seal written when
+   * it landed. This is what verification runs on: a seal exists from the moment
+   * a fill happens, so a record can be checked whether or not it has ever been
+   * batched.
+   */
+  readonly record: readonly SealedLeaf[];
   readonly batches: readonly ProofBatch[];
   /** Present when there is nothing committed to prove. */
   readonly note?: string;
@@ -50,22 +63,28 @@ export interface VerifyCheck {
 }
 
 /**
- * The result of checking a record against the chain.
+ * The result of checking a record.
  *
- * `verified` is true only when the trades rebuild their roots, the roots fold to
- * the accumulator the record claims, and that accumulator is the one Solana
- * actually holds. `checks` carries each step so a caller can show its work.
+ * `verified` is true only when every fill rehashes to the seal recorded beside
+ * it and every fill proves membership of the record's root. `checks` carries
+ * each step so a caller can show its work, and `broken` names the fills that
+ * failed rather than leaving a caller to diff the record themselves.
  */
 export interface VerifiedRecord {
   readonly trader: string;
   readonly seasonOrdinal: number;
   readonly verified: boolean;
-  /** The accumulator these committed trades produce, hex. */
-  readonly computedAccumulator: string;
-  /** The accumulator on chain, hex, or null when there is no record account. */
-  readonly onChainAccumulator: string | null;
+  /**
+   * The root over every fill in the record, in order.
+   *
+   * One hash standing for the whole record. Two people checking the same record
+   * compute the same value; a record with one figure altered anywhere inside it
+   * does not.
+   */
+  readonly root: string;
+  /** Fills whose stored figures no longer hash to the seal beside them. */
+  readonly broken: readonly string[];
   readonly tradeCount: number;
-  readonly batchCount: number;
   readonly checks: readonly VerifyCheck[];
 }
 

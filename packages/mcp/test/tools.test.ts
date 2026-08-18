@@ -29,7 +29,7 @@ function mockFetch(): typeof fetch {
 }
 
 describe('mcp tools', () => {
-  const tools = createTools({ apiBase: 'http://probatio.test', rpc: 'http://rpc', fetchImpl: mockFetch() });
+  const tools = createTools({ apiBase: 'http://probatio.test', fetchImpl: mockFetch() });
 
   it('get_record returns the public record', async () => {
     const record = await tools.getRecord({ wallet: WALLET });

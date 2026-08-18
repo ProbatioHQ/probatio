@@ -23,23 +23,21 @@ const stdoutIo: CliIo = {
 const HELP = `probatio, the open prop firm
 
 Usage
-  probatio verify <wallet> [--rpc <url>] [--season <n>] [--api <url>] [--json]
+  probatio verify <wallet> [--season <n>] [--api <url>] [--json]
   probatio record <wallet> [--api <url>] [--json]
   probatio standings [--limit <n>] [--api <url>] [--json]
   probatio season [--api <url>] [--json]
   probatio proof <wallet> [--season <n>] [--api <url>]
 
 Options
-  --rpc <url>     Solana RPC endpoint to check the record against (verify)
   --season <n>    a specific season ordinal, default the latest committed
   --limit <n>     how many standings to return
   --api <url>     a Probatio instance, default https://probatio.app
   --json          print the raw JSON result instead of a summary
 
-verify exits 0 when the record checks out against the chain, 1 when it does not.`;
+verify exits 0 when every fill rehashes to the seal recorded with it, 1 when one does not.`;
 
 interface Flags {
-  rpc?: string | undefined;
   api?: string | undefined;
   season?: number | undefined;
   limit?: number | undefined;
@@ -50,7 +48,7 @@ interface Flags {
 /** A bad command line. `run` turns it into a clear message and exit code 2. */
 class UsageError extends Error {}
 
-const VALUE_FLAGS = new Set(['--rpc', '--api', '--season', '--limit']);
+const VALUE_FLAGS = new Set(['--api', '--season', '--limit']);
 
 /** A value that is really the next option (a bare `--json`), not a negative number. */
 function looksLikeFlag(value: string): boolean {
@@ -98,7 +96,6 @@ function parseFlags(args: readonly string[]): Flags {
     if (value === undefined || (inline === undefined && looksLikeFlag(value))) {
       throw new UsageError(`${name} needs a value`);
     }
-    if (name === '--rpc') flags.rpc = value;
     else if (name === '--api') flags.api = value;
     else if (name === '--season') flags.season = count(name, value);
     else flags.limit = count(name, value);
@@ -107,7 +104,7 @@ function parseFlags(args: readonly string[]): Flags {
 }
 
 function client(flags: Flags, fetchImpl?: typeof fetch): Probatio {
-  return new Probatio({ apiBase: flags.api, rpc: flags.rpc, fetchImpl });
+  return new Probatio({ apiBase: flags.api, fetchImpl });
 }
 
 /** Lamports (a decimal string) as SOL, without a float ever touching the amount. */
@@ -126,19 +123,17 @@ function printVerify(result: VerifiedRecord, io: CliIo): void {
   io.out('');
   io.out(
     result.verified
-      ? `VERIFIED  ${result.trader} in season ${result.seasonOrdinal}, ${result.tradeCount} trade(s) checked`
-      : `NOT VERIFIED  ${result.trader} in season ${result.seasonOrdinal}`,
+      ? `VERIFIED  ${result.trader}, ${result.tradeCount} fill(s) checked`
+      : `NOT VERIFIED  ${result.trader}` +
+        (result.broken.length > 0 ? `, fill(s) ${result.broken.join(', ')} do not match their seal` : ''),
   );
+  if (result.root) io.out(`ROOT      ${result.root}`);
 }
 
 async function cmdVerify(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Promise<number> {
   const wallet = flags.positional[0];
   if (!wallet) {
-    io.err('verify needs a wallet: probatio verify <wallet> --rpc <url>');
-    return 2;
-  }
-  if (!flags.rpc) {
-    io.err('verify needs an rpc endpoint to check against the chain: --rpc <url>');
+    io.err('verify needs a wallet: probatio verify <wallet>');
     return 2;
   }
   const result = await client(flags, fetchImpl).verifyRecord(wallet, { season: flags.season });
@@ -169,7 +164,7 @@ async function cmdRecord(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Pro
     const win = `${(season.winRateBps / 100).toFixed(1)}% win`;
     io.out(
       `  season ${season.seasonId} (${kind}): ${season.trades} trade(s), ` +
-        `${season.roundTrips} round trip(s), ${win}, ${season.committedTrades} committed`,
+        `${season.roundTrips} round trip(s), ${win}`,
     );
   }
   return 0;
@@ -207,7 +202,7 @@ async function cmdSeason(flags: Flags, io: CliIo, fetchImpl?: typeof fetch): Pro
   io.out(`  ${season.entrants} entrant(s), pot ${formatSol(season.potLamports)} SOL`);
   io.out(
     season.rulesetHash === season.rulesetHashNow
-      ? '  ruleset: matches the hash recorded on chain'
+      ? '  ruleset: matches the hash recorded for this season'
       : '  ruleset: CHANGED since the season opened, does not match the recorded hash',
   );
   for (const payout of season.payouts) {

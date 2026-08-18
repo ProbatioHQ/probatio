@@ -13,7 +13,6 @@ export interface ToolConfig {
   /** A Probatio instance. Defaults to https://probatio.app. */
   readonly apiBase?: string | undefined;
   /** A Solana RPC endpoint, used by verify_record when the call omits one. */
-  readonly rpc?: string | undefined;
   /** Injected fetch, for tests. */
   readonly fetchImpl?: typeof fetch | undefined;
 }
@@ -21,7 +20,6 @@ export interface ToolConfig {
 export interface ProbatioTools {
   verifyRecord(input: {
     wallet: string;
-    rpc?: string | undefined;
     season?: number | undefined;
   }): Promise<VerifiedRecord>;
   getRecord(input: { wallet: string }): Promise<ProfileRecord>;
@@ -33,12 +31,11 @@ export interface ProbatioTools {
 export function createTools(config: ToolConfig = {}): ProbatioTools {
   const probatio = new Probatio({
     apiBase: config.apiBase,
-    rpc: config.rpc,
     fetchImpl: config.fetchImpl,
   });
 
   return {
-    verifyRecord: (input) => probatio.verifyRecord(input.wallet, { rpc: input.rpc, season: input.season }),
+    verifyRecord: (input) => probatio.verifyRecord(input.wallet, { season: input.season }),
     getRecord: (input) => probatio.getRecord(input.wallet),
     getStandings: (input) => probatio.getStandings({ limit: input.limit }),
     getSeason: () => probatio.getSeason(),

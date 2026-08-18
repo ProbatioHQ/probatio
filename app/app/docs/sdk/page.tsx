@@ -1,7 +1,7 @@
 export const metadata = {
   title: 'SDK, Probatio',
   description:
-    'Read a Probatio record and check it against the chain yourself, in a few lines of TypeScript. The verification the site runs, as a library.',
+    'Read a Probatio record and check its hashes yourself, in a few lines of TypeScript. The verification the site runs, as a library.',
 };
 
 export default function SdkDocs() {
@@ -11,10 +11,9 @@ export default function SdkDocs() {
 
       <p>
         The point of Probatio is that a record does not need Probatio to be believed.{' '}
-        <code>@probatio/sdk</code> is that as a library. It fetches the trades a trader
-        committed, rebuilds their hashes, folds them into an accumulator, and compares it to
-        the one Solana holds, at an address derived from constants inside the package, over an
-        RPC you choose. A <code>verified: true</code> never comes from a server&apos;s say-so.
+        <code>@probatio/sdk</code> is that as a library. It fetches the figures every fill was
+        priced from, rehashes each one, and compares against the seal recorded beside it. A{' '}
+        <code>verified: true</code> never comes from a server&apos;s say-so.
       </p>
 
       <pre>
@@ -24,30 +23,28 @@ export default function SdkDocs() {
       <section className="panel">
         <h2>Verify a record</h2>
         <p>
-          The flagship call. Give it a wallet and an RPC endpoint, and it returns whether the
-          record checks out, along with every step it took to decide.
+          The flagship call. Give it a wallet and it returns whether the record checks out, along
+          with every step it took to decide. It needs no endpoint and no key: the checking is
+          arithmetic, and the only network call is fetching the record.
         </p>
         <pre>
           <code>{`import { Probatio } from '@probatio/sdk';
 
-const probatio = new Probatio({
-  rpc: 'https://api.mainnet-beta.solana.com',
-});
+const probatio = new Probatio();
 
 const result = await probatio.verifyRecord(wallet);
 
-result.verified;             // true only when the chain holds what these trades produce
-result.computedAccumulator;  // what the committed trades fold to
-result.onChainAccumulator;   // what Solana actually holds
-result.tradeCount;           // how many trades were checked
-result.checks;               // each step: roots rebuilt, membership, chain fold, on-chain`}</code>
+result.verified;    // true only when every fill matches the seal recorded with it
+result.root;        // one hash standing for the whole record, in order
+result.broken;      // the fills that disagree, by sequence, empty when none do
+result.tradeCount;  // how many fills were checked
+result.checks;      // each step, with the detail behind it`}</code>
         </pre>
         <p>
-          Every check must pass for <code>verified</code> to be true: the trades rebuild their
-          roots, the roots fold to the accumulator the record claims, and that accumulator is
-          the one on chain. A season can be named with{' '}
-          <code>verifyRecord(wallet, {'{'} season: 1 {'}'})</code>; without it the latest
-          committed season is used.
+          Every check must pass for <code>verified</code> to be true: each fill rehashes to its
+          seal, and each fill proves membership of the record&apos;s root. A season can be named
+          with <code>verifyRecord(wallet, {'{'} season: 1 {'}'})</code>; without it the
+          trader&apos;s latest is used.
         </p>
       </section>
 
@@ -67,12 +64,12 @@ const proof  = await probatio.getProof(wallet);    // the raw inputs verifyRecor
       <section className="panel">
         <h2>Why it does not trust us</h2>
         <p>
-          The SDK reads the trades from a Probatio instance, because it has to get the data
-          somewhere. It does not read the <em>verdict</em> from anywhere. The record&apos;s
-          on-chain address is derived from the program id and seeds shipped in the package, the
-          accumulator is fetched from the RPC you pass, and the comparison happens on your
-          machine. An instance that served a record it never committed, or lied about the
-          numbers, fails <code>verifyRecord</code> rather than being believed by it.
+          The SDK reads the fills from a Probatio instance, because it has to get the data
+          somewhere. It does not read the <em>verdict</em> from anywhere. The hashing is the
+          same open-source function the engine seals with, it runs on your machine, and it runs
+          over figures the instance handed you. An instance that altered a stored fill has to
+          hand you the altered figures, which no longer produce the seal beside them, so it
+          fails <code>verifyRecord</code> rather than being believed by it.
         </p>
       </section>
 

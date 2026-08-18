@@ -21,7 +21,7 @@ const STANDINGS = {
   final: false,
 };
 
-const EMPTY_PROOF = { trader: WALLET, seasonId: 5, seasonOrdinal: 0, batches: [], note: 'nothing yet' };
+const EMPTY_PROOF = { trader: WALLET, seasonId: 5, seasonOrdinal: 0, record: [], batches: [] };
 
 const SEASON = {
   ranked: {
@@ -68,19 +68,15 @@ describe('probatio cli', () => {
 
   it('verify needs a wallet', async () => {
     const { io, err } = capture();
-    expect(await run(['verify', '--rpc', 'http://rpc'], io, mockFetch())).toBe(2);
+    expect(await run(['verify'], io, mockFetch())).toBe(2);
     expect(err.join('\n')).toMatch(/needs a wallet/);
   });
 
-  it('verify needs an rpc endpoint', async () => {
-    const { io, err } = capture();
-    expect(await run(['verify', WALLET, api, base], io, mockFetch())).toBe(2);
-    expect(err.join('\n')).toMatch(/rpc/);
-  });
-
-  it('verify reports a not-verified record and exits 1', async () => {
+  // Nothing else is needed. This used to require an endpoint and refuse without
+  // one; verification is arithmetic on figures the record already carries.
+  it('verify needs nothing but a wallet', async () => {
     const { io, out } = capture();
-    const code = await run(['verify', WALLET, '--rpc', 'http://rpc', api, base], io, mockFetch());
+    const code = await run(['verify', WALLET, api, base], io, mockFetch());
     expect(code).toBe(1);
     expect(out.join('\n')).toMatch(/NOT VERIFIED/);
   });
@@ -160,7 +156,7 @@ describe('probatio cli', () => {
 
   it('rejects a negative --season', async () => {
     const { io, err } = capture();
-    expect(await run(['verify', WALLET, '--rpc', 'http://rpc', '--season', '-1'], io, mockFetch())).toBe(2);
+    expect(await run(['verify', WALLET, '--season', '-1'], io, mockFetch())).toBe(2);
     expect(err.join('\n')).toMatch(/--season must be a non-negative integer/);
   });
 

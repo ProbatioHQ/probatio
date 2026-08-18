@@ -8,16 +8,14 @@ import { createTools } from './tools';
  * The Probatio MCP server.
  *
  * Gives an agent the same reach the SDK does: read a trader's record and check
- * it against the chain, so it can vet or back a trader on proof rather than on a
+ * it by recomputing its hashes, so it can vet or back a trader on proof rather than on a
  * leaderboard's word. Speaks over stdio; point an MCP client at `probatio-mcp`.
  *
  * The default instance and RPC come from PROBATIO_API and PROBATIO_RPC; a
- * verify_record call may also carry its own rpc.
  */
 
 const tools = createTools({
   apiBase: process.env['PROBATIO_API'],
-  rpc: process.env['PROBATIO_RPC'],
 });
 
 type ToolResult = { content: { type: 'text'; text: string }[] };
@@ -45,13 +43,13 @@ const register = server.tool.bind(server) as unknown as (
 
 register(
   'verify_record',
-  "Verify a trader's Probatio record against Solana. Rebuilds their committed " +
-    'trades, folds the accumulator, and compares it to the one on chain. Returns ' +
-    'verified plus every check. Needs an rpc, in the call or from PROBATIO_RPC.',
-  { wallet: z.string(), rpc: z.string().optional(), season: z.number().int().nonnegative().optional() },
+  "Verify a trader's Probatio record. Rebuilds every fill from the figures it " +
+    'was priced from and compares each hash to the seal recorded with it. Returns ' +
+    'verified, the record root, any fills that disagree, and every check.',
+  { wallet: z.string(), season: z.number().int().nonnegative().optional() },
   async (args) =>
     asText(
-      await tools.verifyRecord(args as { wallet: string; rpc?: string; season?: number }),
+      await tools.verifyRecord(args as { wallet: string; season?: number }),
     ),
 );
 
@@ -72,7 +70,7 @@ register(
 register(
   'get_season',
   'The current ranked season: its status, pot, projected payouts, and the two ' +
-    'ruleset hashes to compare (recorded on chain vs recomputed now).',
+    'ruleset hashes to compare (recorded for the season vs recomputed now).',
   {},
   async () => asText(await tools.getSeason()),
 );

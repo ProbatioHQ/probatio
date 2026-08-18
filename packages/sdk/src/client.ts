@@ -62,18 +62,17 @@ export class Probatio {
     return getSeason(this.#read());
   }
 
-  /** Verify a record against the chain. Needs an rpc, from here or the config. */
+  /**
+   * Verify a record. Nothing else is needed: no endpoint, no key, no network
+   * beyond fetching the record itself, and the checking is arithmetic done here.
+   */
   verifyRecord(
     trader: string,
-    options: { readonly season?: number | undefined; readonly rpc?: string | undefined } = {},
+    options: { readonly season?: number | undefined } = {},
   ): Promise<VerifiedRecord> {
-    const rpc = options.rpc ?? this.#config.rpc;
-    if (!rpc) throw new ProbatioError('no rpc endpoint configured; pass one to the client or the call');
     const verifyOptions: VerifyOptions = {
-      rpc,
       apiBase: this.#config.apiBase,
       fetchImpl: this.#config.fetchImpl,
-      programId: this.#config.programId,
       season: options.season,
     };
     return verifyRecord(trader, verifyOptions);
