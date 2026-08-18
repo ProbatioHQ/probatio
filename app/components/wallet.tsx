@@ -211,6 +211,32 @@ export function WalletButton() {
     free: { balance: string };
     ranked: { balance: string; ordinal: number; live: boolean } | null;
   } | null>(null);
+  const [switching, setSwitching] = useState(false);
+
+  /*
+   * Move trading between the two accounts.
+   *
+   * Nothing moves between them and no balance changes; this decides only where
+   * the next trade lands. The page is reloaded rather than patched because
+   * every open surface reads the active account from the server, the chart, the
+   * trade panel, the position, and leaving any of them showing the other one
+   * is how somebody sells the wrong holding.
+   */
+  const choose = useCallback(async (mode: 'free' | 'ranked') => {
+    setSwitching(true);
+    try {
+      const response = await fetch('/api/account/mode', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      window.location.reload();
+    } catch (error) {
+      console.error('[wallet] could not switch account', error);
+      setSwitching(false);
+    }
+  }, []);
   // Whatever is newest: the refresher once it has answered, otherwise the
   // figure that arrived with the session, so the pill has a number from the
   // first render rather than waiting on a second request.
@@ -331,7 +357,7 @@ export function WalletButton() {
               <em>Ranked</em>
               <b>{(Number(BigInt(split.ranked.balance)) / 1e9).toFixed(2)}</b>
             </span>
-            <span className="wallet-leg">
+            <span className={split.ranked.live ? 'wallet-leg' : 'wallet-leg live'}>
               <em>Free</em>
               <b>{(Number(BigInt(split.free.balance)) / 1e9).toFixed(2)}</b>
             </span>
@@ -353,6 +379,35 @@ export function WalletButton() {
         <div className="wallet-menu">
           {/* The address, where it is looked up rather than watched. */}
           <span className="wallet-menu-head">{shortenPubkey(pubkey)}</span>
+          {split?.ranked && (
+            /*
+             * Which account the next trade lands in.
+             *
+             * In the menu rather than on the pill: it changes where money goes,
+             * and a control that does that should take a deliberate click
+             * rather than sit under the cursor on every page.
+             */
+            <span className="wallet-modes" role="group" aria-label="Account to trade">
+              <button
+                type="button"
+                className={split.ranked.live ? 'wallet-mode on' : 'wallet-mode'}
+                aria-pressed={split.ranked.live}
+                disabled={switching || split.ranked.live}
+                onClick={() => void choose('ranked')}
+              >
+                Ranked
+              </button>
+              <button
+                type="button"
+                className={split.ranked.live ? 'wallet-mode' : 'wallet-mode on'}
+                aria-pressed={!split.ranked.live}
+                disabled={switching || !split.ranked.live}
+                onClick={() => void choose('free')}
+              >
+                Free play
+              </button>
+            </span>
+          )}
           <a href="/me">Your account</a>
           <a href={`/p/${pubkey}`}>Public record</a>
           <a href="/season">This season</a>

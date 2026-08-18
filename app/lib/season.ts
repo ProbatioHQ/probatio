@@ -9,6 +9,7 @@ import {
 } from '@probatio/db';
 import { tradingOpen } from '@probatio/seasons';
 import type { Client } from '@libsql/client';
+import { accountChoice } from './account-choice';
 import { noteActivity } from './activity';
 
 /**
@@ -129,10 +130,28 @@ async function resolveSeason(
     );
 
     if (entered && open) {
+      /*
+       * Ranked unless this browser asked for free play.
+       *
+       * Entering used to move every trade onto the season with no way back, so
+       * somebody wanting to try an idea without spending it on a ranked record
+       * had nowhere to do that. A trader who has chosen free play gets free
+       * play; everybody else gets the season, which is what they entered for.
+       */
+      if ((await accountChoice()) !== 'free') {
+        return {
+          account: await ensureAccount(client, ranked.id, pubkey, now),
+          seasonId: ranked.id,
+          ranked: true,
+          rankedSeasonId: ranked.id,
+        };
+      }
+
+      const freeId = await freePlayId(client, now);
       return {
-        account: await ensureAccount(client, ranked.id, pubkey, now),
-        seasonId: ranked.id,
-        ranked: true,
+        account: await ensureAccount(client, freeId, pubkey, now),
+        seasonId: freeId,
+        ranked: false,
         rankedSeasonId: ranked.id,
       };
     }
@@ -198,7 +217,11 @@ export async function balances(client: Client, pubkey: string, now: number): Pro
   if (!season || !(await hasEntered(client, season.id, pubkey))) return { free, ranked: null };
 
   const account = await ensureAccount(client, season.id, pubkey, now);
+  // Live means trades land here, which is the season being open and this
+  // browser not having chosen otherwise, not merely the season running.
+  const chosenFree = (await accountChoice()) === 'free';
   const live =
+    !chosenFree &&
     season.startsAt !== null &&
     season.endsAt !== null &&
     tradingOpen(

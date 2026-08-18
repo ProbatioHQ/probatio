@@ -5366,3 +5366,47 @@ body:has(main.home) .glow {
   font-size: 12.5px;
   color: var(--text-faint);
 }
+
+/* ------------------------------------------------------------------ *
+ * Choosing which account to trade.
+ *
+ * In the menu rather than on the pill, because it decides where money
+ * goes and a control that does that should take a deliberate click
+ * rather than sit under the cursor on every page.
+ * ------------------------------------------------------------------ */
+.wallet-modes {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.wallet-mode {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--ink-sunken);
+  color: var(--text-dim);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.wallet-mode:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--line-bright);
+}
+/* The one being traded, which is also the one that cannot be clicked. */
+.wallet-mode.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  cursor: default;
+  opacity: 1;
+}
+.wallet-mode:disabled:not(.on) {
+  opacity: 0.5;
+  cursor: default;
+}
