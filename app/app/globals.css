@@ -5215,3 +5215,99 @@ body:has(main.home) .glow {
   color: var(--text-faint);
 }
 .record-note { margin-top: 14px; }
+
+/* ------------------------------------------------------------------ *
+ * The coach report.
+ *
+ * It was a heading, a line of small print, and bullet points, which is
+ * the shape of a note rather than of a review somebody asked for. The
+ * finding leads at the size a finding deserves, the points are numbered
+ * so a reader can say which one they disagree with, and the thing to
+ * work on next is set apart because it is the only instruction in it.
+ * ------------------------------------------------------------------ */
+.report-headline {
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  font-size: clamp(21px, 2.6vw, 29px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  max-width: 30ch;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+
+.report-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 22px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.report-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.report-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.report-points li {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 4px 12px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+.report-points li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.report-n {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--accent) 75%, transparent);
+  padding-top: 2px;
+}
+.report-points li p {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--text-dim);
+  max-width: 68ch;
+}
+
+/* The one instruction in the whole thing, so it does not read as a fifth point. */
+.report-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 22px 0 0;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.report-focus-k {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+.report-focus-v {
+  font-size: 16.5px;
+  line-height: 1.45;
+  color: var(--text);
+  text-wrap: balance;
+}

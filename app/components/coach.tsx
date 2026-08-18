@@ -93,23 +93,36 @@ export function Coach() {
       <h2>Coach</h2>
 
       {state.report ? (
-        <article>
-          <h3>{state.report.headline}</h3>
-          <p>
+        <article className="report">
+          {/* The finding leads, at the size a finding deserves. */}
+          <p className="report-headline">{state.report.headline}</p>
+          <p className="report-meta">
             <span>
               On {state.report.tripsAtReport} closed{' '}
               {state.report.tripsAtReport === 1 ? 'trade' : 'trades'}
             </span>
-            <span> · {when(state.report.createdAt)}</span>
+            <span className="report-dot" aria-hidden="true" />
+            <span>{when(state.report.createdAt)}</span>
           </p>
-          <ul>
-            {state.report.observations.map((observation) => (
-              <li key={observation.metric}>{observation.text}</li>
+
+          {/* Numbered, because they are findings in order of weight rather
+              than a list of remarks, and a reader should be able to say which
+              one they are arguing with. */}
+          <ol className="report-points">
+            {state.report.observations.map((observation, index) => (
+              <li key={observation.metric}>
+                <span className="report-n" aria-hidden="true">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <p>{observation.text}</p>
+              </li>
             ))}
-          </ul>
+          </ol>
+
           {state.report.focus && (
-            <p>
-              <strong>Next:</strong> {state.report.focus}
+            <p className="report-focus">
+              <span className="report-focus-k">Work on this next</span>
+              <span className="report-focus-v">{state.report.focus}</span>
             </p>
           )}
         </article>
