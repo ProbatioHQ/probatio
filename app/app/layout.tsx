@@ -99,7 +99,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
               </a>
               <a
                 className="icon-link"
-                href="https://x.com/ProbatoTrade"
+                href="https://x.com/ProbatioTrade"
                 target="_blank"
                 rel="noreferrer noopener"
                 aria-label="Probatio on X"

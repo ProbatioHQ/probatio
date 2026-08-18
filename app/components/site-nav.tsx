@@ -150,7 +150,7 @@ export function SiteNav() {
               </a>
               <a
                 className="nav-icon-button"
-                href="https://x.com/ProbatoTrade"
+                href="https://x.com/ProbatioTrade"
                 target="_blank"
                 rel="noreferrer noopener"
                 aria-label="Probatio on X"
