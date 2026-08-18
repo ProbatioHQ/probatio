@@ -5468,16 +5468,16 @@ body:has(main.home) .glow {
 /*
  * The menu button, matched to Axon's.
  *
- * Axon draws a 36px rounded square with a 1px border and three 16x1px hairline
- * bars, 5px apart. That is the reference asked for, so those are the numbers,
- * translated only in colour: its gray-700 border and gray-300 bars become this
- * site's own line and text tokens.
+ * Axon draws a 36px square with three 16x1px hairline bars 5px apart, and the
+ * geometry here is theirs exactly. Two deliberate departures.
  *
- * The border is deliberate and it is Axon's. What was wanted gone is the box
- * that used to appear the moment the button was tapped, which was never this
- * border: it was the site-wide focus ring, 2px of accent at 2px offset, which
- * a button that opens a menu keeps for as long as the menu is open. That is
- * handled below.
+ * No border. Axon's button carries one, `border-gray-200 dark:border-gray-700`,
+ * so matching it exactly means a box, and a box on this control has now been
+ * refused four separate times. Asked for directly beats copied from a
+ * reference, so the bars stand on the ground with nothing drawn around them.
+ *
+ * No focus ring either, handled below. That ring is what actually produced the
+ * box in the screenshots, and it is a separate thing from the border.
  */
 .nav-toggle {
   display: none;
@@ -5487,17 +5487,13 @@ body:has(main.home) .glow {
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid var(--line-bright);
-  border-radius: 8px;
+  border: 0;
   background: none;
   color: inherit;
   cursor: pointer;
-  transition: border-color 140ms ease;
   -webkit-tap-highlight-color: transparent;
 }
-.nav-toggle:hover {
-  border-color: color-mix(in srgb, var(--text) 45%, var(--line-bright));
-}
+.nav-toggle:hover .nav-bars i { background: var(--accent); }
 
 /*
  * No focus ring on this one control.
@@ -5555,7 +5551,9 @@ body:has(main.home) .glow {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgb(0 0 0 / 0.45);
+  /* bg-black/20, Axon's. 45% read as the whole screen going dark, which is
+     what made a half-height drawer feel like a full-screen takeover. */
+  background: rgb(0 0 0 / 0.2);
   animation: scrim-in 140ms ease both;
 }
 
@@ -5565,7 +5563,7 @@ body:has(main.home) .glow {
   right: 0;
   /* Under the header, whatever the notch does to it. */
   top: calc(56px + env(safe-area-inset-top, 0px));
-  padding: 8px 20px 16px;
+  padding: 16px 24px;
   background: var(--ink-raised);
   border-bottom: 1px solid var(--line);
   box-shadow: 0 24px 48px -24px rgb(0 0 0 / 0.9);
@@ -5583,11 +5581,11 @@ body:has(main.home) .glow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 2px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14px;
   -webkit-tap-highlight-color: transparent;
 }
 .nav-drawer > a:last-of-type { border-bottom: 0; }
@@ -5608,8 +5606,8 @@ body:has(main.home) .glow {
 .nav-drawer-foot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-top: 14px;
+  gap: 12px;
+  padding-top: 12px;
 }
 .nav-drawer-wallet {
   flex: 1 1 auto;
@@ -5623,16 +5621,16 @@ body:has(main.home) .glow {
 .nav-drawer-wallet button {
   width: 100%;
   justify-content: center;
-  padding: 12px 14px;
-  font-size: 15px;
+  padding: 10px 14px;
+  font-size: 14px;
 }
 .nav-icon-button {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--line-bright);
   border-radius: 8px;
   color: var(--text-dim);
