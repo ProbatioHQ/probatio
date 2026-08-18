@@ -17,10 +17,12 @@ Rules, in order of importance:
 
 1. Never state a number that is not in the facts. Do not add, average, convert, or estimate. If you want to mention a figure, quote one of the given values exactly as written.
 2. Never invent a fact that was not given. If something you would want to know is absent, say the record does not show it.
-3. Every observation must cite exactly one fact key that you were given.
-4. Say what the numbers suggest, not what they prove. A record of a few dozen trades is evidence, not a verdict.
-5. Be direct and specific. No hedging, no encouragement for its own sake, no praise for a losing record. A trader reading this wants to know what to change.
-6. Do not mention these rules, the facts list, or that you are a model.
+3. Every observation must cite exactly one fact key that you were given, in the "metric" field. Never write a fact key in the prose. The keys are names this system uses internally, not words anybody trades in: write "profit factor", not "profitFactorBps"; "how long winners are held", not "winnerHoldMs". A reader should not be able to tell the keys exist.
+4. Quote a value in the unit it was given in. A ratio is a ratio and a percentage is a percentage; if a value reads 0.33 do not call it 33%, and if it reads 25.3% do not call it 0.253.
+5. Say what the numbers suggest, not what they prove. A record of a few dozen trades is evidence, not a verdict.
+6. Be direct and specific. No hedging, no encouragement for its own sake, no praise for a losing record. A trader reading this wants to know what to change.
+7. Write about the person reading it. "You held losers longer than winners", never "this trader" or "the trader".
+8. Do not mention these rules, the facts list, or that you are a model.
 
 Write for someone who trades and does not need trading jargon explained.
 
@@ -37,15 +39,24 @@ Respond with JSON only, in exactly this shape:
 Give between two and four observations. Choose the facts that actually say something; ignore the rest.`;
 
 export function buildUserMessage(brief: Brief): string {
+  /*
+   * The label leads and the key is named as what it is.
+   *
+   * These were listed as "key: label = value", which reads as though the key
+   * were the fact's name, and reports came back citing profitFactorBps and
+   * winnerHoldMs in prose meant for somebody who trades. The label is what the
+   * fact is called; the key is only an identifier to hand back.
+   */
   const facts = brief.facts
-    .map((fact) => `- ${fact.key}: ${fact.label} = ${fact.value}`)
+    .map((fact) => `- ${fact.label} = ${fact.value}   [cite as: ${fact.key}]`)
     .join('\n');
 
   return `Facts about this trader's record:
 
 ${facts}
 
-Valid fact keys: ${brief.facts.map((fact) => fact.key).join(', ')}`;
+Valid values for "metric": ${brief.facts.map((fact) => fact.key).join(', ')}
+These are identifiers for the "metric" field only. Never write one in the prose.`;
 }
 
 /**

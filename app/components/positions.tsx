@@ -182,9 +182,8 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
       ) : (
         <>
         <p className="dim" style={{ fontSize: 13 }}>
-          Every fill you have made. Slippage is how far the price moved against you on the way in.
-          Record shows whether the trade has been written to Solana yet, which is what makes it
-          checkable by anyone.
+          Every fill you have made, at the price the market was at that moment. Slippage is how
+          far the price moved against you between clicking and landing.
         </p>
         <div className="scroller trade-log">
         <table>
@@ -198,11 +197,16 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
               {/* Slippage, in the percent people trade on rather than the basis
                   points the engine works in. */}
               <th scope="col">Slippage</th>
-              {/* One column, not two. "Leaf hash" beside "on chain" was a raw
-                  hash a normal reader has no use for and a status they do. The
-                  hash is what a verifier needs, so it is kept on the row as a
-                  hover title rather than taking a column of its own. */}
-              <th scope="col">Record</th>
+              {/*
+                No column for whether this reached the chain.
+                
+                It read "recording…" on every row of every trade, because the
+                program those commits call is not deployed and nothing is being
+                written. A status that has only ever had one value is not a
+                status, and one that says a thing is in progress when nothing is
+                happening is worse than absent. The hash each trade was sealed
+                with is still on the row, as its title.
+              */}
             </tr>
           </thead>
           <tbody>
@@ -215,15 +219,9 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td>{sol(trade.solAmount)}</td>
                 <td>{tokens(trade.tokenAmount)}</td>
                 <td>{sol(trade.fee)}</td>
-                <td>
+                <td title={`sealed as ${trade.leafHash}`}>
                   {slippage(trade.priceImpactBps)}
                   {trade.partial && ' · partial'}
-                </td>
-                <td
-                  className={trade.committed ? 'gain' : 'dim'}
-                  title={`proof ${trade.leafHash}`}
-                >
-                  {trade.committed ? 'on chain' : 'recording…'}
                 </td>
               </tr>
             ))}
