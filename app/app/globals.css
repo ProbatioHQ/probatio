@@ -545,19 +545,46 @@ hr {
   }
 
   /*
-   * Block buttons on a phone — but only the ones that are actually blocks.
+   * Block buttons on a phone, and the reason half this file kept breaking.
    *
-   * This was every `button` on the site, which is right for "Enter the season"
-   * at the end of a column and wrong for everything that lives inside a row:
-   * the wallet control stretched to the full width of the header and pushed
-   * the nav onto a third line, and the chart's chips, the timeframe
-   * segments, the buy and sell sides and the size presets would all have gone
-   * the same way.
+   * Every `button` gets full width unless it is named below. That is right for
+   * "Enter the season" at the end of a column and wrong for anything living in
+   * a row, so the list of exceptions grew. The list was the problem, not its
+   * contents: a new inline control is full-width by default and nothing fails
+   * loudly when it is forgotten. It took out the lane buttons (each pill 100%
+   * of its row, so Soon and Graduated sat a screen-width off to the right and
+   * the feed looked like it only had a New lane), the timeframe row (ten
+   * buttons at full width, one per line, above the chart), and the token
+   * page's back arrow (full width with a centred icon, which is why it read as
+   * floating in the middle of the screen).
    *
-   * Named exclusions rather than a narrower selector, so a new inline control
-   * has to say it is one.
+   * Chained `:not()` was also why none of that could be overridden: each one
+   * contributes the specificity of its argument, so nine of them scored about
+   * (0,8,1) and beat every single-class rule written against it.
+   *
+   * `:where()` fixes that permanently. It contributes no specificity at all, so
+   * this is now a plain element selector at (0,0,1) and any class rule beats it
+   * without having to know this exists.
    */
-  button:not(.wallet-connect):not(.wallet-pill):not(.chip):not(.preset):not(.side):not(.segmented button):not(.linklike):not(.toggle):not(.rail-btn) {
+  button:not(
+    :where(
+      .wallet-connect,
+      .wallet-pill,
+      .chip,
+      .preset,
+      .side,
+      .segmented button,
+      .linklike,
+      .toggle,
+      .rail-btn,
+      .lane-pill,
+      .lane-tool,
+      .time-btn,
+      .token-back,
+      .nav-toggle,
+      .chart-top-btn
+    )
+  ) {
     width: 100%;
     align-self: stretch;
   }
@@ -1241,7 +1268,7 @@ button,
 .term {
   position: relative;
   border: 1px solid var(--line-bright);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: linear-gradient(180deg, color-mix(in srgb, #fff 2.5%, var(--ink-raised)), var(--ink-sunken));
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent),
@@ -1704,7 +1731,7 @@ button,
   display: flex;
   flex-direction: column;
   padding: 5px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid var(--line-bright);
   background: color-mix(in srgb, var(--ink-raised) 96%, transparent);
   backdrop-filter: blur(14px);
@@ -2931,7 +2958,7 @@ button:hover:not(:disabled),
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -3749,7 +3776,7 @@ body:has(main.wide) .site-footer .shell {
   color: var(--text);
   background: rgba(63, 224, 138, 0.04);
   border: 1px solid rgba(63, 224, 138, 0.18);
-  border-radius: 10px;
+  border-radius: var(--radius);
   transition:
     border-color 120ms ease,
     background 120ms ease,
@@ -4062,7 +4089,7 @@ body:has(main.wide) .site-footer .shell {
   align-items: flex-end;
   gap: 2px;
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
 }
 .acct-return.gain {
@@ -4867,7 +4894,7 @@ button {
   flex-wrap: wrap;
   gap: 10px 18px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid var(--line-bright);
   background: linear-gradient(180deg, color-mix(in srgb, #fff 3%, var(--ink-sunken)), var(--ink-sunken) 60%);
 }
@@ -5217,7 +5244,7 @@ body:has(main.home) .glow {
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .record-stat {
@@ -5323,7 +5350,7 @@ body:has(main.home) .glow {
   gap: 5px;
   margin: 22px 0 0;
   padding: 16px 18px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
@@ -5354,7 +5381,7 @@ body:has(main.home) .glow {
   gap: 8px;
   margin-top: 14px;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--ink-sunken);
 }
@@ -5810,6 +5837,37 @@ body:has(main.home) .glow {
  * The feed on a phone.
  * ================================================================== */
 
+/* ================================================================== *
+ * Softer corners on a phone.
+ * ================================================================== */
+
+/*
+ * One number, raised, rather than a hunt for every rounded thing.
+ *
+ * 10px is a desk radius: it reads as precise next to dense rows of figures on a
+ * wide screen. On a phone, where a panel is the full width of the device and
+ * sits against the bezel's own curve, the same 10px reads as a sharp box stuck
+ * to a rounded screen. Everything that takes its radius from the token moves
+ * together, and the handful of surfaces that hard-coded 10px are pointed at the
+ * token so they move with it.
+ *
+ * Controls are left alone. Pills and buttons already carry their own radius,
+ * and rounding them further makes a button look like a lozenge.
+ */
+@media (max-width: 860px) {
+  :root { --radius: 16px; }
+
+  .term,
+  .card,
+  .panel {
+    border-radius: var(--radius);
+  }
+}
+
+/* The portfolio row is a phone thing: a wide header already carries the
+   balance, and repeating it under the heading would be saying it twice. */
+.feed-portfolio { display: none; }
+
 /* Neither exists where all three lanes fit side by side. */
 .lane-picker,
 .feed-sub { display: none; }
@@ -5861,6 +5919,58 @@ body:has(main.home) .glow {
     /* 16px or larger, or iOS zooms the page in on focus and leaves the
        viewport scrolled sideways when it is done. */
     font-size: 16px;
+  }
+
+  /*
+   * What you are worth, over the buttons.
+   *
+   * The gap above the lane row was empty, which reads as a page that failed
+   * rather than one with nothing to say.
+   */
+  .feed-portfolio {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 14px 16px;
+    margin-bottom: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--ink-sunken);
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+  .feed-portfolio-k {
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .feed-portfolio-value {
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .feed-portfolio-move {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 550;
+    font-variant-numeric: tabular-nums;
+  }
+  .feed-portfolio-pct {
+    padding: 2px 7px;
+    border-radius: 7px;
+  }
+  .feed-portfolio-pct.gain { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .feed-portfolio-pct.loss { background: color-mix(in srgb, var(--loss) 18%, transparent); }
+  /* Signed out it is a sentence, not a figure, so it does not pretend to be
+     an account worth nothing. */
+  .feed-portfolio.out .feed-portfolio-say {
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-dim);
   }
 
   /*

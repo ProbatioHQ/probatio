@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { FeedPortfolio } from '@/components/feed-portfolio';
 import { LaunchFeedList } from '@/components/launch-feed';
 
 export const metadata: Metadata = {
@@ -28,6 +29,10 @@ export default function FeedPage() {
           the prices, the liquidity and the fees are the real ones.
         </p>
       </div>
+
+      {/* Phone only. A wide screen carries the balance in the header, where it
+          is always visible; a phone header does not have room for it. */}
+      <FeedPortfolio />
 
       <LaunchFeedList variant="terminal" />
 
