@@ -6375,13 +6375,17 @@ body:has(main.home) .glow {
    * common case, and the field above them is still there for anything else.
    */
   .presets:not(.phone-presets) { display: none; }
+  /* Three sizes and a way to name a fourth. */
   .phone-presets {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, 1fr) 56px;
     gap: 10px;
     margin-top: 4px;
   }
   .phone-presets .preset {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     min-height: 52px;
     padding: 0;
@@ -6394,7 +6398,56 @@ body:has(main.home) .glow {
     font-weight: 650;
     box-shadow: none;
   }
+  /* Selling is not buying, and a row of green tells you nothing about which
+     one you are about to do. */
+  .phone-presets .preset.sell-big {
+    background: color-mix(in srgb, var(--loss) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--loss) 45%, transparent);
+    color: var(--loss);
+  }
+  /* The opener is the quiet one: it is a way in, not a size. */
+  .phone-presets .custom-toggle {
+    background: var(--ink-sunken);
+    border: 1px solid var(--line-bright);
+    color: var(--text-dim);
+  }
+  .phone-presets .custom-toggle.on {
+    border-color: var(--text);
+    color: var(--text);
+  }
   .phone-presets .preset:disabled { opacity: 0.45; }
+
+  /* The field it opens, on the row under it. */
+  .custom-amount {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .custom-amount input {
+    width: 100%;
+    height: 52px;
+    padding: 0 14px;
+    border: 1px solid var(--line-bright);
+    border-radius: 12px;
+    background: var(--ink-sunken);
+    color: var(--text);
+    /* 16px or larger, or iOS zooms the page in on focus. */
+    font-size: 16px;
+  }
+  .custom-amount .preset {
+    min-height: 52px;
+    padding: 0 22px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--text);
+    color: var(--ink);
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 650;
+    box-shadow: none;
+  }
+  .custom-amount .preset:disabled { opacity: 0.4; }
 
   /*
    * Cash and holding, as one row you read rather than two labels you parse.

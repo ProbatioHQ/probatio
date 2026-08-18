@@ -26,6 +26,34 @@ const BUY_PRESETS = [0.1, 0.5, 1, 2, 5];
  */
 const PHONE_BUY_PRESETS = [0.1, 0.2, 0.3];
 /** Sell sizes, as a fraction of the position. */
+/**
+ * A whole percentage of a holding, or null if it is not one.
+ *
+ * Capped at 100 because there is no such thing as selling more of a position
+ * than exists; the engine would reject it, but a button that offers something
+ * impossible and then refuses it is worse than one that never offers it.
+ * Floored at 1, since zero percent of anything is not a trade.
+ */
+function clampPercent(raw: string): number | null {
+  const value = Math.floor(Number(raw));
+  if (!Number.isFinite(value) || value < 1) return null;
+  return Math.min(100, value);
+}
+
+/**
+ * The mark on the button that opens a custom amount.
+ *
+ * Drawn rather than set as a glyph or an emoji, so it takes the colour of the
+ * button it sits in and renders the same everywhere.
+ */
+function PencilMark() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+    </svg>
+  );
+}
+
 const SELL_PRESETS: { label: string; numerator: number; denominator: number }[] = [
   { label: '25%', numerator: 1, denominator: 4 },
   { label: '50%', numerator: 1, denominator: 2 },
@@ -272,10 +300,30 @@ export function TradePanel({
     });
   }, []);
 
+  /*
+   * The phone's custom amount, for the value that is not one of the three.
+   *
+   * The three buttons cover the common case and nothing else, which is fine
+   * until somebody wants 1.33 SOL or to sell 27% of a position. The field
+   * above accepts either, but on a phone it is a number pad and a token count
+   * that runs off the end of the input, so reaching it to sell "most of this"
+   * meant typing out nine figures of base units. This is the same action as a
+   * preset: it fills the amount, it does not trade.
+   */
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+
   const buyPreset = useCallback((sol: number) => {
     setSide('buy');
     setAmount(String(sol));
   }, []);
+
+  // Percent on one side and SOL on the other, so a value carried across would
+  // be read as the wrong thing entirely.
+  useEffect(() => {
+    setCustomOpen(false);
+    setCustomValue('');
+  }, [side]);
 
   const sellFraction = useCallback(
     (numerator: number, denominator: number) => {
@@ -519,9 +567,54 @@ export function TradePanel({
                 {sol}
               </button>
             ))}
+            {/* Anything the three do not cover. */}
+            <button
+              type="button"
+              className={customOpen ? 'preset custom-toggle on' : 'preset custom-toggle'}
+              aria-expanded={customOpen}
+              aria-label="Another amount"
+              disabled={working}
+              onClick={() => setCustomOpen((was) => !was)}
+            >
+              <PencilMark />
+            </button>
           </div>
+          {customOpen && (
+            <div className="custom-amount">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={0.01}
+                autoFocus
+                value={customValue}
+                placeholder="SOL"
+                onChange={(event) => setCustomValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  const sol = Number(customValue);
+                  if (sol > 0) {
+                    buyPreset(sol);
+                    setCustomOpen(false);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="preset"
+                disabled={!(Number(customValue) > 0)}
+                onClick={() => {
+                  buyPreset(Number(customValue));
+                  setCustomOpen(false);
+                }}
+              >
+                Set
+              </button>
+            </div>
+          )}
           </>
         ) : (
+          <>
           <div className="presets" role="group" aria-label="Sell size">
             {SELL_PRESETS.map((preset, index) => (
               <button
@@ -535,6 +628,74 @@ export function TradePanel({
               </button>
             ))}
           </div>
+          {/*
+            The same three on a phone, which had none of them.
+            
+            The rule that hides the desktop buy ladder on a phone was written as
+            `.presets:not(.phone-presets)`, which is every preset row including
+            this one, so selling on a phone meant typing a token count of nine
+            or ten figures into a field narrower than the number. A percentage
+            of what you hold is the only sane way to size a sell.
+          */}
+          <div className="presets phone-presets" role="group" aria-label="Sell size">
+            {SELL_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                className="preset sell-big"
+                disabled={working || holding === 0n}
+                onClick={() => sellFraction(preset.numerator, preset.denominator)}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={customOpen ? 'preset custom-toggle on' : 'preset custom-toggle'}
+              aria-expanded={customOpen}
+              aria-label="Another percentage"
+              disabled={working || holding === 0n}
+              onClick={() => setCustomOpen((was) => !was)}
+            >
+              <PencilMark />
+            </button>
+          </div>
+          {customOpen && (
+            <div className="custom-amount">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={100}
+                step={1}
+                autoFocus
+                value={customValue}
+                placeholder="% of holding"
+                onChange={(event) => setCustomValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  const percent = clampPercent(customValue);
+                  if (percent === null) return;
+                  sellFraction(percent, 100);
+                  setCustomOpen(false);
+                }}
+              />
+              <button
+                type="button"
+                className="preset"
+                disabled={clampPercent(customValue) === null}
+                onClick={() => {
+                  const percent = clampPercent(customValue);
+                  if (percent === null) return;
+                  sellFraction(percent, 100);
+                  setCustomOpen(false);
+                }}
+              >
+                Set
+              </button>
+            </div>
+          )}
+          </>
         )}
 
         <button
