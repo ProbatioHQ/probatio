@@ -16,6 +16,15 @@ const LAMPORTS_PER_SOL = 1_000_000_000n;
 
 /** Buy sizes, in SOL. The hotkeys are the digits beside them. */
 const BUY_PRESETS = [0.1, 0.5, 1, 2, 5];
+/*
+ * The phone's three, which are not the desktop's five.
+ *
+ * A wide panel can carry a ladder from a tenth of a SOL to five and a keyboard
+ * shortcut on each rung. A phone gets three buttons big enough to hit without
+ * looking, and these are the three every mobile client puts there, so they are
+ * the sizes somebody arriving already expects to see.
+ */
+const PHONE_BUY_PRESETS = [0.1, 0.2, 0.3];
 /** Sell sizes, as a fraction of the position. */
 const SELL_PRESETS: { label: string; numerator: number; denominator: number }[] = [
   { label: '25%', numerator: 1, denominator: 4 },
@@ -481,6 +490,7 @@ export function TradePanel({
         </label>
 
         {side === 'buy' ? (
+          <>
           <div className="presets" role="group" aria-label="Buy size">
             {BUY_PRESETS.map((sol, index) => (
               <button
@@ -494,6 +504,23 @@ export function TradePanel({
               </button>
             ))}
           </div>
+          {/* The same action at a size a thumb can use. Only one of these two
+              rows is ever displayed; which one is a question of whether there
+              is a pointer, not of how wide the window is. */}
+          <div className="presets phone-presets" role="group" aria-label="Buy size">
+            {PHONE_BUY_PRESETS.map((sol) => (
+              <button
+                key={sol}
+                type="button"
+                className="preset buy-big"
+                disabled={working}
+                onClick={() => buyPreset(sol)}
+              >
+                {sol}
+              </button>
+            ))}
+          </div>
+          </>
         ) : (
           <div className="presets" role="group" aria-label="Sell size">
             {SELL_PRESETS.map((preset, index) => (

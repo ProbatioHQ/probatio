@@ -7,6 +7,7 @@ import { useWallet } from '@/components/wallet';
 import { Positions } from '@/components/positions';
 import { TradePanel } from '@/components/trade-panel';
 import type { PriceUnit } from '@/lib/price-display';
+import { Sprout, age, freshAge } from '@/components/sprout';
 
 /**
  * The trading surface for one token.
@@ -252,8 +253,50 @@ export function TokenView({
 
   const changed = quote.change;
 
+  /* Ticks so the age in the bar stays honest on a page left open. */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const launched = head.launchedAt ?? 0;
+
   return (
     <>
+      {/*
+        The bar above the token, which only a phone shows.
+
+        A wide screen has the site header, a back button in the browser chrome
+        and a whole page of context around the token. A phone has none of that:
+        the page fills the screen, so it carries its own way out and says which
+        token you are looking at while you are scrolled into the chart.
+      */}
+      <div className="token-bar">
+        <button
+          type="button"
+          className="token-back"
+          aria-label="Back"
+          onClick={() => {
+            // Back where there is somewhere to go back to, and the feed
+            // otherwise, so a token opened from a shared link is not a dead end.
+            if (window.history.length > 1) window.history.back();
+            else window.location.href = '/feed';
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m15 5-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="token-bar-sym">{head.symbol ?? head.name}</span>
+        {launched > 0 && (
+          <span className={freshAge(launched, now) ? 'token-bar-age new' : 'token-bar-age'}>
+            <Sprout />
+            {age(launched, now)}
+          </span>
+        )}
+      </div>
+
       {/*
         Who the token is, and what it is worth, on one row.
 

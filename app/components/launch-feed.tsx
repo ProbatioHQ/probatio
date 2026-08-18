@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Sprout, age, freshAge } from '@/components/sprout';
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -188,54 +189,6 @@ function marketCapLabel(lamports: string, solUsd: number | null): string {
   if (usd >= 1_000) return `$${(usd / 1_000).toFixed(1)}K`;
   if (usd >= 1) return `$${usd.toFixed(0)}`;
   return `$${usd.toFixed(2)}`;
-}
-
-function age(launchedAt: number, now: number): string {
-  // A searched token that was never in the feed has no known launch time. Show
-  // nothing rather than counting from the epoch and claiming it is decades old.
-  if (launchedAt <= 0) return '';
-  const seconds = Math.max(0, Math.floor(now / 1000) - launchedAt);
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86_400) return `${Math.floor(seconds / 3_600)}h`;
-  return `${Math.floor(seconds / 86_400)}d`;
-}
-
-/**
- * Whether a launch is new enough to be worth marking.
- *
- * Under an hour reads green, older reads grey. The line it draws is the one
- * that matters in this feed: a token minutes old is still being decided, and
- * one from yesterday has already been.
- */
-function freshAge(launchedAt: number, now: number): boolean {
-  if (launchedAt <= 0) return false;
-  return Math.floor(now / 1000) - launchedAt < 3_600;
-}
-
-/**
- * The sprout beside a token's age.
- *
- * Drawn rather than set as an emoji: an emoji is a different typeface on every
- * platform, cannot take the colour of the text it sits with, and would be the
- * one thing on the page rendered by somebody else's font.
- */
-function Sprout() {
-  return (
-    <svg
-      className="sprout"
-      viewBox="0 0 16 16"
-      width="11"
-      height="11"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      {/* A stem, and a leaf either side of it. */}
-      <path d="M7.4 14.6V8.2h1.2v6.4z" />
-      <path d="M7.6 8.1C7.6 5.9 6 4.2 3.6 3.6c-.5-.1-.8.2-.7.7.5 2.3 2.2 3.9 4.4 3.9z" />
-      <path d="M8.4 7.6c0-2.2 1.6-3.9 4-4.5.5-.1.8.2.7.7-.5 2.3-2.2 3.9-4.4 3.9z" />
-    </svg>
-  );
 }
 
 /**
