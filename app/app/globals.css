@@ -2912,48 +2912,142 @@ button:hover:not(:where(:disabled)),
 /* ============================================================ standings */
 
 /*
- * Column widths, because a six-column table on a 1400px shell spreads.
+ * The board.
  *
- * Left to itself the browser divides the width by the content, and with one
- * entrant that means "0.0%" and "0" get a couple of hundred pixels each and the
- * eye has to travel the whole page to read one row. The figures are given only
- * the room they need and the trader takes the slack, so the numbers stay in a
- * block that can be compared down the column.
+ * Was a six-column table dividing a wide panel by content width, which left a
+ * couple of hundred pixels between "0.0%" and "0" and made reading one row a
+ * trip across the page. Capping the table only moved the fault: the rows then
+ * ended in mid-panel with the row highlight cut off halfway, which is worse
+ * than spread out.
  *
- * Right-aligned, as figures are anywhere they are meant to be read against each
- * other, with the heading following its column.
+ * A grid instead. The figures get exactly the width they need and no more, the
+ * trader absorbs everything left over, and the numbers end up in a block that
+ * can be read down rather than across. Every row is the same track list as the
+ * header, so nothing can drift out of alignment.
  */
-.standings { table-layout: fixed; }
-.standings td { vertical-align: middle; }
-
-.standings .rank { width: 56px; }
-
-.standings th:nth-child(n + 3),
-.standings td:nth-child(n + 3) {
-  width: 130px;
-  text-align: right;
-  padding-right: 0;
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.standings th:nth-child(4),
-.standings td:nth-child(4) { width: 150px; }
 
-/* The trader keeps whatever is left, and truncates rather than wrapping. */
-.standings th:nth-child(2),
-.standings td:nth-child(2) {
-  width: auto;
-  max-width: 0;
+.board-head,
+.board-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 104px 128px 74px 116px;
+  align-items: center;
+  gap: 16px;
+}
+
+.board-head {
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+/* Headings sit over their own figures, so they follow them right. */
+.board-head > span:nth-child(n + 3) { text-align: right; }
+
+.board-row {
+  position: relative;
+  padding: 13px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.board-row:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  border-color: var(--line);
+}
+
+/*
+ * Where you are on the board, marked on the edge rather than by flooding the
+ * row. A filled row competes with the figures inside it.
+ */
+.board-row.is-you {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.board-row.is-you::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.board-trader {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+}
+.board-name {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 14px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.board-trader:hover .board-name { color: var(--accent); }
+
+/* Return ranks the season, so it is the one figure given size. */
+.board-return {
+  text-align: right;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 16px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.board-return.gain { color: var(--accent); }
+.board-return.loss { color: var(--loss); }
+.board-return.flat { color: var(--text-dim); }
+
+.board-equity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.board-figure { font-size: 14px; color: var(--text); }
+.board-equity .delta { font-size: 11px; }
+
+.board-trades {
+  text-align: right;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.board-pays {
+  text-align: right;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* A payout is the only thing on this board anyone gets to keep, so it is the
+   one value that reads as a thing rather than as a number. */
+.pays-chip {
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  color: var(--accent);
   white-space: nowrap;
 }
-
-.standings tbody tr {
-  transition: background 140ms ease;
-}
-.standings tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
-
-/* A board with two entrants should not be as wide as one with forty. */
-.standings-wrap { max-width: 980px; }
 
 /* A rank is a number until the top of the board, where it earns a shape. */
 .medal {
@@ -2978,33 +3072,27 @@ button:hover:not(:where(:disabled)),
 .medal.m2 { border-color: var(--line-bright); color: var(--text-dim); }
 .medal.m3 { border-color: var(--line-bright); color: var(--text-faint); }
 
-.standings .trader {
-  text-decoration: none;
-  color: var(--text);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.standings .trader:hover { color: var(--accent); }
-
-.standings .you {
+/*
+ * Scoped to .board now, not .standings.
+ *
+ * These were written against the table and every one of them was left pointing
+ * at an ancestor that no longer exists: the "you" chip would have rendered as
+ * bare text and the equity delta would have lost its size. A rule that silently
+ * stops matching is the failure mode of renaming markup, so they move with it.
+ */
+.board .you {
+  flex: 0 0 auto;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 9.5px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
 }
 
-/* A row that is in the money reads as such before the payout column is read. */
-.standings tr.paying td:first-child {
-  box-shadow: inset 2px 0 0 var(--accent-dim);
-}
-
-.standings .delta {
-  display: block;
+.board .delta {
   font-size: 11px;
   opacity: 0.85;
 }
@@ -6396,6 +6484,53 @@ body:has(main.home) .glow {
 .token-quote-move.loss {
   background: color-mix(in srgb, var(--loss) 20%, transparent);
   color: var(--loss);
+}
+
+/* ================================================================== *
+ * The board on a phone.
+ * ================================================================== */
+
+@media (max-width: 860px) and (pointer: coarse) {
+  /*
+   * Six columns do not fit 342px. The rank and the trader keep the top line,
+   * the four figures sit under them as labelled pairs, and every label comes
+   * from the header that is no longer above them.
+   */
+  .board-head { display: none; }
+
+  .board-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+    row-gap: 12px;
+    padding: 14px;
+  }
+  .board-trader { grid-column: 2; }
+
+  .board-return,
+  .board-equity,
+  .board-trades,
+  .board-pays {
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 2px;
+  }
+  .board-return { grid-column: 1 / 2; }
+  .board-return::before,
+  .board-equity::before,
+  .board-trades::before,
+  .board-pays::before {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .board-return::before { content: 'Return'; }
+  .board-equity::before { content: 'Equity'; }
+  .board-trades::before { content: 'Trades'; }
+  .board-pays::before { content: 'Pays'; }
 }
 
 /* ================================================================== *

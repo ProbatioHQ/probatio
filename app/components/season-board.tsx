@@ -329,25 +329,30 @@ export function SeasonBoard() {
             <p className="dim">Nobody has entered yet. First in is first on the board.</p>
           ) : (
             <>
-              <div className="scroller standings-wrap">
-                <table className="standings">
-                  <thead>
-                    <tr>
-                      <th scope="col">#</th>
-                      <th scope="col">Trader</th>
-                      <th scope="col">Return</th>
-                      <th scope="col">Equity</th>
-                      <th scope="col">Trades</th>
-                      <th scope="col">Pays</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {board.standings.map((row) => (
-                      <StandingRow key={row.trader} row={row} you={row.trader === pubkey} />
-                    ))}
-                    {board.you && <StandingRow row={board.you} you />}
-                  </tbody>
-                </table>
+              {/*
+                A board, not a table.
+                
+                Six columns dividing a wide panel by content put a couple of
+                hundred pixels between "0.0%" and "0" and made reading one row a
+                trip across the page. Capping the table's width only moved the
+                problem: it left the rows ending in mid-panel with the highlight
+                cut off. A grid fixes both, because the figures can be given
+                exactly the room they need while the trader absorbs whatever is
+                left, and it lets a row be a row rather than six cells.
+              */}
+              <div className="board" role="table" aria-label="Standings">
+                <div className="board-head" role="row">
+                  <span role="columnheader">#</span>
+                  <span role="columnheader">Trader</span>
+                  <span role="columnheader">Return</span>
+                  <span role="columnheader">Equity</span>
+                  <span role="columnheader">Trades</span>
+                  <span role="columnheader">Pays</span>
+                </div>
+                {board.standings.map((row) => (
+                  <StandingRow key={row.trader} row={row} you={row.trader === pubkey} />
+                ))}
+                {board.you && <StandingRow row={board.you} you />}
               </div>
 
               <p className="dim" style={{ fontSize: 13 }}>
@@ -366,32 +371,44 @@ export function SeasonBoard() {
 function StandingRow({ row, you = false }: { row: Row; you?: boolean }) {
   const pnl = BigInt(row.finalEquity) - BigInt(row.startingBalance);
   const paying = row.payoutLamports !== '0';
+  const tone = row.returnBps > 0 ? 'gain' : row.returnBps < 0 ? 'loss' : 'flat';
 
   return (
-    <tr aria-current={you ? 'true' : undefined} className={paying ? 'paying' : undefined}>
-      <td className="rank">
+    <div
+      role="row"
+      aria-current={you ? 'true' : undefined}
+      className={`board-row${you ? ' is-you' : ''}${paying ? ' is-paying' : ''}`}
+    >
+      <span className="board-rank" role="cell">
         <span className={row.rank <= 3 ? `medal m${row.rank}` : 'medal'}>{row.rank}</span>
-      </td>
-      <td>
-        {/* Every trader is a link. The whole argument is that a record can be
-            checked, and a name you cannot click is not a record. */}
-        <a className="mono trader" href={`/p/${row.trader}`}>
-          {row.name ?? short(row.trader)}
-          {you && <span className="you">you</span>}
-        </a>
-      </td>
-      <td className={row.returnBps > 0 ? 'gain' : row.returnBps < 0 ? 'loss' : 'dim'}>
+      </span>
+
+      {/* Every trader is a link. The whole argument is that a record can be
+          checked, and a name you cannot click is not a record. */}
+      <a className="board-trader" role="cell" href={`/p/${row.trader}`}>
+        <span className="board-name">{row.name ?? short(row.trader)}</span>
+        {you && <span className="you">you</span>}
+      </a>
+
+      {/* Return is what the season ranks on, so it is the figure the row is
+          read by and the only one given size. */}
+      <span className={`board-return ${tone}`} role="cell">
         {percent(row.returnBps)}
-      </td>
-      <td className="mono">
-        {sol(row.finalEquity)}
+      </span>
+
+      <span className="board-equity" role="cell">
+        <span className="board-figure">{sol(row.finalEquity)}</span>
         <span className={pnl > 0n ? 'gain delta' : pnl < 0n ? 'loss delta' : 'dim delta'}>
           {pnl >= 0n ? '+' : '−'}
           {sol((pnl < 0n ? -pnl : pnl).toString())}
         </span>
-      </td>
-      <td className="mono">{row.tradeCount}</td>
-      <td className="mono">{paying ? `${sol(row.payoutLamports)} SOL` : ''}</td>
-    </tr>
+      </span>
+
+      <span className="board-trades" role="cell">{row.tradeCount}</span>
+
+      <span className="board-pays" role="cell">
+        {paying ? <span className="pays-chip">{sol(row.payoutLamports)} SOL</span> : <span className="dim">·</span>}
+      </span>
+    </div>
   );
 }
