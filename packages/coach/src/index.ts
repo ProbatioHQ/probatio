@@ -28,9 +28,7 @@ export { reviewResponse, unsupportedFigures } from './review';
 export type { Observation, Report, ReviewResult } from './review';
 
 export {
-  RANKED_COOLDOWN_MS,
-  WEEK_MS,
-  cooldownFor,
+  TRIPS_PER_REPORT,
   entitlement,
   explainRefusal,
 } from './entitlement';

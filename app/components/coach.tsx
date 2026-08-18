@@ -29,7 +29,9 @@ interface CoachState {
   minimumTrips: number;
   report: Report | null;
   available: boolean;
-  nextAvailableAt: number | null;
+  /** Closed trades still to go, and the count the next report unlocks at. */
+  tripsUntilNext: number;
+  unlocksAtTrips: number;
   reason: string | null;
 }
 
@@ -155,7 +157,37 @@ export function Coach() {
           {working ? 'Reading your trades…' : state.report ? 'New report' : 'Get a report'}
         </button>
       ) : (
-        state.reason && <p>{state.reason}</p>
+        /*
+         * How far off the next one is, as a count rather than a sentence.
+         *
+         * A report is earned by closing trades, so the useful thing to show is
+         * how many are left and how far along that is. A bar fills as they
+         * trade, which a line of prose saying "not yet" does not.
+         */
+        state.tripsUntilNext > 0 && (
+          <div className="coach-gate">
+            <div className="coach-gate-head">
+              <span className="coach-gate-k">Next report</span>
+              <span className="coach-gate-v">
+                {state.trips} / {state.unlocksAtTrips} trades
+              </span>
+            </div>
+            <div
+              className="coach-gate-bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={state.unlocksAtTrips}
+              aria-valuenow={state.trips}
+            >
+              <span
+                style={{
+                  width: `${Math.min(100, Math.max(0, (state.trips / Math.max(1, state.unlocksAtTrips)) * 100))}%`,
+                }}
+              />
+            </div>
+            {state.reason && <p className="coach-gate-note">{state.reason}</p>}
+          </div>
+        )
       )}
 
       {error && <p role="alert">{error}</p>}

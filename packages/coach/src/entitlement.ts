@@ -1,22 +1,28 @@
 /**
  * Who may ask for a report, and how often.
  *
- * Free gets one a week. Ranked gets one per session. Both are gated on the
- * record having actually changed, which is not a billing rule — running the
- * same numbers twice produces the same advice and charges for it.
+ * Counted in closed trades, not in time. A report is a reading of a record, so
+ * what makes a new one worth asking for is the record having changed enough to
+ * read differently, and five closed trades is enough to move a win rate or a
+ * hold time. A clock says nothing about that: a week of not trading produces
+ * the same report as the one before it, and an afternoon of twenty trades
+ * produces a genuinely different record that a weekly limit would sit on.
+ *
+ * Each report covers everything up to the moment it was asked for, so the
+ * second one reads ten trades rather than the five since the first, and the
+ * ones before it are kept as they were.
  *
  * Pure, so the rule can be tested without a clock or a database, and so the
- * same function answers "may I?" and "when may I?" rather than two versions of
- * the policy drifting apart.
+ * same function answers "may I?" and "how far off am I?" rather than two
+ * versions of the policy drifting apart.
  */
 
 export type Tier = 'free' | 'ranked';
 
-export const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
-/** Long enough that a report covers a sitting rather than a single trade. */
-export const RANKED_COOLDOWN_MS = 60 * 60 * 1_000;
+/** Closed trades between one report and the next. */
+export const TRIPS_PER_REPORT = 5;
 
-export type Refusal = 'not_enough_trades' | 'nothing_new' | 'cooldown';
+export type Refusal = 'not_enough_trades' | 'need_more_trades';
 
 export interface EntitlementInput {
   readonly tier: Tier;
@@ -32,45 +38,48 @@ export interface EntitlementInput {
 export interface Entitlement {
   readonly allowed: boolean;
   readonly refusal: Refusal | null;
-  /** When they could next ask, if waiting is what is needed. */
-  readonly nextAllowedAt: number | null;
-}
-
-export function cooldownFor(tier: Tier): number {
-  return tier === 'ranked' ? RANKED_COOLDOWN_MS : WEEK_MS;
+  /** How many more closed trades are needed. Zero when one may be asked for. */
+  readonly tripsUntilNext: number;
+  /** The count at which the next report unlocks, for showing progress against. */
+  readonly unlocksAtTrips: number;
 }
 
 export function entitlement(input: EntitlementInput): Entitlement {
-  if (input.tripsNow < input.minimumTrips) {
-    return { allowed: false, refusal: 'not_enough_trades', nextAllowedAt: null };
-  }
-
-  // The first report is never gated on anything but having traded.
+  // The first report waits for a record worth reading at all.
   if (input.lastReportAt === null) {
-    return { allowed: true, refusal: null, nextAllowedAt: null };
+    if (input.tripsNow < input.minimumTrips) {
+      return {
+        allowed: false,
+        refusal: 'not_enough_trades',
+        tripsUntilNext: input.minimumTrips - input.tripsNow,
+        unlocksAtTrips: input.minimumTrips,
+      };
+    }
+    return { allowed: true, refusal: null, tripsUntilNext: 0, unlocksAtTrips: input.minimumTrips };
   }
 
-  if (input.tripsNow <= input.tripsAtLastReport) {
-    return { allowed: false, refusal: 'nothing_new', nextAllowedAt: null };
+  // Every one after it waits for another five to close.
+  const unlocksAtTrips = input.tripsAtLastReport + TRIPS_PER_REPORT;
+  if (input.tripsNow < unlocksAtTrips) {
+    return {
+      allowed: false,
+      refusal: 'need_more_trades',
+      tripsUntilNext: unlocksAtTrips - input.tripsNow,
+      unlocksAtTrips,
+    };
   }
 
-  const ready = input.lastReportAt + cooldownFor(input.tier);
-  if (input.now < ready) {
-    return { allowed: false, refusal: 'cooldown', nextAllowedAt: ready };
-  }
-
-  return { allowed: true, refusal: null, nextAllowedAt: null };
+  return { allowed: true, refusal: null, tripsUntilNext: 0, unlocksAtTrips };
 }
 
-export function explainRefusal(refusal: Refusal, tier: Tier, minimumTrips: number): string {
+export function explainRefusal(refusal: Refusal, remaining: number, minimumTrips: number): string {
+  const trades = (n: number): string => `${n} ${n === 1 ? 'trade' : 'trades'}`;
   switch (refusal) {
     case 'not_enough_trades':
-      return `Close at least ${minimumTrips} trades and there will be a pattern worth reviewing.`;
-    case 'nothing_new':
-      return 'Nothing has changed since the last report. Trade, then come back.';
-    case 'cooldown':
-      return tier === 'ranked'
-        ? 'Your last report is still recent. A session needs to be a session.'
-        : 'Free accounts get one report a week. Ranked gets one per session.';
+      return `Close ${trades(minimumTrips)} and there will be a pattern worth reviewing. ` +
+        `${trades(remaining)} to go.`;
+    case 'need_more_trades':
+      return `Close ${trades(remaining)} more and a new report can be written, covering ` +
+        `everything up to that point.`;
   }
 }

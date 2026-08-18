@@ -107,9 +107,14 @@ export async function GET(request: Request): Promise<Response> {
     minimumTrips: MINIMUM_TRIPS,
     report: previous ? serialize(previous) : null,
     available: state.allowed,
-    nextAvailableAt: state.nextAllowedAt,
+    // Counted in trades rather than in time, so the interface can show progress
+    // toward the next one instead of a clock nobody is watching.
+    tripsUntilNext: state.tripsUntilNext,
+    unlocksAtTrips: state.unlocksAtTrips,
     reason:
-      state.refusal === null ? null : explainRefusal(state.refusal, ctx.tier, MINIMUM_TRIPS),
+      state.refusal === null
+        ? null
+        : explainRefusal(state.refusal, state.tripsUntilNext, MINIMUM_TRIPS),
   });
 }
 
@@ -149,8 +154,9 @@ export async function POST(request: Request): Promise<Response> {
         error:
           state.refusal === 'not_enough_trades'
             ? insufficientHistoryMessage(brief)
-            : explainRefusal(state.refusal!, ctx.tier, MINIMUM_TRIPS),
-        nextAvailableAt: state.nextAllowedAt,
+            : explainRefusal(state.refusal!, state.tripsUntilNext, MINIMUM_TRIPS),
+        tripsUntilNext: state.tripsUntilNext,
+        unlocksAtTrips: state.unlocksAtTrips,
         report: previous ? serialize(previous) : null,
       },
       { status: 429 },
