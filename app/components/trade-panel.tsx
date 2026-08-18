@@ -125,6 +125,32 @@ export function TradePanel({
   const [held, setHeld] = useState<string>('0');
   /** What the holding cost and what it is worth now, for the live position. */
   const [position, setPosition] = useState<{ costBasis: string; value: string | null } | null>(null);
+  /*
+   * The price as it moves, so the position figure moves with it.
+   *
+   * The value came from the positions endpoint, which reads every holding from
+   * chain and so cannot be asked more than a few times a minute. On a token
+   * that halves inside a minute, a figure a dozen seconds old is not a slow
+   * number, it is the wrong one. The same stream the chart draws from pushes a
+   * price whenever one trades, and a holding's worth is that price times what
+   * is held, which is arithmetic this already has everything for.
+   */
+  const [livePrice, setLivePrice] = useState<string | null>(null);
+  useEffect(() => {
+    setLivePrice(null);
+    if (typeof EventSource === 'undefined') return;
+    const source = new EventSource(`/api/price-stream?mint=${encodeURIComponent(mint)}`);
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data as string) as { price?: string };
+        if (payload.price) setLivePrice(payload.price);
+      } catch {
+        // A malformed frame is one tick missed, not a reason to drop the stream.
+      }
+    };
+    // Errors are left to the browser, which reconnects on its own.
+    return () => source.close();
+  }, [mint]);
   /** Scopes the hotkeys: see the keydown handler below. */
   const panel = useRef<HTMLElement>(null);
 
@@ -364,10 +390,19 @@ export function TradePanel({
           whether a trade was working was to read a fill receipt and do the
           arithmetic, and a receipt reports one trade rather than a position.
         */}
-        {holding > 0n && position && position.value !== null && (
+        {holding > 0n && position && (position.value !== null || livePrice !== null) && (
           (() => {
             const cost = Number(BigInt(position.costBasis)) / Number(LAMPORTS_PER_SOL);
-            const now = Number(BigInt(position.value)) / Number(LAMPORTS_PER_SOL);
+            /*
+             * Priced from the stream if it has spoken, and from the last read
+             * otherwise. The scale is the one every stored price uses, so this
+             * is the same multiplication the server would have done.
+             */
+            const marked =
+              livePrice !== null
+                ? (holding * BigInt(livePrice)) / 10n ** 18n
+                : BigInt(position.value!);
+            const now = Number(marked) / Number(LAMPORTS_PER_SOL);
             const change = now - cost;
             const percent = cost > 0 ? (change / cost) * 100 : 0;
             const up = change >= 0;
