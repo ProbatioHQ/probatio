@@ -6514,26 +6514,57 @@ body:has(main.home) .glow {
    * ran off the edge. Pinned to both edges of the panel instead, so it is as
    * wide as there is room for and never wider.
    */
+  /*
+   * The menu measures against the controls row, not against its own button.
+   *
+   * `left: 0; right: 0` did nothing useful because the containing block is
+   * `.chart-menu-wrap`, which is only as wide as the Indicators button. So the
+   * menu came out about ninety pixels across and every entry broke into three
+   * or four lines: "Moving average (SMA 9/21/50)" stacked one word per row.
+   * Capping its height then made it worse, since a column that narrow is
+   * mostly height.
+   *
+   * Taking the positioning off the wrapper and putting it on the row means
+   * both edges resolve against the full width of the panel.
+   */
+  .chart-menu-wrap { position: static; }
+  .chart-top { position: relative; }
+
   .chart-menu {
     left: 0;
     right: 0;
     min-width: 0;
     max-width: none;
-    /*
-     * Bounded and scrollable.
-     *
-     * Neither the base rule nor the mobile one capped its height, so seven
-     * indicators simply ran off the bottom of the screen with the last of them
-     * unreachable. Half the viewport, and it scrolls inside that.
-     */
-    max-height: 50dvh;
+    /* Bounded, and scrolling inside that bound: neither the base rule nor the
+       first mobile one capped the height, so the last indicators sat off the
+       bottom of the screen with no way to reach them. */
+    max-height: 52dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
+    padding: 6px;
+    border-radius: var(--radius);
   }
   .chart-menu button {
-    min-height: 40px;
-    font-size: 13px;
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 13.5px;
+    text-align: left;
+    /* One line each now that there is room for one. */
+    white-space: nowrap;
   }
+
+  /*
+   * "reading history" comes off the controls row.
+   *
+   * It is a status about a load that finishes on its own, and it was the widest
+   * thing on the line: about a hundred and ten pixels, which is the difference
+   * between the four controls fitting on one row and wrapping onto two. The
+   * history still loads and the chart still fills in; it just stops narrating.
+   *
+   * The paused warning stays. That one is not progress, it is the price on
+   * screen having stopped being current, and it has to be visible.
+   */
+  .chart-loading.dim { display: none; }
 
   /* The footnote under the chart is a paragraph explaining where the candles
      come from. True, and not what a phone needs between the chart and the buy
