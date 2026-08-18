@@ -5,6 +5,7 @@ import './globals.css';
 import { AmbientTerminal } from '@/components/ambient-terminal';
 import { HeaderScroll } from '@/components/header-scroll';
 import { PageTransition } from '@/components/page-transition';
+import { SiteNav } from '@/components/site-nav';
 import { StatusBanner } from '@/components/status-banner';
 import { WalletButton, WalletProvider } from '@/components/wallet';
 
@@ -76,16 +77,12 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             <a href="/" className="wordmark" aria-label="Probatio home">
               <span className="mark" aria-hidden="true" />
             </a>
-            {/* Verify and Trust are not here: they live in the footer, and
-                repeating them in both crowds a header that is mostly for the
-                app's own pages. */}
-            <nav className="site-nav" aria-label="Main">
-              <a href="/feed">Terminal</a>
-              <a href="/season">Season</a>
-              <a href="/store">Store</a>
-              <a href="/roadmap">Roadmap</a>
-              <a href="/docs">How it works</a>
-            </nav>
+            {/* A row where there is width for one, a button where there is
+                not. Verify and Trust stay out of the row, since repeating the
+                footer crowds a header that is mostly for the app's own pages,
+                but they are in the panel: on a phone the footer is the whole
+                page away. */}
+            <SiteNav />
             <div className="site-right">
               {/* External, so PageTransition leaves them alone and they open
                   where a social link is expected to. */}
