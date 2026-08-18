@@ -329,7 +329,7 @@ export function SeasonBoard() {
             <p className="dim">Nobody has entered yet. First in is first on the board.</p>
           ) : (
             <>
-              <div className="scroller">
+              <div className="scroller standings-wrap">
                 <table className="standings">
                   <thead>
                     <tr>
