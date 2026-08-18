@@ -38,7 +38,22 @@ export async function POST(request: Request): Promise<Response> {
     return new Response('Not found', { status: 404 });
   }
 
-  let body: { dry?: boolean; at?: string; free?: boolean } = {};
+  let body: {
+    dry?: boolean;
+    at?: string;
+    free?: boolean;
+    /*
+     * The two moments a season actually turns on, given rather than derived.
+     *
+     * The standard schedule counts a fixed window forward from the start, which
+     * lands wherever the start happened to be. A season people plan around has
+     * to fall on stated hours instead: entries closing at midnight on a Monday,
+     * the season ending at ten on a Friday. Both are optional and the standard
+     * window is used for whichever is left out.
+     */
+    entryClosesAt?: string;
+    endsAt?: string;
+  } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -64,7 +79,31 @@ export async function POST(request: Request): Promise<Response> {
   // ruleset while opening a free one would publish a commitment to a price
   // nobody is charged, which is the one thing the hash exists to prevent.
   const rules = body.free ? { ...base, entryCost } : base;
-  const schedule = scheduleFrom(start, rules.durationMs, rules.entryWindowMs);
+  const standard = scheduleFrom(start, rules.durationMs, rules.entryWindowMs);
+  const stated = (value: string | undefined): number | null => {
+    if (!value) return null;
+    const at = Date.parse(value);
+    return Number.isNaN(at) ? NaN : at;
+  };
+  const closesAt = stated(body.entryClosesAt);
+  const finishesAt = stated(body.endsAt);
+  if (Number.isNaN(closesAt) || Number.isNaN(finishesAt)) {
+    return Response.json({ error: 'entryClosesAt and endsAt must be ISO timestamps' }, { status: 400 });
+  }
+  const schedule = {
+    startsAt: standard.startsAt,
+    entryClosesAt: closesAt ?? standard.entryClosesAt,
+    endsAt: finishesAt ?? standard.endsAt,
+  };
+
+  // A season that closes entries after it ends, or ends before it starts, is
+  // not a season anybody can enter or win.
+  if (schedule.entryClosesAt > schedule.endsAt || schedule.endsAt <= schedule.startsAt) {
+    return Response.json(
+      { error: 'the schedule must run start, then entry close, then end' },
+      { status: 400 },
+    );
+  }
   const hash = rulesetHashHex(rules);
 
   // Seasons may not overlap: a stretch covered by two is a stretch in which a
