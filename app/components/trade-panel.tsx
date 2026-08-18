@@ -533,15 +533,32 @@ export function TradePanel({
         </button>
 
         {showSlippage && (
+          /*
+           * Typed as a percentage, which is the unit it is spoken in.
+           *
+           * It took basis points, so somebody who wanted ten percent had to
+           * know to type a thousand, and somebody who typed ten got a tenth of
+           * a percent and had every trade rejected without being told why. The
+           * engine still works in basis points; only the field has changed, and
+           * one decimal place is as fine as the engine can act on anyway.
+           */
           <label className="field">
-            <span>Tolerance, in basis points</span>
+            <span>Tolerance, in percent</span>
             <input
               type="number"
               min={0}
-              max={10_000}
-              step={50}
-              value={slippageBps}
-              onChange={(event) => setSlippageBps(Number(event.target.value))}
+              max={100}
+              step={0.5}
+              value={slippageBps / 100}
+              onChange={(event) => {
+                const percent = Number(event.target.value);
+                if (!Number.isFinite(percent)) return;
+                // Clamped here rather than trusted from the field, because a
+                // browser will hand over whatever was typed regardless of min
+                // and max, and a negative tolerance rejects everything.
+                const clamped = Math.min(100, Math.max(0, percent));
+                setSlippageBps(Math.round(clamped * 100));
+              }}
             />
           </label>
         )}
