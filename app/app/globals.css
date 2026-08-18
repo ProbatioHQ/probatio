@@ -5487,11 +5487,29 @@ body:has(main.home) .glow {
   width: 36px;
   height: 36px;
   padding: 0;
+  /*
+   * Every one of these matters, and box-shadow is the one that was missing.
+   *
+   * There are three global `button` rules on this site and between them every
+   * button gets a radius, an inset white top edge and an outer glow. Overriding
+   * background and border removed the fill and the outline, and left the inset
+   * highlight and the glow still drawing a rounded rectangle around nothing,
+   * which is the box that kept coming back. `all: unset` is not used instead
+   * because it would take the flex layout with it.
+   */
   border: 0;
+  border-radius: 0;
   background: none;
+  box-shadow: none;
   color: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+.nav-toggle:hover,
+.nav-toggle:hover:not(:disabled) {
+  background: none;
+  box-shadow: none;
+  opacity: 1;
 }
 .nav-toggle:hover .nav-bars i { background: var(--accent); }
 
