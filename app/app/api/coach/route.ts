@@ -176,7 +176,15 @@ export async function POST(request: Request): Promise<Response> {
     // verified.
     console.warn('[coach] response rejected', response.problems);
     return Response.json(
-      { error: 'the coach produced something that did not check out. Try again.' },
+      {
+        error: 'the coach produced something that did not check out. Try again.',
+        // What the checks actually objected to. Rejecting a report is the right
+        // outcome, but rejecting it silently leaves no way to tell a model
+        // having an off moment from a guard that rejects everything it is
+        // handed, and those need opposite responses.
+        problems: response.problems,
+        dropped: response.dropped,
+      },
       { status: 502 },
     );
   }

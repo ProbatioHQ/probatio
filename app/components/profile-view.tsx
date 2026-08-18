@@ -76,60 +76,73 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
     <div className="stack">
       {profile.seasons.map((season) => {
         const negative = season.netPnl.startsWith('-');
-        const fullyCommitted = season.committedTrades >= season.trades && season.trades > 0;
+        const traded = season.trades > 0;
+        const wins =
+          season.winRateBps === null ? null : Math.round((season.winRateBps / 10_000) * season.roundTrips);
 
         return (
-          <section key={season.seasonId} aria-label={laneLabel(season)} className="panel">
-            <div className="panel-head">
-              <h2>{laneLabel(season)}</h2>
+          <section key={season.seasonId} aria-label={laneLabel(season)} className="record">
+            <div className="record-head">
+              <span className="record-lane">{laneLabel(season)}</span>
+              {traded && (
+                <span className={negative ? 'record-tag loss' : 'record-tag gain'}>
+                  {negative ? 'down' : 'up'}
+                </span>
+              )}
             </div>
 
-            <div className="readout">
-              <div className="readout-row">
-                <span className="k">Profit and loss</span>
-                <span className={`v ${season.trades === 0 ? '' : negative ? 'loss' : 'gain'}`}>
-                  {negative ? '' : '+'}
-                  {sol(season.netPnl)} SOL
-                </span>
-              </div>
-              <div className="readout-row">
+            {/* The one figure somebody came to see, at the size that says so. */}
+            <div className={`record-pnl ${!traded ? 'flat' : negative ? 'loss' : 'gain'}`}>
+              {traded && !negative && '+'}
+              {sol(season.netPnl)}
+              <span className="record-unit">SOL</span>
+            </div>
+
+            <div className="record-grid">
+              <div className="record-stat">
                 <span className="k">Win rate</span>
                 <span className="v">
-                  {season.winRateBps === null ? 'n/a' : `${(season.winRateBps / 100).toFixed(0)}%`}
+                  {season.winRateBps === null ? '—' : `${(season.winRateBps / 100).toFixed(0)}%`}
                 </span>
+                {wins !== null && season.roundTrips > 0 && (
+                  <span className="sub">
+                    {wins}W · {season.roundTrips - wins}L
+                  </span>
+                )}
               </div>
-              <div className="readout-row">
-                <span className="k">Trades</span>
-                <span className="v">{season.trades}</span>
-              </div>
-              <div className="readout-row">
-                <span className="k">Closed positions</span>
+              <div className="record-stat">
+                <span className="k">Closed</span>
                 <span className="v">{season.roundTrips}</span>
+                <span className="sub">round trips</span>
               </div>
-              <div className="readout-row">
-                <span className="k">On chain</span>
-                <span className={`v ${fullyCommitted ? 'gain' : ''}`}>
-                  {fullyCommitted
-                    ? 'all committed'
-                    : `${season.committedTrades} of ${season.trades}`}
-                </span>
+              <div className="record-stat">
+                <span className="k">Fills</span>
+                <span className="v">{season.trades}</span>
+                <span className="sub">buys and sells</span>
               </div>
             </div>
 
-            {!fullyCommitted && (
-              <p className="dim panel-note">
-                Trades not yet committed cannot be checked. They are committed in batches, so
-                recent ones may still be waiting.
-              </p>
+            {!traded && (
+              <p className="dim record-note">Nothing traded here yet.</p>
             )}
           </section>
         );
       })}
 
+      {/*
+        Nothing here claims to be checkable against a chain.
+        
+        The page used to count how much of the record had been committed and
+        offer a verifier to check it against Solana. Neither is running: the
+        program those commits call is not deployed, so the count was always zero
+        of everything and the offer was to check nothing against nothing. What
+        the record is today is what this server recorded as each fill happened,
+        and saying that plainly is worth more than an invitation that leads
+        somewhere empty.
+      */}
       <p className="dim">
-        <a href={`/verify?trader=${encodeURIComponent(profile.trader)}`}>Check this record yourself</a>
-        . The verifier runs in your browser against an RPC you choose. Nothing here is taken on
-        our word.
+        Every fill is recorded as it happens, at the price the market was at that moment, and
+        cannot be edited afterwards.
       </p>
     </div>
   );

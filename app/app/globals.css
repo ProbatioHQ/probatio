@@ -5108,3 +5108,110 @@ body:has(main.home) .glow {
   background: color-mix(in srgb, var(--accent) 55%, var(--line-bright));
   background-clip: content-box;
 }
+
+/* ------------------------------------------------------------------ *
+ * A public record, as something worth showing somebody.
+ *
+ * It was five label-and-value rows, one of which counted how much had
+ * reached a chain and always said none. This is the page a trader
+ * points at when they claim they are any good, so the result leads at
+ * the size a result deserves and the rest supports it.
+ * ------------------------------------------------------------------ */
+.record {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 3%, var(--ink-raised)), var(--ink-raised) 55%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent),
+    0 12px 32px -22px rgb(0 0 0 / 0.85);
+}
+
+.record-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.record-lane {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.record-tag {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.record-tag.gain {
+  color: var(--gain);
+  background: color-mix(in srgb, var(--gain) 12%, transparent);
+  border-color: color-mix(in srgb, var(--gain) 32%, transparent);
+}
+.record-tag.loss {
+  color: var(--loss);
+  background: color-mix(in srgb, var(--loss) 12%, transparent);
+  border-color: color-mix(in srgb, var(--loss) 32%, transparent);
+}
+
+.record-pnl {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 18px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(34px, 6vw, 52px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.record-pnl.gain { color: var(--gain); }
+.record-pnl.loss { color: var(--loss); }
+.record-pnl.flat { color: var(--text-faint); }
+.record-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.record-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  background: var(--ink-sunken);
+}
+.record-stat .k {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.record-stat .v {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.record-stat .sub {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.record-note { margin-top: 14px; }
