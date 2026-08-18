@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
-import { activeSeason } from '@/lib/season';
+import { activeSeason, balances } from '@/lib/season';
 import { currentUser } from '@/lib/session';
 
 /**
@@ -26,12 +26,22 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     const client = await db();
-    const { account } = await activeSeason(client, user.pubkey, Date.now());
+    const now = Date.now();
+    const [{ account }, both] = await Promise.all([
+      activeSeason(client, user.pubkey, now),
+      balances(client, user.pubkey, now),
+    ]);
 
     return Response.json(
       {
+        // The account trading currently lands in, which is what the trade
+        // panel spends against.
         balance: account.solBalance,
         startingBalance: account.startingBalance,
+        // Both of them, named, so the header can show where somebody stands
+        // rather than one figure that silently changes meaning.
+        free: both.free,
+        ranked: both.ranked,
       },
       // Never cached, anywhere. A balance is only worth showing if it is the
       // one the account holds right now.

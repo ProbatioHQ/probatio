@@ -5014,3 +5014,50 @@ body:has(main.home) .glow {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Two balances in the header, once a season has been entered.
+ *
+ * Free play and a ranked season are separate accounts with separate
+ * ten SOL, so one figure that quietly changed which account it meant
+ * was the wrong shape. Both, named, with the one trades are landing in
+ * marked, and ranked absent entirely for anybody who has not entered.
+ * ------------------------------------------------------------------ */
+.wallet-split {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+.wallet-leg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.1;
+}
+.wallet-leg + .wallet-leg {
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.wallet-leg em {
+  font-style: normal;
+  font-size: 8.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.wallet-leg b {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+/* The account a trade would land in right now. */
+.wallet-leg.live em { color: color-mix(in srgb, var(--accent) 80%, transparent); }
+.wallet-leg.live b { color: var(--text); }
+
+@media (max-width: 720px) {
+  /* Only the one being traded survives the narrow header. */
+  .wallet-leg:not(.live) { display: none; }
+  .wallet-leg + .wallet-leg { padding-left: 0; border-left: 0; }
+}

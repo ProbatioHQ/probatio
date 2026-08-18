@@ -158,3 +158,66 @@ async function resolveSeason(
     rankedSeasonId: null,
   };
 }
+
+export interface Balances {
+  /** Free play, which every wallet always has. */
+  readonly free: { balance: string; startingBalance: string };
+  /** The ranked season, only once they have entered one. */
+  readonly ranked: {
+    balance: string;
+    startingBalance: string;
+    ordinal: number;
+    /** Whether trades are landing here rather than in free play. */
+    live: boolean;
+  } | null;
+}
+
+/**
+ * Both balances a wallet has, rather than whichever one is currently in use.
+ *
+ * Entering a ranked season moves trading onto a separate account with its own
+ * ten SOL, and free play keeps its own balance untouched underneath. The rest
+ * of the app asks for the active account and gets exactly one, which is right
+ * for filling a trade and wrong for showing somebody where they stand: the
+ * figure in the header changed the moment they entered, with nothing to say
+ * which of the two it was, so a free-play balance appeared to vanish and a
+ * ranked one appeared out of nowhere.
+ *
+ * Free play is always present. Ranked is null until they enter, which is what
+ * keeps it off the screen for everybody who has not.
+ */
+export async function balances(client: Client, pubkey: string, now: number): Promise<Balances> {
+  const freeId = await freePlayId(client, now);
+  const freeAccount = await ensureAccount(client, freeId, pubkey, now);
+  const free = {
+    balance: freeAccount.solBalance,
+    startingBalance: freeAccount.startingBalance,
+  };
+
+  const season = await currentRankedSeason(client, now);
+  if (!season || !(await hasEntered(client, season.id, pubkey))) return { free, ranked: null };
+
+  const account = await ensureAccount(client, season.id, pubkey, now);
+  const live =
+    season.startsAt !== null &&
+    season.endsAt !== null &&
+    tradingOpen(
+      {
+        startsAt: season.startsAt,
+        endsAt: season.endsAt,
+        entryClosesAt: season.entryClosesAt ?? season.endsAt,
+        finalizedAt: season.status === 'finalized' ? season.endsAt : null,
+      },
+      now,
+    );
+
+  return {
+    free,
+    ranked: {
+      balance: account.solBalance,
+      startingBalance: account.startingBalance,
+      ordinal: season.ordinal,
+      live,
+    },
+  };
+}

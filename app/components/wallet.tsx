@@ -199,6 +199,18 @@ export function WalletButton() {
   const { status, pubkey, signIn, signOut, balance: fromSession } = useWallet();
   const [open, setOpen] = useState(false);
   const [fresh, setFresh] = useState<string | null>(null);
+  /*
+   * Both balances, once they are known.
+   *
+   * A wallet entered in a ranked season is trading a separate account with its
+   * own ten SOL, and free play keeps its own underneath. Showing one figure
+   * meant the number in the header changed the moment somebody entered, with
+   * nothing to say which of the two it had become.
+   */
+  const [split, setSplit] = useState<{
+    free: { balance: string };
+    ranked: { balance: string; ordinal: number; live: boolean } | null;
+  } | null>(null);
   // Whatever is newest: the refresher once it has answered, otherwise the
   // figure that arrived with the session, so the pill has a number from the
   // first render rather than waiting on a second request.
@@ -235,10 +247,16 @@ export function WalletButton() {
             console.error('[wallet] balance read failed', response.status, body);
             return null;
           }
-          return (await response.json()) as { balance?: string };
+          return (await response.json()) as {
+            balance?: string;
+            free?: { balance: string };
+            ranked?: { balance: string; ordinal: number; live: boolean } | null;
+          };
         })
         .then((data) => {
-          if (!cancelled && data?.balance) setFresh(data.balance);
+          if (cancelled || !data) return;
+          if (data.balance) setFresh(data.balance);
+          if (data.free) setSplit({ free: data.free, ranked: data.ranked ?? null });
         })
         .catch((error) => console.error('[wallet] balance read failed', error));
     };
@@ -305,6 +323,19 @@ export function WalletButton() {
         <AddressMark pubkey={pubkey} />
         {balance === null ? (
           <span className="wallet-addr">{shortenPubkey(pubkey)}</span>
+        ) : split?.ranked ? (
+          /* Entered a season: both balances, named, with the one trades are
+             currently landing in marked as live. */
+          <span className="wallet-split">
+            <span className={split.ranked.live ? 'wallet-leg live' : 'wallet-leg'}>
+              <em>Ranked</em>
+              <b>{(Number(BigInt(split.ranked.balance)) / 1e9).toFixed(2)}</b>
+            </span>
+            <span className="wallet-leg">
+              <em>Free</em>
+              <b>{(Number(BigInt(split.free.balance)) / 1e9).toFixed(2)}</b>
+            </span>
+          </span>
         ) : (
           <span className="wallet-amount">
             {(Number(BigInt(balance)) / 1e9).toFixed(2)}
