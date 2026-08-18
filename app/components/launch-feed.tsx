@@ -175,10 +175,20 @@ const FILTER_KEY = 'probatio.feed.filters';
  */
 const OPENING_MARKET_CAP = '27959000000';
 
-/** Largest first, with an unread curve counted at what it opened worth. */
+/**
+ * Largest first, with an unpriced token at the bottom.
+ *
+ * Matches the server's ordering exactly, including where a null cap goes. It
+ * did not: this counted a null as the opening market cap, which drops it into
+ * the middle of the list, while the API sinks it. The list would have been
+ * ordered one way on arrival and reshuffled the moment the first curve update
+ * came down the stream.
+ */
 function byMarketCap(a: Token, b: Token): number {
-  const left = BigInt(a.marketCap ?? OPENING_MARKET_CAP);
-  const right = BigInt(b.marketCap ?? OPENING_MARKET_CAP);
+  if (a.marketCap === null) return b.marketCap === null ? 0 : 1;
+  if (b.marketCap === null) return -1;
+  const left = BigInt(a.marketCap);
+  const right = BigInt(b.marketCap);
   return right > left ? 1 : right < left ? -1 : 0;
 }
 

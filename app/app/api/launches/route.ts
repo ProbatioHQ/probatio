@@ -317,7 +317,11 @@ export async function GET(request: Request): Promise<Response> {
     solUsd: await solUsd(),
     lanes: {
       new: withImages(fresh),
-      bonding: withImages(bonding),
+      // Both of these rank by what a token is worth. Bonding used to arrive
+      // ordered by curve progress, which is a different question from the
+      // column of market caps beside it and reads as unsorted: a token at
+      // 99.86% sat above one worth thirty thousand.
+      bonding: byMarketCap(withImages(bonding)),
       bonded: byMarketCap(withImages(bonded)),
     },
     bondingFloorBps: BONDING_FLOOR_BPS,
