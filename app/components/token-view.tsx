@@ -162,15 +162,35 @@ export function TokenView({
   // site's console errors on the page.
   useEffect(() => {
     if (indexed) return;
-    const timer = setInterval(() => {
+    let cancelled = false;
+    /*
+     * Asked at once, then kept asking.
+     *
+     * This used to set an interval and nothing else, so the first answer came
+     * thirty seconds after the page opened. That was survivable while the
+     * server resolved it before rendering and the page arrived knowing. It no
+     * longer does — that lookup was a call to another company's server sitting
+     * in front of every token page, and taking it out is what made these open
+     * in under a second — so the browser is now the only thing that asks, and
+     * waiting half a minute to ask meant the TradingView tab sat disabled on
+     * tokens it works perfectly well for.
+     */
+    const check = (): void => {
       void fetch(`/api/chart-source?mint=${encodeURIComponent(mint)}`)
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { indexed?: boolean } | null) => {
-          if (body?.indexed) setIndexed(true);
+          if (!cancelled && body?.indexed) setIndexed(true);
         })
         .catch(() => undefined);
-    }, 30_000);
-    return () => clearInterval(timer);
+    };
+
+    check();
+    // A token minutes old gets indexed while somebody is looking at it.
+    const timer = setInterval(check, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [indexed, mint]);
   const [unit, setUnit] = useState<PriceUnit>('market-cap');
 
