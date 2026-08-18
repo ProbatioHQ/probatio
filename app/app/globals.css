@@ -5469,9 +5469,9 @@ body:has(main.home) .glow {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 52px;
+  width: 56px;
   height: 52px;
-  margin-right: -13px;
+  margin-right: -9px;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -5483,6 +5483,28 @@ body:has(main.home) .glow {
 .nav-toggle:hover .nav-bars i,
 .nav-toggle.open .nav-bars i {
   background: var(--text);
+}
+
+/*
+ * The box around the hamburger, found at last.
+ *
+ * It was never a border or a background on the button; both of those came off
+ * two commits ago. It is the site-wide focus ring: `:focus-visible` draws a
+ * 2px accent outline at 2px offset, and a button that opens a menu keeps focus
+ * after it is tapped, so on a phone the ring appeared the moment the thing was
+ * used and stayed. It is also the thin arc that has been sitting above the
+ * bars in every screenshot: the top edge of that ring, clipped by the header.
+ *
+ * The ring goes and the focus signal moves onto the bars themselves, which is
+ * better anyway. A ring around a control is only needed when the control has
+ * no other way to say it is focused, and three bars that turn accent green
+ * say it plainly without drawing the box that was never wanted.
+ */
+.nav-toggle:focus-visible {
+  outline: none;
+}
+.nav-toggle:focus-visible .nav-bars i {
+  background: var(--accent);
 }
 
 /* Three bars, drawn rather than set in a font, so they take the header's
@@ -5499,22 +5521,22 @@ body:has(main.home) .glow {
    * read as one smudge at arm's length.
    */
   gap: 7px;
-  width: 30px;
-  height: 25px;
+  width: 38px;
+  height: 26px;
 }
 .nav-bars i {
   display: block;
-  height: 3.5px;
+  height: 4px;
   border-radius: 2px;
   background: var(--text);
   transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms ease;
 }
 /* Open, the bars become the cross that closes them. */
-/* Bars are 3.5 tall with 7 between them, so the outer two travel 10.5px to
-   meet the middle one. Recompute this whenever either number moves. */
-.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(10.5px) rotate(45deg); }
+/* Bars are 4 tall with 7 between them, so the outer two travel 11px to meet
+   the middle one. Recompute this whenever either number moves. */
+.nav-toggle.open .nav-bars i:nth-child(1) { transform: translateY(11px) rotate(45deg); }
 .nav-toggle.open .nav-bars i:nth-child(2) { opacity: 0; }
-.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-10.5px) rotate(-45deg); }
+.nav-toggle.open .nav-bars i:nth-child(3) { transform: translateY(-11px) rotate(-45deg); }
 
 .nav-panel {
   position: absolute;
