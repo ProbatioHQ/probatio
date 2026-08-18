@@ -159,6 +159,61 @@ export async function pruneUnusedTimeframes(db: Client): Promise<number> {
   return Number(result.rowsAffected ?? 0);
 }
 
+/**
+ * How many tokens may keep candles at all.
+ *
+ * The per-timeframe caps bound a token and say nothing about how many tokens
+ * there are, which is the half that actually decides the size of the table. A
+ * token costs roughly six and a half thousand rows across the timeframes kept,
+ * and every row carries a forty-four character mint, five numeric strings and
+ * its share of the index: call it a megabyte and a half. A feed that charts
+ * thousands of tokens a day will fill any volume given long enough, and a
+ * bigger volume only moves the date.
+ *
+ * This is the ceiling. Whatever the feed does, the table is this many tokens
+ * wide, and the space it needs can be worked out in advance rather than
+ * discovered when writes start failing.
+ */
+const MINT_BUDGET = Number(process.env['PROBATIO_CANDLE_MINTS'] ?? '160');
+
+/**
+ * Drop the candles of every token past the budget, oldest activity first.
+ *
+ * Recency is judged by the newest candle a token has, which the writers keep
+ * current for anything being charted or watched, so what survives is what is
+ * being looked at. A token somebody holds is kept regardless of where it falls,
+ * because that chart belongs to a position they still own.
+ */
+export async function pruneToMintBudget(db: Client): Promise<number> {
+  const ranked = await db.execute({
+    sql: `SELECT mint FROM (
+            SELECT mint, MAX(open_time) AS last_seen
+            FROM candles GROUP BY mint
+            ORDER BY last_seen DESC
+            LIMIT -1 OFFSET ?
+          )
+          EXCEPT SELECT mint FROM positions`,
+    args: [MINT_BUDGET],
+  });
+  const mints = ranked.rows.map((row) => String(row['mint']));
+  if (mints.length === 0) return 0;
+
+  let deleted = 0;
+  // In batches, so a volume with little room to write a journal is not asked
+  // to do the whole thing in one statement.
+  for (let i = 0; i < mints.length; i += 50) {
+    const batch = mints.slice(i, i + 50);
+    const marks = batch.map(() => '?').join(',');
+    const result = await db.execute({
+      sql: `DELETE FROM candles WHERE mint IN (${marks})`,
+      args: batch,
+    });
+    await db.execute({ sql: `DELETE FROM candle_backfills WHERE mint IN (${marks})`, args: batch });
+    deleted += Number(result.rowsAffected ?? 0);
+  }
+  return deleted;
+}
+
 export async function pruneCandles(db: Client): Promise<number> {
   // One statement per timeframe, because each keeps a different depth and a
   // single cap would either strand the short ones or starve the long ones.
@@ -233,6 +288,7 @@ export async function runRetention(db: Client, now: number): Promise<RetentionRe
     candlesDeleted:
       (await pruneUnusedTimeframes(db)) +
       (await pruneIdleMints(db, now)) +
+      (await pruneToMintBudget(db)) +
       (await pruneCandles(db)),
     poolSnapshotsDeleted: await prunePoolSnapshots(db, now),
     launchesDeleted: await pruneLaunches(db, now),
