@@ -41,7 +41,7 @@ function signed(value: number, places: number): string {
 }
 
 export function FeedPortfolio() {
-  const { status } = useWallet();
+  const { status, signIn } = useWallet();
   const signedIn = status === 'signed-in';
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
@@ -75,8 +75,24 @@ export function FeedPortfolio() {
       <div className="feed-portfolio out">
         <span className="feed-portfolio-k">Practice money, real prices</span>
         <span className="feed-portfolio-say">
-          Connect a wallet from the menu to trade any of these with 10 SOL of practice money.
+          Trade any of these with 10 SOL of practice money.
         </span>
+        {/*
+          The action, here, rather than a sentence pointing at the menu.
+          
+          Telling somebody where the button is, on a screen with room for the
+          button, is the wrong half of the job. This is the same signIn every
+          other connect control calls, so on a phone with no injected provider
+          it hands the page to Phantom's browser exactly as they do.
+        */}
+        <button
+          type="button"
+          className="feed-portfolio-connect"
+          disabled={status === 'working'}
+          onClick={() => void signIn()}
+        >
+          {status === 'working' ? 'Waiting for your wallet…' : 'Connect Phantom'}
+        </button>
       </div>
     );
   }

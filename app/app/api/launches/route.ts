@@ -49,13 +49,46 @@ const BONDING_FLOOR_BPS = 5_000;
  * curve has not been read: an unknown value and a worthless token are not the
  * same thing and must not render the same.
  */
+/**
+ * What a curve is worth before anybody has traded it.
+ *
+ * Every pump.fun launch opens at the same place: 30 SOL of virtual SOL reserve
+ * against 1,073,000,000,000,000 base units of virtual token reserve. Buying
+ * only ever moves the price up from there, so this is a hard floor that no
+ * live curve can be under.
+ */
+const OPENING_VIRTUAL_SOL = 30_000_000_000n;
+const OPENING_VIRTUAL_TOKENS = 1_073_000_000_000_000n;
+const OPENING_MARKET_CAP = marketCapLamports(
+  priceFromReserves(OPENING_VIRTUAL_SOL, OPENING_VIRTUAL_TOKENS),
+  PUMPFUN_TOKEN_TOTAL_SUPPLY,
+);
+
 function marketCapOf(launch: LaunchWithCurve): string | null {
   const curve = launch.curve;
   if (!curve?.virtualSolReserves || !curve.virtualTokenReserves) return null;
   if (curve.virtualTokenReserves <= 0n) return null;
 
   const price = priceFromReserves(curve.virtualSolReserves, curve.virtualTokenReserves);
-  return marketCapLamports(price, PUMPFUN_TOKEN_TOTAL_SUPPLY).toString();
+  const cap = marketCapLamports(price, PUMPFUN_TOKEN_TOTAL_SUPPLY);
+
+  /*
+   * A curve cannot be worth less than the day it opened.
+   *
+   * Two tokens in the feed read 99.86% and 95.98% bonded with market caps of
+   * thirteen and twenty-four dollars, against roughly twenty-seven thousand for
+   * their neighbours at the same progress. Progress is read from the real token
+   * reserve and the cap from the virtual pair, so a row written while a curve
+   * was migrating can hold a nearly-sold reserve alongside a virtual pair that
+   * has already been zeroed out, and the two then describe different worlds.
+   *
+   * Rather than guess which half is right, the impossible half is discarded:
+   * under the opening cap is not a cheap token, it is a bad read. Reported as
+   * unknown so the caller falls back to what the chain said, and the next curve
+   * read corrects it.
+   */
+  if (cap < OPENING_MARKET_CAP) return null;
+  return cap.toString();
 }
 
 function shape(

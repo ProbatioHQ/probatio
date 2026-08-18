@@ -2041,6 +2041,16 @@ button:hover:not(:disabled),
 .feed {
   max-height: 420px;
   overflow-y: auto;
+  /*
+   * No scroll anchoring.
+   *
+   * The browser default holds your visual position when content is inserted
+   * above what you are reading, which is right for a comment thread and wrong
+   * for this: launches arrive at the top of the list every few seconds, so the
+   * anchoring pushed the newest row up out of view and you had to drag the list
+   * back down to see the one thing it had just told you about.
+   */
+  overflow-anchor: none;
   padding-right: 6px;
   display: flex;
   flex-direction: column;
@@ -6290,14 +6300,58 @@ body:has(main.home) .glow {
   .chart-panel > .term-body,
   .trade > .term-body { padding: 0; }
 
-  /* The source switch is the only thing left in the chart's bar, so it takes
-     the row rather than sitting in the corner of one. */
+  /*
+   * The chart's controls as one band, not two stray rows.
+   *
+   * A monospace TRADINGVIEW / NATIVE segment sat on its own line, then a rule,
+   * then a timeframe pill and Indicators floated off to the right on a second
+   * line, with "reading history" trailing after them. Four controls, three
+   * visual groups, no relationship between any of them.
+   *
+   * They cannot share a DOM row, since the source switch belongs to the panel
+   * and the rest to the chart, so they are made to read as one: the rule
+   * between them goes, the vertical gap closes to almost nothing, and all of it
+   * lines up on the same left edge at the same height.
+   */
   .chart-panel > .term-bar {
-    padding: 0 0 8px;
+    padding: 0;
     border-bottom: 0;
     background: none;
   }
   .chart-controls { margin: 0; }
+  .chart-panel .segmented {
+    height: 34px;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .chart-panel .segmented button {
+    padding: 0 14px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+  .chart-top {
+    gap: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .chart-top-actions {
+    gap: 8px;
+    margin-left: 0;
+    margin-right: auto;
+  }
+  .chart-top-btn {
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+  /* A status, at the size of one, rather than a fourth control. */
+  .chart-loading {
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+  }
 
   /* The footnote under the chart is a paragraph explaining where the candles
      come from. True, and not what a phone needs between the chart and the buy
@@ -6527,37 +6581,64 @@ body:has(main.home) .glow {
   }
   .phone-presets .preset:disabled { opacity: 0.45; }
 
-  /* The field it opens, on the row under it. */
-  .custom-amount {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    margin-top: 10px;
+  /*
+   * A button being retyped, which is the same button with a field in it.
+   *
+   * It keeps its own size, colour and shape while it is edited, so the row does
+   * not reflow and it is obvious which of the three is being changed. On the
+   * sell side the % stays outside the input: it is what the number means rather
+   * than part of the number, and it is not yours to delete.
+   */
+  .phone-presets.editing .preset:not(.custom-toggle) {
+    /* Dimmed while editing, so the row reads as a set of things to change
+       rather than a set of things to trade. */
+    opacity: 0.72;
   }
-  .custom-amount input {
+  .phone-presets .as-field {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    opacity: 1;
+    padding: 0 6px;
+  }
+  .phone-presets .as-field input {
     width: 100%;
-    height: 52px;
-    padding: 0 14px;
-    border: 1px solid var(--line-bright);
-    border-radius: 12px;
-    background: var(--ink-sunken);
-    color: var(--text);
-    /* 16px or larger, or iOS zooms the page in on focus. */
-    font-size: 16px;
-  }
-  .custom-amount .preset {
-    min-height: 52px;
-    padding: 0 22px;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
     border: 0;
-    border-radius: 12px;
-    background: var(--text);
-    color: var(--ink);
-    font-family: var(--font-geist-sans), system-ui, sans-serif;
-    font-size: 16px;
+    background: none;
+    color: inherit;
+    font-family: inherit;
+    font-size: 17px;
     font-weight: 650;
-    box-shadow: none;
+    text-align: center;
+    /* iOS zooms the page on a field under 16px; 17 is over it and matches the
+       weight of the label it replaces. */
   }
-  .custom-amount .preset:disabled { opacity: 0.4; }
+  .phone-presets .as-field input:focus { outline: none; }
+  .phone-presets .as-field input::-webkit-outer-spin-button,
+  .phone-presets .as-field input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .phone-presets .as-field i {
+    font-style: normal;
+    font-size: 17px;
+    font-weight: 650;
+  }
+
+  /* The footer says where to go, not what the site is. */
+  .site-footer .footer-say { display: none; }
+
+  /* The action, at the size of every other one on the page. */
+  .feed-portfolio-connect {
+    margin-top: 8px;
+    min-height: 46px;
+    border-radius: 12px;
+    font-size: 15px;
+  }
 
   /*
    * Cash and holding, as one row you read rather than two labels you parse.

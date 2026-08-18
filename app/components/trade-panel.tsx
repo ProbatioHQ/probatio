@@ -25,6 +25,10 @@ const BUY_PRESETS = [0.1, 0.5, 1, 2, 5];
  * the sizes somebody arriving already expects to see.
  */
 const PHONE_BUY_PRESETS = [0.1, 0.2, 0.3];
+/** The phone's sell sizes, as whole percentages of the position. */
+const PHONE_SELL_PERCENTS = [25, 50, 100];
+/** Where this browser's edited sizes live. */
+const SIZES_KEY = 'probatio.trade.sizes';
 /** Sell sizes, as a fraction of the position. */
 /**
  * A whole percentage of a holding, or null if it is not one.
@@ -310,19 +314,92 @@ export function TradePanel({
    * meant typing out nine figures of base units. This is the same action as a
    * preset: it fills the amount, it does not trade.
    */
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customValue, setCustomValue] = useState('');
+  /*
+   * Which of the three buttons is being retyped, and what into.
+   *
+   * The first version of this opened a separate field with its own Set button
+   * underneath the row, which is a second way to do what the amount field above
+   * already does. What was wanted is the buttons themselves: tap the pencil,
+   * tap the size you want to replace, and type over it in place. So editing is
+   * a state the row is in, and the index of the button currently holding an
+   * input.
+   */
+  const [editing, setEditing] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
+
+  /*
+   * The sizes on the buttons, which are a preference of this browser's.
+   *
+   * Kept here rather than in the database: they belong to the person holding
+   * the phone, not to the account, and nothing about them is worth surviving
+   * being wrong.
+   */
+  const [buySizes, setBuySizes] = useState<number[]>(PHONE_BUY_PRESETS);
+  const [sellPercents, setSellPercents] = useState<number[]>(PHONE_SELL_PERCENTS);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SIZES_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { buy?: number[]; sell?: number[] };
+      if (Array.isArray(saved.buy) && saved.buy.length === 3) setBuySizes(saved.buy);
+      if (Array.isArray(saved.sell) && saved.sell.length === 3) setSellPercents(saved.sell);
+    } catch {
+      // A corrupt preference is not worth a broken panel. The defaults stand.
+    }
+  }, []);
+
+  const remember = useCallback((buy: number[], sell: number[]) => {
+    try {
+      localStorage.setItem(SIZES_KEY, JSON.stringify({ buy, sell }));
+    } catch {
+      // Private browsing, a full quota. The sizes still work for this session.
+    }
+  }, []);
+
+  /*
+   * Write a retyped size back onto its button.
+   *
+   * Nothing is applied to the amount field here: editing a size is changing a
+   * tool, not placing an order, and a tap that both rewrites a button and fills
+   * a trade is one tap doing two jobs. A value that does not parse leaves the
+   * button as it was.
+   */
+  const commitSize = useCallback(
+    (index: number) => {
+      if (side === 'buy') {
+        const sol = Number(draft);
+        if (Number.isFinite(sol) && sol > 0) {
+          const next = buySizes.map((value, at) => (at === index ? sol : value));
+          setBuySizes(next);
+          remember(next, sellPercents);
+        }
+      } else {
+        const percent = clampPercent(draft);
+        if (percent !== null) {
+          const next = sellPercents.map((value, at) => (at === index ? percent : value));
+          setSellPercents(next);
+          remember(buySizes, next);
+        }
+      }
+      setEditIndex(null);
+      setDraft('');
+    },
+    [side, draft, buySizes, sellPercents, remember],
+  );
 
   const buyPreset = useCallback((sol: number) => {
     setSide('buy');
     setAmount(String(sol));
   }, []);
 
-  // Percent on one side and SOL on the other, so a value carried across would
-  // be read as the wrong thing entirely.
+  // Percent on one side and SOL on the other, so an edit carried across would
+  // be applied to the wrong kind of number entirely.
   useEffect(() => {
-    setCustomOpen(false);
-    setCustomValue('');
+    setEditing(false);
+    setEditIndex(null);
+    setDraft('');
   }, [side]);
 
   const sellFraction = useCallback(
@@ -555,63 +632,68 @@ export function TradePanel({
           {/* The same action at a size a thumb can use. Only one of these two
               rows is ever displayed; which one is a question of whether there
               is a pointer, not of how wide the window is. */}
-          <div className="presets phone-presets" role="group" aria-label="Buy size">
-            {PHONE_BUY_PRESETS.map((sol) => (
-              <button
-                key={sol}
-                type="button"
-                className="preset buy-big"
-                disabled={working}
-                onClick={() => buyPreset(sol)}
-              >
-                {sol}
-              </button>
-            ))}
-            {/* Anything the three do not cover. */}
+          <div
+            className={editing ? 'presets phone-presets editing' : 'presets phone-presets'}
+            role="group"
+            aria-label="Buy size"
+          >
+            {buySizes.map((sol, index) =>
+              editing && editIndex === index ? (
+                <span key={index} className="preset buy-big as-field">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={0.01}
+                    autoFocus
+                    value={draft}
+                    aria-label="Buy size in SOL"
+                    onChange={(event) => setDraft(event.target.value)}
+                    onBlur={() => commitSize(index)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commitSize(index);
+                      if (event.key === 'Escape') {
+                        setEditIndex(null);
+                        setDraft('');
+                      }
+                    }}
+                  />
+                </span>
+              ) : (
+                <button
+                  key={index}
+                  type="button"
+                  className="preset buy-big"
+                  disabled={working}
+                  onClick={() => {
+                    if (!editing) {
+                      buyPreset(sol);
+                      return;
+                    }
+                    setEditIndex(index);
+                    setDraft(String(sol));
+                  }}
+                >
+                  {sol}
+                </button>
+              ),
+            )}
+            {/* Turns the three into fields you can type over. */}
             <button
               type="button"
-              className={customOpen ? 'preset custom-toggle on' : 'preset custom-toggle'}
-              aria-expanded={customOpen}
-              aria-label="Another amount"
+              className={editing ? 'preset custom-toggle on' : 'preset custom-toggle'}
+              aria-pressed={editing}
+              aria-label={editing ? 'Done editing sizes' : 'Edit sizes'}
               disabled={working}
-              onClick={() => setCustomOpen((was) => !was)}
+              onClick={() => {
+                setEditing((was) => !was);
+                setEditIndex(null);
+                setDraft('');
+              }}
             >
               <PencilMark />
             </button>
           </div>
-          {customOpen && (
-            <div className="custom-amount">
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step={0.01}
-                autoFocus
-                value={customValue}
-                placeholder="SOL"
-                onChange={(event) => setCustomValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  const sol = Number(customValue);
-                  if (sol > 0) {
-                    buyPreset(sol);
-                    setCustomOpen(false);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="preset"
-                disabled={!(Number(customValue) > 0)}
-                onClick={() => {
-                  buyPreset(Number(customValue));
-                  setCustomOpen(false);
-                }}
-              >
-                Set
-              </button>
-            </div>
-          )}
           </>
         ) : (
           <>
@@ -637,64 +719,70 @@ export function TradePanel({
             or ten figures into a field narrower than the number. A percentage
             of what you hold is the only sane way to size a sell.
           */}
-          <div className="presets phone-presets" role="group" aria-label="Sell size">
-            {SELL_PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                type="button"
-                className="preset sell-big"
-                disabled={working || holding === 0n}
-                onClick={() => sellFraction(preset.numerator, preset.denominator)}
-              >
-                {preset.label}
-              </button>
-            ))}
+          <div
+            className={editing ? 'presets phone-presets editing' : 'presets phone-presets'}
+            role="group"
+            aria-label="Sell size"
+          >
+            {sellPercents.map((percent, index) =>
+              editing && editIndex === index ? (
+                // The % stays put. It is what the number means, not part of it.
+                <span key={index} className="preset sell-big as-field">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={100}
+                    step={1}
+                    autoFocus
+                    value={draft}
+                    aria-label="Sell size, percent of holding"
+                    onChange={(event) => setDraft(event.target.value)}
+                    onBlur={() => commitSize(index)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commitSize(index);
+                      if (event.key === 'Escape') {
+                        setEditIndex(null);
+                        setDraft('');
+                      }
+                    }}
+                  />
+                  <i aria-hidden="true">%</i>
+                </span>
+              ) : (
+                <button
+                  key={index}
+                  type="button"
+                  className="preset sell-big"
+                  disabled={working || (holding === 0n && !editing)}
+                  onClick={() => {
+                    if (!editing) {
+                      sellFraction(percent, 100);
+                      return;
+                    }
+                    setEditIndex(index);
+                    setDraft(String(percent));
+                  }}
+                >
+                  {percent}%
+                </button>
+              ),
+            )}
             <button
               type="button"
-              className={customOpen ? 'preset custom-toggle on' : 'preset custom-toggle'}
-              aria-expanded={customOpen}
-              aria-label="Another percentage"
-              disabled={working || holding === 0n}
-              onClick={() => setCustomOpen((was) => !was)}
+              className={editing ? 'preset custom-toggle on' : 'preset custom-toggle'}
+              aria-pressed={editing}
+              aria-label={editing ? 'Done editing sizes' : 'Edit sizes'}
+              disabled={working}
+              onClick={() => {
+                setEditing((was) => !was);
+                setEditIndex(null);
+                setDraft('');
+              }}
             >
               <PencilMark />
             </button>
           </div>
-          {customOpen && (
-            <div className="custom-amount">
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={100}
-                step={1}
-                autoFocus
-                value={customValue}
-                placeholder="% of holding"
-                onChange={(event) => setCustomValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  const percent = clampPercent(customValue);
-                  if (percent === null) return;
-                  sellFraction(percent, 100);
-                  setCustomOpen(false);
-                }}
-              />
-              <button
-                type="button"
-                className="preset"
-                disabled={clampPercent(customValue) === null}
-                onClick={() => {
-                  const percent = clampPercent(customValue);
-                  if (percent === null) return;
-                  sellFraction(percent, 100);
-                  setCustomOpen(false);
-                }}
-              >
-                Set
-              </button>
-            </div>
-          )}
           </>
         )}
 

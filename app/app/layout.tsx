@@ -128,7 +128,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
 
         <footer className="site-footer">
           <div className="shell">
-            <span>Practice money. Real prices. Records kept honestly.</span>
+            {/* The tagline is the front page's job. In a phone footer it is a
+                line of marketing between somebody and the four links they
+                actually came down here for. */}
+            <span className="footer-say">Practice money. Real prices. Records kept honestly.</span>
             <span>
               <a href="/docs">How it works</a> · <a href="/roadmap">Roadmap</a> ·{' '}
               <a href="/verify">Verify a record</a> · <a href="/trust">What you have to trust</a>

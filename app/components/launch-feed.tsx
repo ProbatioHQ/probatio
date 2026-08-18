@@ -175,6 +175,13 @@ const FILTER_KEY = 'probatio.feed.filters';
  */
 const OPENING_MARKET_CAP = '27959000000';
 
+/** Largest first, with an unread curve counted at what it opened worth. */
+function byMarketCap(a: Token, b: Token): number {
+  const left = BigInt(a.marketCap ?? OPENING_MARKET_CAP);
+  const right = BigInt(b.marketCap ?? OPENING_MARKET_CAP);
+  return right > left ? 1 : right < left ? -1 : 0;
+}
+
 function marketCapLabel(lamports: string, solUsd: number | null): string {
   const sol = Number(BigInt(lamports)) / 1e9;
 
@@ -576,12 +583,11 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
          * are worth, largest first.
          */
         next.new.sort((a, b) => b.launchedAt - a.launchedAt);
-        next.bonding.sort((a, b) => (b.progressBps ?? 0) - (a.progressBps ?? 0));
-        next.bonded.sort((a, b) => {
-          const left = BigInt(a.marketCap ?? OPENING_MARKET_CAP);
-          const right = BigInt(b.marketCap ?? OPENING_MARKET_CAP);
-          return right > left ? 1 : right < left ? -1 : 0;
-        });
+        // Soon and Graduated both rank by what a token is worth, largest first.
+        // Soon used to rank by curve progress, which is a different question and
+        // reads as unsorted next to a column of market caps.
+        next.bonding.sort(byMarketCap);
+        next.bonded.sort(byMarketCap);
 
         if (promoted.size > 0) {
           setArrived((was) => new Set([...was, ...promoted]));
