@@ -194,16 +194,32 @@ function summarise(
 
   if (overall === 'exploitable') {
     return (
-      `the simulator is filling better than the chain on ${suspend.length} token(s) — ` +
+      `the simulator is filling better than the chain on ${suspend.length} token(s), ` +
       `suspend them from ranked trading now: ${suspend.join(', ')}`
     );
   }
   if (overall === 'divergent') {
     const affected = tokens.filter((token) => token.severity === 'divergent');
+    /*
+     * Named, not counted.
+     *
+     * This said "the engine disagrees with the chain on 2 token(s) by 28bps,
+     * fix before the next season" and stopped there, which is an instruction
+     * with nothing to act on: no mint, no direction, no sample count. The
+     * exploitable branch above has always named its tokens because it demands
+     * a suspension; this one demands a fix and named nothing.
+     */
+    const detail = affected
+      .map(
+        (token) =>
+          `${token.mint.slice(0, 8)}… ${token.medianSignedBps >= 0 ? '+' : ''}` +
+          `${token.medianSignedBps}bps over ${token.samples} samples`,
+      )
+      .join(', ');
     return (
-      `the engine disagrees with the chain on ${affected.length} token(s) by ` +
-      `${Math.max(...affected.map((token) => token.medianAbsBps))}bps — traders are being ` +
-      'short-changed, fix before the next season'
+      `the engine disagrees with the chain on ${affected.length} token(s) by up to ` +
+      `${Math.max(...affected.map((token) => token.medianAbsBps))}bps, traders are being ` +
+      `short-changed, fix before the next season: ${detail}`
     );
   }
   if (overall === 'watch') {
