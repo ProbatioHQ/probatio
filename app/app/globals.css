@@ -1251,6 +1251,7 @@ button,
 .page-prose {
   padding: 56px 0 96px;
   max-width: 72ch;
+  margin-inline: auto;
 }
 
 /* ============================================================ terminal */
@@ -3901,8 +3902,18 @@ body:has(main.wide) .site-footer .shell {
    clean block with a status pill and its items. Terminal palette, plain
    layout, readable first. */
 
+/*
+ * Centred, like every other capped page.
+ *
+ * A max-width with no auto margin does not centre anything: it just makes the
+ * element narrower and leaves it against the start edge. On a 1400px shell that
+ * put the whole roadmap in the left 760px with half the page empty beside it.
+ * `main.wide` already carried `margin: 0 auto` for exactly this reason; this
+ * one and `.page-prose` were the two that never got it.
+ */
 .roadmap {
   max-width: 760px;
+  margin-inline: auto;
 }
 
 .phases {
