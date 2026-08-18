@@ -116,7 +116,7 @@ export function Season() {
           <p className="dim">Opens {new Date(season.startsAt).toLocaleString()}.</p>
         )}
         {season.status === 'finalized' ? (
-          <p className="dim">This season is over and its results are on chain.</p>
+          <p className="dim">This season is over and its results are final.</p>
         ) : (
           closed && <p className="dim">This season is over. Results are not published yet.</p>
         )}

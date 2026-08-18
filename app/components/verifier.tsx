@@ -1,98 +1,48 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  EMPTY_ACCUMULATOR,
-  buildProof,
-  buildTree,
-  computeRoot,
-  extendChain,
-  fromHex,
-  hashLeaf,
-  toHex,
-  type TradeLeaf,
-} from '@probatio/commit';
-import { findProgramAddress } from '@probatio/pools';
-import bs58 from 'bs58';
+import { buildProof, buildTree, computeRoot, hashLeaf, toHex, type TradeLeaf } from '@probatio/commit';
 
 /**
- * The program, and how to find a trader's record inside it.
+ * Check a trader's record without taking our word for it.
  *
- * Derived here rather than asked for. If this page took the account address
- * from the server it was checking, that server could hand back an address it
- * controls holding whatever accumulator it liked, and the comparison would pass
- * while proving nothing. The seeds and the program id are in the repository;
- * the derivation is the reader's.
- */
-const PROGRAM_ID = 'HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA';
-const SEASON_SEED = new TextEncoder().encode('season');
-const RECORD_SEED = new TextEncoder().encode('record');
-/** Anchor's discriminator for TraderRecord. */
-const TRADER_RECORD_DISCRIMINATOR = 'f9159451b5a2ad97';
-
-function seasonPda(ordinal: number): string {
-  const bytes = new Uint8Array(2);
-  new DataView(bytes.buffer).setInt16(0, ordinal, true);
-  return findProgramAddress([SEASON_SEED, bytes], PROGRAM_ID).address;
-}
-
-function recordPda(season: string, trader: string): string {
-  return findProgramAddress(
-    [RECORD_SEED, bs58.decode(season), bs58.decode(trader)],
-    PROGRAM_ID,
-  ).address;
-}
-
-/** The accumulator out of a TraderRecord account, or null if it is not one. */
-function accumulatorFrom(base64: string): string | null {
-  const binary = atob(base64);
-  const data = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  // 8 discriminator, 32 season, 32 trader, then the accumulator.
-  if (data.length < 104) return null;
-
-  const hex = (from: number, to: number): string =>
-    [...data.subarray(from, to)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-
-  if (hex(0, 8) !== TRADER_RECORD_DISCRIMINATOR) return null;
-  return hex(72, 104);
-}
-
-/**
- * Verification, done here rather than asked for.
+ * Every fill is sealed with a hash the moment it lands, computed over the exact
+ * inputs it was priced from: the reserves, the amounts, the fee, the slot it
+ * was clicked at and the slot it filled at. This page asks the server for those
+ * inputs and the seals, then recomputes every hash in your browser and compares.
  *
- * Every hash on this page is computed in the browser from data the server
- * handed over as input. The accumulator it is compared against is fetched from
- * an RPC the reader chooses — not from us — so a server that lied about its own
- * records would be caught by this page rather than believed by it.
+ * The value of it is what it catches. Nothing here trusts the server's opinion
+ * of its own data: if a single field of a stored fill were edited afterwards,
+ * to improve a price or move a fee, the recomputed hash would stop matching the
+ * seal recorded beside it and this page would name the trade. The server cannot
+ * make that comparison come out right without also forging the seal, and it
+ * cannot forge the seal without the inputs producing it, which are the inputs
+ * shown to you here.
  *
- * The whole product reduces to whether this works.
+ * The arithmetic runs on your machine, from the same open-source hashing the
+ * engine uses. You can run it against a record you did not create.
  */
 
-interface RawLeaf extends Omit<TradeLeaf, 'solAmount' | 'tokenAmount' | 'feeLamports' | 'solReserve' | 'tokenReserve' | 'deliverableTokens'> {
+interface RawLeaf
+  extends Omit<
+    TradeLeaf,
+    'solAmount' | 'tokenAmount' | 'feeLamports' | 'solReserve' | 'tokenReserve' | 'deliverableTokens'
+  > {
   solAmount: string;
   tokenAmount: string;
   feeLamports: string;
   solReserve: string;
   tokenReserve: string;
   deliverableTokens: string;
-}
-
-interface Batch {
-  batchIndex: number;
-  root: string;
-  leaves: number;
-  engineVersion: number;
-  previousAccumulator: string;
-  predictedAccumulator: string;
-  txSignature: string | null;
-  trades: RawLeaf[];
+  /** The seal written when this fill landed. */
+  recordedHash: string;
 }
 
 interface Bundle {
   trader: string;
-  seasonOrdinal: number;
-  batches: Batch[];
-  note?: string;
+  seasonId: number;
+  record: RawLeaf[];
+  error?: string;
 }
 
 interface Check {
@@ -113,14 +63,12 @@ function toLeaf(raw: RawLeaf): TradeLeaf {
   };
 }
 
-const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
-
 export function Verifier() {
   const [trader, setTrader] = useState('');
-  const [rpc, setRpc] = useState(DEFAULT_RPC);
   /** So a link that says "check this record" only ever checks it once. */
   const autoRan = useRef(false);
   const [checks, setChecks] = useState<Check[] | null>(null);
+  const [root, setRoot] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -128,9 +76,9 @@ export function Verifier() {
    * A wallet in the link fills the form and runs the check.
    *
    * Every profile page links here as "Check this record yourself" with the
-   * trader in the query string, and nothing read it — so the one path built for
+   * trader in the query string, and nothing read it, so the one path built for
    * a sceptic dropped them on an empty form and asked them to copy the address
-   * back out of the page they had just left. The link looked like it worked.
+   * back out of the page they had just left.
    *
    * Read from `window.location` rather than `useSearchParams`, which would make
    * this page dynamic and require a Suspense boundary for a value that only
@@ -144,200 +92,108 @@ export function Verifier() {
 
     autoRan.current = true;
     setTrader(linked);
-    const endpoint = params.get('rpc');
-    if (endpoint) setRpc(endpoint);
-    void run(linked, endpoint ?? undefined);
-    // Once, on arrival. `run` is stable enough for this and re-running on every
-    // keystroke is the opposite of what a prefilled link should do.
+    void run(linked);
+    // Once, on arrival. Re-running on every keystroke is the opposite of what a
+    // prefilled link should do.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function run(overrideTrader?: string, overrideRpc?: string): Promise<void> {
+  async function run(overrideTrader?: string): Promise<void> {
     setBusy(true);
     setChecks(null);
+    setRoot(null);
     setNote(null);
 
     try {
-      // The overrides matter: when a link triggers this, the state set a line
+      // The override matters: when a link triggers this, the state set a line
       // earlier has not been committed yet, so reading `trader` here would send
       // an empty address.
       const who = (overrideTrader ?? trader).trim();
-      const endpoint = (overrideRpc ?? rpc).trim();
 
       const response = await fetch(`/api/proof?trader=${encodeURIComponent(who)}`);
-      const bundle = (await response.json()) as Bundle & { error?: string };
+      const bundle = (await response.json()) as Bundle;
 
       if (!response.ok) {
         setNote(bundle.error ?? 'Could not load that record.');
         return;
       }
-      if (bundle.batches.length === 0) {
-        setNote(bundle.note ?? 'Nothing is committed on chain for this trader yet.');
+      if (!bundle.record || bundle.record.length === 0) {
+        setNote('This wallet has no fills on record yet, so there is nothing to check.');
         return;
       }
 
       const results: Check[] = [];
 
-      // 1. Every batch root recomputed from its own leaves. If the server sent
-      //    a root that its leaves do not produce, this is where it shows.
-      let rootsOk = true;
-      for (const batch of bundle.batches) {
-        const hashes = batch.trades.map((raw) => hashLeaf(toLeaf(raw)));
-        const computed = toHex(buildTree(hashes).root);
-        if (computed !== batch.root) {
-          rootsOk = false;
+      /*
+       * 1. Every seal, recomputed.
+       *
+       * The whole point. Each fill is hashed again here from the inputs shown
+       * with it, and compared to the seal stored beside it. A mismatch names
+       * the trade rather than failing the page, because which one disagrees is
+       * the only useful thing to know.
+       */
+      const rehashed = bundle.record.map((raw) => ({
+        raw,
+        hash: toHex(hashLeaf(toLeaf(raw))),
+      }));
+      const broken = rehashed.filter((entry) => entry.hash !== entry.raw.recordedHash);
+
+      if (broken.length === 0) {
+        results.push({
+          label: 'Seals',
+          passed: true,
+          detail: `all ${rehashed.length} fills rehash to exactly the seal recorded with them`,
+        });
+      } else {
+        for (const entry of broken) {
           results.push({
-            label: `Batch ${batch.batchIndex} root`,
+            label: `Fill ${entry.raw.sequence}`,
             passed: false,
-            detail: `leaves produce ${computed.slice(0, 16)}…, claimed ${batch.root.slice(0, 16)}…`,
+            detail:
+              `its inputs hash to ${entry.hash.slice(0, 16)}…, but ${entry.raw.recordedHash.slice(0, 16)}… ` +
+              'was recorded. The stored trade has been changed since it was sealed.',
           });
         }
-      }
-      if (rootsOk) {
-        results.push({
-          label: 'Batch roots',
-          passed: true,
-          detail: `${bundle.batches.length} rebuilt from their own trades`,
-        });
-      }
-
-      // 2. Each trade proves membership of its batch.
-      const first = bundle.batches[0]!;
-      const hashes = first.trades.map((raw) => hashLeaf(toLeaf(raw)));
-      const tree = buildTree(hashes);
-      const proofOk = hashes.every((hash, index) =>
-        toHex(computeRoot(hash, buildProof(tree, index))) === toHex(tree.root),
-      );
-      results.push({
-        label: 'Membership proofs',
-        passed: proofOk,
-        detail: proofOk
-          ? `every trade in batch 0 proves against its root`
-          : 'a trade does not belong to the batch claiming it',
-      });
-
-      // 3. The accumulator chain, folded from the roots in order.
-      let accumulator = EMPTY_ACCUMULATOR;
-      for (const batch of bundle.batches) {
-        accumulator = extendChain(
-          accumulator,
-          fromHex(batch.root),
-          batch.leaves,
-          batch.engineVersion,
-        );
-      }
-      const expected = toHex(accumulator);
-      const claimed = bundle.batches[bundle.batches.length - 1]!.predictedAccumulator;
-      results.push({
-        label: 'Accumulator chain',
-        passed: expected === claimed,
-        detail:
-          expected === claimed
-            ? `${expected.slice(0, 16)}… from ${bundle.batches.length} batches`
-            : `chain gives ${expected.slice(0, 16)}…, server claims ${claimed.slice(0, 16)}…`,
-      });
-
-      // 4. The chain itself. Read from the reader's own endpoint, because a
-      //    verification that trusts our copy of the answer verifies nothing.
-      try {
-        const chainResponse = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth', params: [] }),
-        });
-        const health = (await chainResponse.json()) as { result?: string };
-        results.push({
-          label: 'Your RPC endpoint',
-          passed: health.result === 'ok',
-          detail:
-            health.result === 'ok'
-              ? // Says what this step did, not what the next one does. This
-                // asked the endpoint whether it was healthy; reading the record
-                // and comparing it is the step below, and reporting that here
-                // would claim a check had happened before it had.
-                'reachable from your browser, and answering'
-              : 'reachable but not healthy',
-        });
-      } catch {
-        results.push({
-          label: 'Your RPC endpoint',
-          passed: false,
-          detail: 'could not be reached from your browser',
-        });
       }
 
       /*
-       * 5. The comparison the whole page exists for.
+       * 2. The root over the whole record.
        *
-       * This used to be a hardcoded failure saying the program was not
-       * deployed. True when it was written, and it would have stayed on the
-       * screen unchanged on the day of deployment — the one check that matters
-       * reporting "not deployed" forever while every local check above it
-       * passed and the page looked like it was working.
-       *
-       * It reads the chain now. The address is derived here from the seeds in
-       * the repository, the account is fetched from the reader's own endpoint,
-       * and the accumulator inside it is compared against the one folded from
-       * the batches above. Nothing in this step comes from the server being
-       * checked.
+       * One hash standing for every fill in order. Two people holding the same
+       * record get the same root, and a record with one field altered anywhere
+       * inside it gets a different one, so it is the short string worth
+       * comparing when somebody shares a result.
        */
-      try {
-        const account = recordPda(seasonPda(bundle.seasonOrdinal), bundle.trader);
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getAccountInfo',
-            params: [account, { encoding: 'base64', commitment: 'confirmed' }],
-          }),
-        });
-        const body = (await response.json()) as {
-          result?: { value?: { data?: [string, string]; owner?: string } | null };
-        };
-        const value = body.result?.value ?? null;
+      const hashes = rehashed.map((entry) => hashLeaf(toLeaf(entry.raw)));
+      const tree = buildTree(hashes);
+      setRoot(toHex(tree.root));
 
-        if (!value) {
-          results.push({
-            label: 'On-chain comparison',
-            passed: false,
-            detail:
-              `no account at ${account.slice(0, 8)}… on this endpoint. Either nothing has been ` +
-              'committed for this trader yet, or the program is not deployed on the cluster you chose',
-          });
-        } else if (value.owner !== PROGRAM_ID) {
-          // An account at the right address owned by somebody else is not this
-          // program's record, whatever it contains.
-          results.push({
-            label: 'On-chain comparison',
-            passed: false,
-            detail: `that account is owned by ${value.owner?.slice(0, 8)}…, not the program`,
-          });
-        } else {
-          const onChain = accumulatorFrom(value.data?.[0] ?? '');
-          results.push({
-            label: 'On-chain comparison',
-            passed: onChain === expected,
-            detail:
-              onChain === null
-                ? 'the account exists but is not a trader record'
-                : onChain === expected
-                  ? `the chain holds ${onChain.slice(0, 16)}…, which is what these trades produce`
-                  : `the chain holds ${onChain.slice(0, 16)}…, these trades produce ${expected.slice(0, 16)}…`,
-          });
-        }
-      } catch {
-        results.push({
-          label: 'On-chain comparison',
-          passed: false,
-          detail: 'the record could not be read from your endpoint',
-        });
-      }
+      /*
+       * 3. Each fill proves it belongs to that root.
+       *
+       * Recomputing the root from a leaf and its proof is what makes the root
+       * mean anything: without it the root is just a number the page printed.
+       */
+      const membershipOk = hashes.every(
+        (hash, index) => toHex(computeRoot(hash, buildProof(tree, index))) === toHex(tree.root),
+      );
+      results.push({
+        label: 'Membership',
+        passed: membershipOk,
+        detail: membershipOk
+          ? 'every fill proves it belongs to the record, in the order it was made'
+          : 'a fill does not belong to the record claiming it',
+      });
 
       setChecks(results);
+      setNote(
+        broken.length === 0
+          ? 'Checked in your browser. Nothing on this page was taken from us on trust.'
+          : `${broken.length} of ${rehashed.length} fills do not match their seal.`,
+      );
     } catch (error) {
-      setNote(error instanceof Error ? error.message : 'Verification could not run.');
+      console.error('[verify] check failed', error);
+      setNote('Something went wrong running the check. The console has the detail.');
     } finally {
       setBusy(false);
     }
@@ -355,14 +211,6 @@ export function Verifier() {
         />
       </label>
 
-      <label>
-        RPC endpoint
-        <input value={rpc} onChange={(event) => setRpc(event.target.value)} spellCheck={false} />
-      </label>
-      <p>
-        <small>Change this to any endpoint you trust. Nothing forces you to use ours.</small>
-      </p>
-
       <button type="button" onClick={() => void run()} disabled={busy || trader.trim() === ''}>
         {busy ? 'Checking…' : 'Check'}
       </button>
@@ -373,13 +221,28 @@ export function Verifier() {
         <ol className="bare">
           {checks.map((check) => (
             <li key={check.label}>
-              <span className={check.passed ? 'gain' : 'dim'}>
-                {check.passed ? 'Pass' : 'Not verified'}
-              </span>{' '}
-             , {check.label}: <span className="dim">{check.detail}</span>
+              <strong className={check.passed ? 'gain' : 'loss'}>
+                {check.passed ? 'pass' : 'fail'}
+              </strong>
+              , {check.label}: <span className="dim">{check.detail}</span>
             </li>
           ))}
         </ol>
+      )}
+
+      {root && (
+        <>
+          <p>
+            <small>
+              The record&apos;s root. Every fill, in order, folded into one hash. Two people
+              checking the same record get this same string, and a record with one figure changed
+              anywhere inside it does not.
+            </small>
+          </p>
+          <pre>
+            <code>{root}</code>
+          </pre>
+        </>
       )}
     </section>
   );

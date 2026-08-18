@@ -183,7 +183,7 @@ export function SeasonBoard() {
             <h1 style={{ fontSize: 28 }}>{season.name}</h1>
             {/* Finalized is not the same as closed, and the difference is the
                 one that matters to somebody owed money: closed means trading
-                stopped, finalized means the results are on chain and a prize
+                stopped, finalized means the results are settled and a prize
                 can be claimed against them. Both used to read "closed". */}
             <span className={`pill ${closed ? 'closed' : 'live'}`}>
               {season.status === 'finalized'

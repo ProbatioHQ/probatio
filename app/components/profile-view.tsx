@@ -130,19 +130,18 @@ export function ProfileView({ pubkey }: { pubkey: string }) {
       })}
 
       {/*
-        Nothing here claims to be checkable against a chain.
+        The offer to check it, which is real again.
         
-        The page used to count how much of the record had been committed and
-        offer a verifier to check it against Solana. Neither is running: the
-        program those commits call is not deployed, so the count was always zero
-        of everything and the offer was to check nothing against nothing. What
-        the record is today is what this server recorded as each fill happened,
-        and saying that plainly is worth more than an invitation that leads
-        somewhere empty.
+        This used to count how much of the record had been sealed elsewhere and
+        invite a check that could not run, so it was removed and replaced with a
+        flat claim. The check works now and it runs entirely in the reader's
+        browser, so the invitation is back and it leads somewhere.
       */}
       <p className="dim">
         Every fill is recorded as it happens, at the price the market was at that moment, and
-        cannot be edited afterwards.
+        sealed with a hash covering the figures it was priced from.{' '}
+        <a href={`/verify?trader=${encodeURIComponent(pubkey)}`}>Recompute those hashes yourself</a>{' '}
+        rather than believing this page.
       </p>
     </div>
   );

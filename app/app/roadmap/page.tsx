@@ -44,7 +44,7 @@ const PHASES: readonly Phase[] = [
       {
         title: 'Head to head duels',
         detail:
-          'One against one, the same tokens over the same window, both records on chain. Put a stake on it and the winner takes the pot.',
+          'One against one, the same tokens over the same window, both records sealed. Put a stake on it and the winner takes the pot.',
       },
       {
         title: 'Automated strategies that get ranked',
@@ -95,7 +95,7 @@ const PHASES: readonly Phase[] = [
     tag: '03',
     status: 'later',
     name: 'An edge worth having',
-    summary: 'The market leaves a trail on chain. This turns that trail into things that make you a better trader.',
+    summary: 'The market leaves a trail. This turns that trail into things that make you a better trader.',
     items: [
       {
         title: 'On-chain intelligence',
@@ -133,7 +133,7 @@ const PHASES: readonly Phase[] = [
       {
         title: 'Tokenized stocks and indices',
         detail:
-          'Equities as they arrive on chain, so a track record here reflects more than one corner of one market.',
+          'Equities as they arrive, so a track record here reflects more than one corner of one market.',
       },
       {
         title: 'Perpetuals and leverage, simulated honestly',
@@ -161,7 +161,7 @@ const PHASES: readonly Phase[] = [
       {
         title: 'Strategy vaults',
         detail:
-          'A strategy with a record that holds up becomes something other people can back. The capital flows in, the creator earns a cut, and both are settled on chain.',
+          'A strategy with a record that holds up becomes something other people can back. The capital flows in and the creator earns a cut.',
       },
       {
         title: 'Back a trader',

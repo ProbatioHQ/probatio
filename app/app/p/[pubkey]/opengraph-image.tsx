@@ -44,10 +44,11 @@ export default async function ProfileCard({
       : `${positive ? '+' : ''}${(card.returnBps / 100).toFixed(1)}%`;
   const tradesText = `${card.trips} closed ${card.trips === 1 ? 'trade' : 'trades'}`;
   const rankText = card.rank === null ? '' : `Rank ${card.rank} of ${card.entrants}`;
-  const committedText =
-    card.committed > 0
-      ? `${card.committed} trades committed on Solana. This record cannot be edited`
-      : 'Not yet committed on chain';
+  // What the card can honestly say about the record: every fill carries a seal
+  // anyone can recompute. It used to count how many trades had reached a chain,
+  // which was a number that was always zero and read as a product that had not
+  // shipped.
+  const sealedText = 'Every fill sealed with a hash anyone can recompute';
   // Not the address again, and never a truncated one. The full key is already
   // on the card above; a shortened one in a URL is an instruction nobody can
   // follow, which defeats the only reason this line exists.
@@ -109,10 +110,10 @@ export default async function ProfileCard({
             style={{
               display: 'flex',
               fontSize: 30,
-              color: card.committed > 0 ? '#e6e8eb' : '#8a8f98',
+              color: '#99a0ab',
             }}
           >
-            {committedText}
+            {sealedText}
           </div>
           <div style={{ display: 'flex', fontSize: 26, color: '#8a8f98' }}>{verifyText}</div>
         </div>

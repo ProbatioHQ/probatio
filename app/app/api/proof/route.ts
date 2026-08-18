@@ -1,5 +1,6 @@
 import { commitHistory, ensureFreePlaySeason, seasonByOrdinal } from '@probatio/db';
-import { leavesFor, loadTrades } from '@probatio/keeper';
+import { hashLeaf, toHex } from '@probatio/commit';
+import { leavesFor, loadTrades, toLeaf } from '@probatio/keeper';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -7,9 +8,9 @@ import { rateLimit } from '@/lib/rate-limit';
  * Everything a stranger needs to check a trader's record without us.
  *
  * This endpoint hands over inputs, not conclusions. It says nothing about
- * whether the record is valid — that question is answered by recomputing the
- * hashes and comparing them to the chain, which is work the verifier does
- * themselves against an RPC they choose.
+ * whether the record is valid: that question is answered by recomputing every
+ * hash from the inputs and comparing, which is work the reader's own browser
+ * does.
  *
  * If this returned a verdict it would be worthless. A server saying its own
  * records are correct is the thing the whole design exists to avoid needing.
@@ -92,14 +93,47 @@ export async function GET(request: Request): Promise<Response> {
    */
   const usedOrdinal = season?.ordinal ?? withCommits?.ordinal ?? -1;
 
+  /*
+   * The record itself: every fill, with the inputs it was sealed from and the
+   * seal that was written at the time.
+   *
+   * Served whether or not the trades have been batched, because the seal is
+   * made when a fill lands, not when a batch is built. A reader can rehash each
+   * one from these inputs and compare; if a single field of a stored trade were
+   * ever altered afterwards, the recomputed hash would stop matching the one
+   * recorded with it.
+   *
+   * Deliberately does not use `leavesFor`, which throws on the first mismatch.
+   * A verifier needs to be told which trade disagrees, not handed an error
+   * page, so every leaf is returned with its recorded hash and the reader
+   * decides.
+   */
+  const stored = await loadTrades(client, seasonId, trader, 0, Number.MAX_SAFE_INTEGER);
+  const record = stored.map((trade) => {
+    const leaf = toLeaf(trade);
+    return {
+      ...leaf,
+      solAmount: leaf.solAmount.toString(),
+      tokenAmount: leaf.tokenAmount.toString(),
+      feeLamports: leaf.feeLamports.toString(),
+      solReserve: leaf.solReserve.toString(),
+      tokenReserve: leaf.tokenReserve.toString(),
+      deliverableTokens: leaf.deliverableTokens.toString(),
+      /** The seal written when this fill landed. */
+      recordedHash: trade.leafHash,
+      /** What these inputs hash to now. Equal, unless something was edited. */
+      rebuiltHash: toHex(hashLeaf(leaf)),
+    };
+  });
+
   const commits = await commitHistory(client, seasonId, trader);
   if (commits.length === 0) {
     return Response.json({
       trader,
       seasonId,
       seasonOrdinal: usedOrdinal,
+      record,
       batches: [],
-      note: 'Nothing has been committed on chain for this trader in this season yet.',
     });
   }
 
@@ -169,11 +203,11 @@ export async function GET(request: Request): Promise<Response> {
     trader,
     seasonId,
     seasonOrdinal: usedOrdinal,
+    record,
     batches,
-    // Read this from the chain yourself. Ours is not the copy that counts.
     howToVerify:
-      'Rebuild each leaf, recompute each batch root, fold the roots into the ' +
-      'accumulator chain, and compare the result against the trader record on ' +
-      'chain. The /verify page does this in your browser against an RPC you choose.',
+      'Rehash every fill from the inputs recorded with it and compare against ' +
+      'the seal stored alongside it, then rebuild the root over them. The ' +
+      '/verify page does exactly this in your browser.',
   });
 }

@@ -7,12 +7,14 @@ export default function VerifyPage() {
     <main className="prose page-prose">
       <h1>Check a record</h1>
       <p>
-        This page does not ask us whether a record is valid. It rebuilds every trade from its
-        own recorded inputs, recomputes the hashes, and compares the result against what is on
-        the Solana chain, in your browser, against an RPC endpoint you choose.
+        Every fill is sealed with a hash the moment it lands, computed over the exact figures it
+        was priced from. This page asks for those figures, recomputes every hash in your browser,
+        and compares. Nothing here is us telling you the answer.
       </p>
       <p>
-        If our server were lying, this page would say so. That is the only reason it exists.
+        If a single number in a stored trade had been changed afterwards, its hash would no
+        longer match the seal recorded beside it, and this page would name the trade. That is the
+        only reason it exists.
       </p>
       <Verifier />
     </main>

@@ -49,7 +49,7 @@ interface TradeEntry {
   partial: boolean;
   latencyMs: number;
   leafHash: string;
-  /** Whether a confirmed batch on chain covers this trade. */
+  /** Retained for older responses; nothing renders it. */
   committed?: boolean;
   createdAt: number;
 }
