@@ -32,7 +32,15 @@ import { db as dbClient } from './db';
  */
 
 /** Reclaim when less than this is free on the database's disk. */
-const TIGHT_BYTES = 64 * 1024 * 1024;
+/*
+ * When the disk counts as tight enough to reclaim.
+ *
+ * 64MB was 14% of a 454MB volume. On the 4.69GB one it is 1.4%, which is not a
+ * warning, it is the moment after the writes have already started failing.
+ * Reclaiming needs room to write a compacted copy beside the live database, so
+ * the trigger has to fire while there is still space for one.
+ */
+const TIGHT_BYTES = 512 * 1024 * 1024;
 
 function filePath(url: string): string | null {
   if (!url.startsWith('file:')) return null;

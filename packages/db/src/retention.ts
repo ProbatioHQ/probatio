@@ -48,10 +48,14 @@ export const KEEP_BY_TIMEFRAME: Record<string, number> = {
   s1: 240,
   s5: 300,
   s15: 400,
-  m1: 500,
-  m5: 600,
-  m15: 800,
-  h1: 1_000,
+  // The minute frames are what a trader actually scrolls back through on a
+  // token that moved, and they were the shallowest thing here: 500 one-minute
+  // candles is eight hours, on tokens whose whole story is often a single
+  // afternoon. Doubled, which costs about 300KB per token at full depth.
+  m1: 1_000,
+  m5: 1_200,
+  m15: 1_200,
+  h1: 1_500,
   h4: 1_000,
   h12: 1_000,
   d1: 1_200,
@@ -69,7 +73,16 @@ export const KEEP_BY_TIMEFRAME: Record<string, number> = {
  * A held token is never dropped, however quiet: its chart belongs to a position
  * somebody still owns.
  */
-const MINT_IDLE_SECONDS = 6 * 60 * 60;
+/*
+ * How long a token keeps its chart after the last person stops looking.
+ *
+ * Six hours was a disk measure, not a product one: a token opened this morning
+ * lost its history by lunchtime, so coming back to it meant watching "reading
+ * history" fill the chart again from scratch. Three days on a volume with room
+ * for it, which is long enough that revisiting anything you traded this week is
+ * instant.
+ */
+const MINT_IDLE_SECONDS = 3 * 24 * 60 * 60;
 
 /**
  * Drop every candle of a token that has gone quiet.
@@ -174,7 +187,22 @@ export async function pruneUnusedTimeframes(db: Client): Promise<number> {
  * wide, and the space it needs can be worked out in advance rather than
  * discovered when writes start failing.
  */
-const MINT_BUDGET = Number(process.env['PROBATIO_CANDLE_MINTS'] ?? '160');
+/*
+ * How many tokens keep a chart.
+ *
+ * 160 was chosen for a 454MB volume that had just been filled by unbounded
+ * candles. The volume is 4.69GB now, and 160 fully backfilled mints is 245MB of
+ * it, so the pruner was throwing away history to protect a disk that is 95%
+ * empty. At the depths below a token costs about 2MB, so 1,200 of them is
+ * 2.35GB: half the volume, leaving the rest for the database proper, the WAL,
+ * the snapshot file and the full copy that compaction makes. Half rather than
+ * two thirds because compaction needs room for a second copy of the database,
+ * and a disk that is 90% full at rest has nowhere to make one.
+ *
+ * Still an env var, and still bounded. The lesson from that outage was not that
+ * the number was too low, it was that there was no number at all.
+ */
+const MINT_BUDGET = Number(process.env['PROBATIO_CANDLE_MINTS'] ?? '1200');
 
 /**
  * Drop the candles of every token past the budget, oldest activity first.
