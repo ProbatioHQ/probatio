@@ -1,7 +1,3 @@
-'use client';
-
-import { useState } from 'react';
-
 /**
  * The band above the header, saying which token is this site's.
  *
@@ -17,7 +13,11 @@ import { useState } from 'react';
  * because the first was there first.
  *
  * Deliberately one constant to change. Setting `CONTRACT` swaps the warning for
- * the address and turns the strip into a copy control; nothing else moves.
+ * the address and points the band at the coin; nothing else moves.
+ *
+ * No client component and no state: this is a marquee and a link, and the
+ * motion is CSS. It briefly carried a copy button, which was the only reason
+ * any of this shipped JavaScript to a browser.
  */
 
 /**
@@ -69,8 +69,6 @@ function Phrase() {
 }
 
 export function TokenStrip() {
-  const [copied, setCopied] = useState(false);
-
   /*
     Read once, scrolled twice.
 
@@ -105,44 +103,24 @@ export function TokenStrip() {
     );
   }
 
-  const copy = (): void => {
-    void navigator.clipboard
-      .writeText(CONTRACT)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1_600);
-      })
-      .catch(() => undefined);
-  };
-
   /*
-    Two things to do with an address, so two controls rather than one.
+    The whole band is the link.
 
-    The band itself goes to the launchpad, because that is what somebody
-    reading a contract address in a header actually wants next. Copying is the
-    other half and cannot share the same click, so it gets its own control at
-    the end of the strip. A button cannot be nested inside a link, so they are
-    siblings and the link is what fills the space.
+    There is one thing to do with a contract address in a header, which is to
+    go and look at the coin, so the band does that and the entire width is the
+    target. A copy button sat at the right for a while and was removed: it
+    fought the link for the same tap, and a reader who wants the string can
+    take it from the page it opens.
   */
   return (
-    <div className="token-strip live">
-      <a
-        className="strip-link"
-        href={COIN_URL}
-        target="_blank"
-        rel="noreferrer noopener"
-        aria-label={`The official ${TICKER} contract address is ${CONTRACT}. Opens it on pump.fun.`}
-      >
-        {track}
-      </a>
-      <button
-        type="button"
-        className="strip-copy"
-        onClick={copy}
-        aria-label={copied ? 'Copied the contract address' : 'Copy the contract address'}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-    </div>
+    <a
+      className="token-strip live"
+      href={COIN_URL}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label={`The official ${TICKER} contract address is ${CONTRACT}. Opens it on pump.fun.`}
+    >
+      {track}
+    </a>
   );
 }

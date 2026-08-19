@@ -168,9 +168,14 @@ main {
   text-align: left;
   align-self: auto;
   cursor: default;
+  text-decoration: none;
 }
 
-/* Once there is an address, the whole band copies it. */
+/*
+ * Once there is an address the band is a link, and the whole of it is the
+ * target: the text is moving, so asking somebody to hit a scrolling address
+ * would be a game rather than a control.
+ */
 .token-strip.live {
   cursor: pointer;
 }
@@ -259,54 +264,6 @@ main {
   white-space: nowrap;
 }
 
-/*
- * The band is a link once there is an address, and the whole of it is the
- * target: the moving text is what somebody aims at, and asking them to hit a
- * scrolling address would be a game rather than a control.
- */
-.strip-link {
-  display: block;
-  width: 100%;
-  height: 100%;
-  color: inherit;
-  text-decoration: none;
-}
-
-/*
- * Copying is the other half, and it cannot share the link's click.
- *
- * Parked at the end of the strip on its own ground, so the address can scroll
- * under it without the word becoming unreadable. The gradient is what stops the
- * marquee appearing to run into the button.
- */
-.strip-copy {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 30px;
-  width: auto;
-  min-height: 0;
-  align-self: auto;
-  display: flex;
-  align-items: center;
-  padding: 0 16px 0 30px;
-  border: 0;
-  border-radius: 0;
-  background: linear-gradient(90deg, transparent, var(--ink-sunken) 26px);
-  color: var(--accent);
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.strip-copy:hover:not(:where(:disabled)) {
-  opacity: 1;
-  color: var(--text);
-}
 
 .site-header {
   border-bottom: 1px solid var(--line);
