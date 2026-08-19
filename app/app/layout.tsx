@@ -6,6 +6,7 @@ import { AmbientTerminal } from '@/components/ambient-terminal';
 import { HeaderScroll } from '@/components/header-scroll';
 import { PageTransition } from '@/components/page-transition';
 import { SiteNav } from '@/components/site-nav';
+import { TokenStrip } from '@/components/token-strip';
 import { StatusBanner } from '@/components/status-banner';
 import { WalletButton, WalletProvider } from '@/components/wallet';
 
@@ -64,6 +65,11 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <a href="#content" className="skip-link">
           Skip to content
         </a>
+
+        {/* Above the header and outside the wallet context, which it does not
+            need: it states which token belongs to this site, which is true
+            whether or not anybody is connected. */}
+        <TokenStrip />
 
         <WalletProvider>
         <HeaderScroll />

@@ -115,6 +115,156 @@ main {
 
 /* ------------------------------------------------------------------ header */
 
+/*
+ * ============================================================ token strip
+ *
+ * The band above the header. See components/token-strip.tsx for what it says
+ * and why it says it at the top of every page.
+ *
+ * It scrolls away rather than sticking: the header is what somebody needs at
+ * arm's reach while they read, and two pinned bands on a phone is most of the
+ * screen gone. The `body > *` rule above puts this at z-index 1 against the
+ * header's 10, so the header passes over it cleanly on the way up.
+ *
+ * A button in its live state, which means undoing the global button styling:
+ * that rule paints a light background and rounds the corners, and this is a
+ * full-bleed band. The class beats it on specificity without needing to be
+ * listed anywhere.
+ */
+.token-strip {
+  /* Set here rather than relying on the `body > *` rule above, because this is
+     not always a direct child of body and the flash is positioned against it. */
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--ink-sunken);
+  color: var(--text-faint);
+  text-align: left;
+  align-self: auto;
+  cursor: default;
+}
+
+/* Once there is an address, the whole band copies it. */
+.token-strip.live {
+  cursor: pointer;
+}
+
+/*
+ * Two identical runs, slid by exactly one run's width.
+ *
+ * `translateX(-50%)` of a track holding two copies is one copy, so the frame it
+ * ends on is pixel-identical to the frame it started on and the loop has no
+ * seam. Sliding by a pixel amount instead would need to know how wide the text
+ * is, which depends on the font actually loading.
+ */
+.strip-track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  /* A run measures about 5,670px, so this is roughly 50px a second: slow
+     enough to read a phrase as it passes rather than catch at it. */
+  animation: strip-slide 112s linear infinite;
+}
+
+.strip-run {
+  display: flex;
+}
+
+.strip-phrase {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 10px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.strip-ticker {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* An address is a string to compare character by character, so it is not
+   uppercased and is spaced normally. Base58 is case-sensitive: upper-casing
+   one would print a different address from the one it copies. */
+.strip-ca {
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+
+.strip-dot {
+  color: var(--line-bright);
+}
+
+@keyframes strip-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/*
+ * Motion is the one thing this band does, so it is the one thing that goes.
+ *
+ * Stopped rather than hidden: the sentence is the point and it is readable
+ * standing still, since a run starts at the left edge.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .strip-track {
+    animation: none;
+  }
+}
+
+/* The sentence, once, for anything reading the page aloud. The moving copy is
+   hidden from it. */
+.strip-say {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Confirmation lands over the band rather than moving it, so the page does not
+   shift under a thumb that just tapped. */
+.strip-flash {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--ink-sunken);
+  color: var(--accent);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+}
+
+.strip-flash.shown {
+  opacity: 1;
+}
+
 .site-header {
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink) 85%, transparent);
