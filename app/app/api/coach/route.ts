@@ -163,10 +163,25 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  /*
+   * One retry when nothing survives checking.
+   *
+   * The reviewer drops any observation citing a figure the record does not
+   * support, and a reply where every observation is dropped fails outright.
+   * That is the right call for the reply in hand and the wrong outcome for the
+   * trader, because the model is sampled and the next reply usually passes.
+   * The allowance is only spent once a report is actually returned, so this
+   * costs an API call rather than the trader's quota.
+   */
   let response;
   try {
     const model = coachModel();
-    response = await requestReport(brief, { apiKey, ...(model ? { model } : {}) });
+    const options = { apiKey, ...(model ? { model } : {}) };
+    response = await requestReport(brief, options);
+    if (!response.report) {
+      console.warn('[coach] first reply rejected, retrying', response.problems);
+      response = await requestReport(brief, options);
+    }
   } catch (error) {
     const code = error instanceof CoachError ? error.code : 'network';
     return Response.json(

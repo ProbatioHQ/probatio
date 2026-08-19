@@ -49,6 +49,52 @@ function normalize(figure: string): string {
   return figure.replace(/\s+/g, '').toLowerCase();
 }
 
+/**
+ * A figure as a number and a unit, so two spellings of one value compare equal.
+ *
+ * The brief writes SOL to three places and percentages to one, and a model
+ * quoting them faithfully rounds: "0.5 SOL" for 0.500, "12%" for 12.3. Compared
+ * as strings those look invented, so an honest observation was dropped, and a
+ * report where every observation was dropped failed outright. That is the 502
+ * this repairs.
+ */
+interface Figure {
+  readonly value: number;
+  readonly unit: string;
+  readonly decimals: number;
+}
+
+function parseFigure(raw: string): Figure | null {
+  const match = /^(-?\d+(?:\.\d+)?)(%|sol)?$/.exec(normalize(raw));
+  if (!match?.[1]) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+  const dot = match[1].indexOf('.');
+  return { value, unit: match[2] ?? '', decimals: dot === -1 ? 0 : match[1].length - dot - 1 };
+}
+
+/**
+ * Whether a cited figure is a faithful rounding of one the record supports.
+ *
+ * Rounded to the precision the citation itself used, so "12%" is accepted
+ * against 12.3 and rejected against 47.8. Inventing a number still fails: this
+ * only forgives losing precision, never gaining a value.
+ *
+ * Magnitudes are compared, because the brief stores a loss as -1.234 SOL and
+ * English states it as "you lost 1.23 SOL", with the direction carried by the
+ * verb rather than a minus sign. Matching signs rejected that, which is the
+ * commonest sentence a coach writes. The cost is that a model claiming a gain
+ * where there was a loss passes this particular check, and that is the right
+ * trade: the words around the figure say which way it went, and rejecting every
+ * honest sentence to catch a rare inverted one left traders with no report at
+ * all.
+ */
+function isRoundingOf(cited: Figure, supported: Figure): boolean {
+  if (cited.unit !== supported.unit) return false;
+  const scale = 10 ** cited.decimals;
+  return Math.round(Math.abs(supported.value) * scale) / scale === Math.abs(cited.value);
+}
+
 export function unsupportedFigures(text: string, brief: Brief): string[] {
   // Only the fact values, which are the trader's actual numbers. Labels used to
   // carry reference figures ("100% would be the exact low", "0% means every
@@ -57,12 +103,18 @@ export function unsupportedFigures(text: string, brief: Brief): string[] {
   // ideal it did not earn ("your exit timing was 100%") unchecked. The labels
   // no longer state a bare figure, so the value-only set both accepts honest
   // references and still catches an invented one.
-  const supported = new Set(
-    brief.facts.flatMap((fact) => (fact.value.match(FIGURE) ?? []).map(normalize)),
-  );
+  const supported = brief.facts
+    .flatMap((fact) => fact.value.match(FIGURE) ?? [])
+    .map(parseFigure)
+    .filter((figure): figure is Figure => figure !== null);
 
   const found = text.match(FIGURE) ?? [];
-  return found.filter((figure) => !supported.has(normalize(figure)));
+  return found.filter((raw) => {
+    const cited = parseFigure(raw);
+    // Unparseable is treated as unsupported, which is the safe direction.
+    if (cited === null) return true;
+    return !supported.some((fact) => isRoundingOf(cited, fact));
+  });
 }
 
 function isNonEmptyString(value: unknown): value is string {
