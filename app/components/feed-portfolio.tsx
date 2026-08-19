@@ -85,8 +85,18 @@ export function FeedPortfolio() {
           other connect control, so a phone with no injected provider is handed
           to Phantom's browser exactly as it is everywhere else.
         */}
+        {/*
+          Three short sentences, where there were forty-four words.
+
+          On a phone this sat above the tokens somebody came to look at, and at
+          that length it was a wall to be scrolled past rather than read. What
+          went is the explanation of how signing works, which belongs on the
+          page about trust and not in front of a feed. What stayed is the two
+          things that decide whether to tap: what the practice money is, and
+          that nothing real can move.
+        */}
         <span className="feed-portfolio-say">
-          Every pump.fun launch as it happens, priced against the real curve.{' '}
+          Every pump.fun launch, priced against the real curve.{' '}
           <button
             type="button"
             className="linklike feed-portfolio-connect"
@@ -95,8 +105,7 @@ export function FeedPortfolio() {
           >
             {status === 'working' ? 'Waiting for your wallet…' : 'Connect a wallet'}
           </button>{' '}
-          to trade any of them with 10 SOL of practice money. It signs a message
-          to prove the record is yours, and nothing is ever asked to move real funds.
+          to trade with 10 SOL of practice money. Nothing ever moves real funds.
         </span>
       </div>
     );

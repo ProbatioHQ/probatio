@@ -83,6 +83,50 @@ function inFlightSet(): Set<string> {
   return store[IN_FLIGHT_KEY];
 }
 
+/**
+ * pump.fun's own record of a coin, which carries the picture directly.
+ *
+ * The chain gives a metadata URI and the picture is a field inside a document
+ * at the other end of it, so every step above can succeed and still leave no
+ * image when that document's host is gone. This asks the launchpad instead,
+ * which stores the image URL beside the coin and answers for tokens years old.
+ *
+ * Why it was needed. The Explore board ranks by market cap, so everything on it
+ * is months old and none of it was ever in the launch feed, which is where this
+ * resolver's cheap path gets its URI. Measured on a token reached from that
+ * board: the card showed a picture and the token page showed a placeholder,
+ * still a placeholder a minute later, because the two read from different
+ * places. The board reads this endpoint. Now so does the page.
+ */
+const PUMP_COIN = 'https://frontend-api-v3.pump.fun/coins';
+const UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+
+interface LaunchpadCoin {
+  image: string | null;
+  name: string | null;
+  symbol: string | null;
+}
+
+async function launchpadCoin(mint: string): Promise<LaunchpadCoin | null> {
+  try {
+    const response = await fetch(`${PUMP_COIN}/${mint}`, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as Record<string, unknown>;
+    const str = (value: unknown, max: number): string | null =>
+      typeof value === 'string' && value.trim() !== '' ? value.trim().slice(0, max) : null;
+    const image = str(body['image_uri'], 400);
+    if (!image) return null;
+    return { image, name: str(body['name'], 120), symbol: str(body['symbol'], 40) };
+  } catch {
+    // Another service having a bad minute is a missing picture, nothing more.
+    return null;
+  }
+}
+
 async function resolveOne(mint: string, now: number): Promise<void> {
   const inFlight = inFlightSet();
   if (inFlight.has(mint)) return;
@@ -116,7 +160,55 @@ async function resolveOne(mint: string, now: number): Promise<void> {
       }
     }
 
-    if (!uri) return;
+    /*
+     * The launchpad is the last resort, and it answers when nothing else does.
+     *
+     * Reached two ways: with no URI at all, which used to return here and leave
+     * the token permanently without a picture, and with a URI whose document
+     * cannot be fetched or carries no image. Both end the same way for the
+     * person looking at the page, so both fall through to the same place.
+     */
+    if (!uri) {
+      const coin = await launchpadCoin(mint);
+      if (!coin) return;
+      /*
+       * The row has to exist before the picture can be written into it.
+       *
+       * `recordOffchainMetadata` is an UPDATE keyed on the mint, so against a
+       * token that has never been seen it matches nothing and reports success.
+       * That is the shape of this whole bug repeated one level down: the write
+       * appeared to work and the page stayed blank. There is no URI to record
+       * here, which the column allows, because the picture did not come from a
+       * document this time.
+       */
+      await upsertOnchainMetadata(
+        client,
+        {
+          mint,
+          name: coin.name,
+          symbol: coin.symbol,
+          uri: null,
+          updateAuthority: null,
+          decimals: null,
+        },
+        now,
+      );
+      await recordOffchainMetadata(
+        client,
+        mint,
+        {
+          name: coin.name,
+          symbol: coin.symbol,
+          description: null,
+          imageUrl: coin.image,
+          twitterUrl: null,
+          websiteUrl: null,
+          telegramUrl: null,
+        },
+        now,
+      );
+      return;
+    }
 
     await upsertOnchainMetadata(
       client,
@@ -126,6 +218,9 @@ async function resolveOne(mint: string, now: number): Promise<void> {
 
     try {
       const document = await fetchOffchainMetadata(uri, { timeoutMs: TIMEOUT_MS });
+      // A document that resolved but has no picture in it is not a success as
+      // far as the page is concerned, so it takes the fallback too.
+      const image = document.image ?? (await launchpadCoin(mint))?.image ?? null;
       await recordOffchainMetadata(
         client,
         mint,
@@ -133,7 +228,7 @@ async function resolveOne(mint: string, now: number): Promise<void> {
           name: document.name,
           symbol: document.symbol,
           description: document.description,
-          imageUrl: document.image,
+          imageUrl: image,
           // Fetched all along, kept from now on.
           twitterUrl: document.twitter,
           websiteUrl: document.website,
@@ -142,6 +237,24 @@ async function resolveOne(mint: string, now: number): Promise<void> {
         now,
       );
     } catch (error) {
+      const coin = await launchpadCoin(mint);
+      if (coin) {
+        await recordOffchainMetadata(
+          client,
+          mint,
+          {
+            name: coin.name ?? name,
+            symbol: coin.symbol ?? symbol,
+            description: null,
+            imageUrl: coin.image,
+            twitterUrl: null,
+            websiteUrl: null,
+            telegramUrl: null,
+          },
+          now,
+        );
+        return;
+      }
       await recordOffchainFailure(
         client,
         mint,

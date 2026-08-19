@@ -1,4 +1,5 @@
 import 'server-only';
+import { cacheImages } from './token-images';
 
 /**
  * What is actually moving, which this database cannot answer on its own.
@@ -35,11 +36,12 @@ const UA =
 /**
  * How long the ranking stays good for.
  *
- * A minute rather than thirty seconds, because building it is now eight calls
- * to pump.fun and fourteen to DEX Screener. The board does not change enough in
- * a minute to be worth twenty-two requests to other people's services.
+ * Two minutes, because building it is now sixteen calls to pump.fun and about
+ * twenty-seven to DEX Screener. An hour's move does not change enough in two
+ * minutes to be worth fifty requests to other people's services, and this
+ * server is already asking pump.fun for a chart every twenty seconds.
  */
-const CACHE_MS = 60_000;
+const CACHE_MS = 120_000;
 /** Sparklines move slower than the ranking and cost a call each. */
 const SPARK_CACHE_MS = 5 * 60_000;
 /**
@@ -56,11 +58,19 @@ const SPARK_CACHE_MS = 5 * 60_000;
  * move gives things like a two-million-dollar token up 24% on five million of
  * volume, which is what somebody opening a page called Movers came to see.
  *
- * Eight pages of fifty. Measured: three hundred candidates leave about a
- * hundred and seventy above the volume floor, and this has to fill three pages
- * of sixty.
+ * Sixteen pages of fifty, which was eight. Eight was sized against the volume
+ * floor alone, and once a token also has to have actually moved it was nowhere
+ * near enough: of the 214 eligible tokens it found, 101 had moved a percent, so
+ * the board ran out before its second page. A thousand candidates yields 338
+ * eligible and enough past the floors to fill the three pages. Sixteen rather
+ * than twenty because the market cap floor below already cuts in around the
+ * seven hundredth token, so the pages past that are fetched and discarded.
+ *
+ * Deeper is also better material. The largest few hundred tokens by market cap
+ * are the ones that move least, so the pages this reaches now are where an hour
+ * actually shows up.
  */
-const CANDIDATE_PAGES = 8;
+const CANDIDATE_PAGES = 16;
 const PAGE_SIZE = 50;
 /** DEX Screener takes thirty addresses per request. */
 const DEX_BATCH = 30;
@@ -74,6 +84,33 @@ const SPARK_CONCURRENCY = 6;
  * of trading, which is true and useless. In dollars over the last day.
  */
 const MIN_VOLUME_USD = 500;
+
+/**
+ * How far a token has to have moved to be called a mover, in percent.
+ *
+ * Anything under this rounds to "+0%" on the card, which is not a fact anybody
+ * came to the page for. Measured over 338 eligible tokens: 176 clear one
+ * percent, which is just under the three pages of sixty this board shows, so
+ * the floor is what fills the board rather than what empties it.
+ */
+const MIN_ABS_CHANGE = 1;
+
+/**
+ * How much a token has to be worth before its hour is worth ranking.
+ *
+ * Paging deeper found real movers and also found the thing the market-cap pool
+ * was chosen to avoid: a token up 7,858% in an hour. That one was not the usual
+ * dust either, it had a hundred thousand dollars of volume behind it, so no
+ * volume floor removes it. What it had was a $175k market cap, meaning its
+ * price an hour earlier implied a token worth about two thousand dollars. A
+ * percentage measured from nearly nothing is arithmetic, not information, and
+ * it sat at the top of the board making every real move look like noise.
+ *
+ * Measured across the same pool: at $200k the largest move on the board falls
+ * from 7,858% to 70%, and 152 tokens still clear the change floor. It is the
+ * launch artifacts that go, not the movers.
+ */
+const MIN_MARKET_CAP_USD = 200_000;
 
 export interface Mover {
   readonly mint: string;
@@ -174,11 +211,31 @@ function dedupe(coins: readonly PumpCoin[]): PumpCoin[] {
   return all;
 }
 
+/**
+ * Read `count` pages of the listing, a few at a time.
+ *
+ * All of them at once was fine at eight and is not at twenty: that is twenty
+ * simultaneous requests to a service this page cannot do without, to build
+ * something one reader is waiting on. Four at a time keeps the burst small and
+ * costs a few hundred milliseconds against a result cached for two minutes.
+ */
+const PAGE_CONCURRENCY = 4;
+
+async function fetchPages(count: number): Promise<PumpCoin[]> {
+  const coins: PumpCoin[] = [];
+  for (let i = 0; i < count; i += PAGE_CONCURRENCY) {
+    const batch = await Promise.all(
+      Array.from({ length: Math.min(PAGE_CONCURRENCY, count - i) }, (_, n) =>
+        fetchPage((i + n) * PAGE_SIZE),
+      ),
+    );
+    coins.push(...batch.flat());
+  }
+  return coins;
+}
+
 async function candidates(): Promise<PumpCoin[]> {
-  const pages = await Promise.all(
-    Array.from({ length: CANDIDATE_PAGES }, (_, index) => fetchPage(index * PAGE_SIZE)),
-  );
-  return dedupe(pages.flat());
+  return dedupe(await fetchPages(CANDIDATE_PAGES));
 }
 
 /**
@@ -382,8 +439,51 @@ async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
     })
     // Real trading behind the percentage, or the board fills with tokens that
     // moved hundreds of percent on a few dollars.
-    .filter((coin) => coin.volumeH24 >= MIN_VOLUME_USD && coin.changeH1 !== null)
-    .sort((a, b) => (b.changeH1 ?? 0) - (a.changeH1 ?? 0));
+    .filter(
+      (coin) =>
+        coin.volumeH24 >= MIN_VOLUME_USD &&
+        coin.marketCapUsd >= MIN_MARKET_CAP_USD &&
+        coin.changeH1 !== null,
+    )
+    /*
+     * A token that has not moved is not a mover.
+     *
+     * Sorting by the hour's gain and taking the first hundred and eighty fills
+     * the board whether or not there are a hundred and eighty tokens worth
+     * showing, and measured against the live pool there never are: of 214
+     * eligible tokens only 19 had moved five percent, so the sixtieth card was
+     * already +0.68% and everything after it rounded to zero. Three pages of
+     * "+0%" is a board reporting that nothing happened, at length.
+     */
+    .filter((coin) => Math.abs(coin.changeH1 ?? 0) >= MIN_ABS_CHANGE)
+    /*
+     * Ranked by how far it moved, not by which way.
+     *
+     * A board called Movers that only counts upwards is half a board, and the
+     * half it drops is the half people most want warning about: in the same
+     * measurement the biggest fall was 14.5% while the sixtieth gain was under
+     * one. Losses are shown in the loss colour and read as clearly as gains.
+     */
+    .sort((a, b) => Math.abs(b.changeH1 ?? 0) - Math.abs(a.changeH1 ?? 0));
+
+  /*
+   * Hand the pictures to the token pages before anybody clicks one.
+   *
+   * The board gets its art from pump.fun's listing; a token page reads this
+   * site's own metadata table, which is filled for tokens the launch feed saw.
+   * Everything here is ranked by market cap and therefore months old, so none
+   * of it was ever in that feed, and clicking a card with a picture on it
+   * opened a page with a placeholder. Recorded here, in the background, so the
+   * first visit already has it rather than the second.
+   */
+  cacheImages(
+    ranked.map((coin) => ({
+      mint: coin.mint,
+      name: coin.name,
+      symbol: coin.symbol,
+      image: coin.image,
+    })),
+  );
 
   // Only cached when there is something to cache. An empty result from a
   // service having a bad minute should not be served for the next minute as

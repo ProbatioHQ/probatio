@@ -40,6 +40,19 @@ function usd(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
+/**
+ * An hour's move, to as many digits as it is worth reading.
+ *
+ * Rounding everything to whole percent printed "+0%" on any token that had
+ * moved less than half of one, which is a card saying nothing in the space
+ * where its reason for being on the board goes. A decimal below ten, where the
+ * difference between 1.4 and 2.5 is the ranking; whole numbers above it, where
+ * a decimal on a 22% move is noise.
+ */
+function percent(value: number): string {
+  return Math.abs(value) < 10 ? value.toFixed(1) : value.toFixed(0);
+}
+
 /** A creator's key as a handle, the way every other client shows it. */
 function handle(creator: string): string {
   return creator.slice(0, 8).toLowerCase();
@@ -104,7 +117,7 @@ function Card({ token, now }: { token: Mover; now: number }) {
         {token.changeH1 !== null && (
           <span className={up ? 'mover-change gain' : 'mover-change loss'}>
             {up ? '+' : ''}
-            {token.changeH1.toFixed(0)}%
+            {percent(token.changeH1)}%
           </span>
         )}
       </span>

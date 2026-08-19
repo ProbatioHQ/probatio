@@ -6332,15 +6332,41 @@ body:has(main.home) .glow {
     gap: 0;
   }
 
+  /*
+   * Thumbnail, two lines of text, figures. Four columns, not three.
+   *
+   * The ticker and the age were both placed at column 2, row 2, which put two
+   * boxes in one cell on top of each other: measured, both rendered at exactly
+   * x=96 y=177 w=222, the age held to the right only by `flex-end` inside its
+   * own full-width box. Neither could push the other, so the space between them
+   * was whatever the column happened to be, and a long ticker ran underneath
+   * the age rather than moving it along.
+   *
+   * The age gets its own column, so the two sit next to each other and the row
+   * is laid out rather than overlaid.
+   */
   .mover {
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-columns: 64px auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
     align-items: center;
-    gap: 14px;
-    padding: 10px 2px;
+    column-gap: 12px;
+    row-gap: 1px;
+    padding: 11px 2px;
   }
 
+  /*
+   * Spanning both rows and centred, which is what lines the text up.
+   *
+   * The thumbnail used to sit in row 1 alone, so the name was bottom-aligned
+   * against it and the ticker fell entirely below its lower edge: art at
+   * y=99-163 against a ticker at y=177. The block of text now centres on the
+   * picture instead of hanging off the top of it.
+   */
   .mover-art {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: center;
     width: 64px;
     height: 64px;
     margin-bottom: 0;
@@ -6350,34 +6376,38 @@ body:has(main.home) .glow {
      cap already says which way the hour went. */
   .mover-art .spark { display: none; }
 
+  /* The name takes both text columns, so it runs on before it truncates. */
   .mover-name {
-    grid-column: 2;
+    grid-column: 2 / span 2;
     grid-row: 1;
+    align-self: end;
     font-family: var(--font-geist-sans), system-ui, sans-serif;
     font-size: 17px;
-    align-self: end;
   }
   .mover-ticker {
     grid-column: 2;
     grid-row: 2;
+    align-self: start;
     margin-bottom: 0;
     font-size: 13px;
-    align-self: start;
   }
   /* The creator's key is a desk detail; a phone row has the age and no space. */
   .mover-creator { display: none; }
+  /* Beside the ticker rather than over it, and left-aligned in its own column
+     so the pair reads as one line however long the ticker is. */
   .mover-by {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 2;
-    justify-content: flex-end;
+    align-self: start;
+    justify-content: flex-start;
     margin-top: 0;
     font-size: 13px;
-    align-self: start;
   }
 
   .mover-figures {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1 / span 2;
+    align-self: center;
     flex-direction: column;
     align-items: flex-end;
     gap: 2px;
@@ -7378,12 +7408,31 @@ body:has(main.home) .glow {
   /* The footer says where to go, not what the site is. */
   .site-footer .footer-say { display: none; }
 
-  /* The action, at the size of every other one on the page. */
+  /*
+   * The action is a word in the sentence, so it is sized like one.
+   *
+   * These four declarations are what was left of a full-width button after the
+   * action moved inside the text, and they were still shaping it: a 46px
+   * minimum height and its own font size turned two words into an atomic box
+   * taller than twice the line it sat on, so the paragraph opened a gap above
+   * and below the line carrying the link. Measured at 46px against a 20.3px
+   * line, which is the jump that made this read as broken on a phone.
+   *
+   * A button cannot be a true inline box: the engine blockifies it to
+   * inline-block whatever `display` says, so it is always one atomic box on the
+   * line. That is fine while the box is exactly one line tall, and it is the
+   * moment the label wraps, which is what `nowrap` prevents. The longest label
+   * this shows is "Waiting for your wallet…", about 165px of the roughly 340px
+   * column, so holding it on one line costs nothing.
+   *
+   * Beyond that nothing is set: `.linklike` already makes it inherit the
+   * paragraph's font, which is the whole requirement, and a tap target is not
+   * owed to a word inside a sentence the way it is to a button.
+   */
   .feed-portfolio-connect {
-    margin-top: 8px;
-    min-height: 46px;
-    border-radius: 12px;
-    font-size: 15px;
+    min-height: 0;
+    font: inherit;
+    white-space: nowrap;
   }
 
   /*
