@@ -6233,6 +6233,37 @@ body:has(main.home) .glow {
 }
 .mover-age.new { color: var(--accent); }
 
+/* Turning the page. Three of them, so a row of numbers rather than a carousel. */
+.pager {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+.page-btn {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--ink-sunken);
+  box-shadow: none;
+  color: var(--text-dim);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  cursor: pointer;
+}
+.page-btn:hover:not(:disabled) {
+  background: var(--ink-sunken);
+  border-color: var(--line-bright);
+  color: var(--text);
+}
+.page-btn.on {
+  border-color: var(--text);
+  background: none;
+  color: var(--text);
+}
+
 /* Fewer columns before the cards become unreadable rather than after. */
 @media (max-width: 1500px) { .movers { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 @media (max-width: 1240px) { .movers { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

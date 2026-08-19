@@ -122,30 +122,33 @@ function Card({ token, now }: { token: Mover; now: number }) {
 
 export function ExploreBoard() {
   const [movers, setMovers] = useState<Mover[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
-  const load = useCallback(() => {
-    void fetch('/api/explore?limit=24')
+  const load = useCallback((which: number) => {
+    void fetch(`/api/explore?page=${which}`)
       .then((response) => (response.ok ? response.json() : null))
-      .then((body: { movers?: Mover[] } | null) => {
+      .then((body: { movers?: Mover[]; pages?: number } | null) => {
         if (!body?.movers) {
           setFailed(true);
           return;
         }
         setFailed(false);
         setMovers(body.movers);
+        if (body.pages) setPages(body.pages);
       })
       .catch(() => setFailed(true));
   }, []);
 
   useEffect(() => {
-    load();
-    // The board is cached for thirty seconds upstream, so asking faster than
-    // that would be asking this server to hand back the same answer.
-    const timer = setInterval(load, 30_000);
+    load(page);
+    // The ranking is cached for a minute upstream, so asking faster than that
+    // would be asking this server to hand back the same answer.
+    const timer = setInterval(() => load(page), 60_000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, page]);
 
   // Ages are relative, so one timer for the page rather than one per card.
   useEffect(() => {
@@ -165,10 +168,34 @@ export function ExploreBoard() {
   if (movers.length === 0) return <p className="dim">Nothing is moving enough to list right now.</p>;
 
   return (
-    <div className="movers">
-      {movers.map((token) => (
-        <Card key={token.mint} token={token} now={now} />
-      ))}
-    </div>
+    <>
+      <div className="movers">
+        {movers.map((token) => (
+          <Card key={token.mint} token={token} now={now} />
+        ))}
+      </div>
+
+      {pages > 1 && (
+        <nav className="pager" aria-label="More movers">
+          {Array.from({ length: pages }, (_, index) => index + 1).map((which) => (
+            <button
+              key={which}
+              type="button"
+              className={which === page ? 'page-btn on' : 'page-btn'}
+              aria-current={which === page ? 'page' : undefined}
+              onClick={() => {
+                setPage(which);
+                // Back to the first row, or turning the page leaves you halfway
+                // down a list you have not seen the top of.
+                setMovers(null);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            >
+              {which}
+            </button>
+          ))}
+        </nav>
+      )}
+    </>
   );
 }

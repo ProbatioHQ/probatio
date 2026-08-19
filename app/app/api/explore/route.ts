@@ -18,13 +18,17 @@ export async function GET(request: Request): Promise<Response> {
   const throttled = await rateLimit(request, 'read');
   if (throttled.response) return throttled.response;
 
-  const requested = Number(new URL(request.url).searchParams.get('limit') ?? '24');
-  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 48) : 24;
+  const url = new URL(request.url);
+  const asked = Number(url.searchParams.get('page') ?? '1');
+  const page = Number.isFinite(asked) ? Math.min(Math.max(Math.trunc(asked), 1), 3) : 1;
 
   try {
-    const board = await movers(limit);
+    const board = await movers(page);
     return Response.json({
-      movers: board,
+      movers: board.movers,
+      page: board.page,
+      pages: board.pages,
+      total: board.total,
       // Named in the payload, not just in the page, so anything reading this
       // API inherits the caveat rather than having to know it.
       ranking:

@@ -32,12 +32,36 @@ const CANDLES = 'https://swap-api.pump.fun/v1/coins';
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-/** How long a whole page of movers stays good for. */
-const CACHE_MS = 30_000;
+/**
+ * How long the ranking stays good for.
+ *
+ * A minute rather than thirty seconds, because building it is now eight calls
+ * to pump.fun and fourteen to DEX Screener. The board does not change enough in
+ * a minute to be worth twenty-two requests to other people's services.
+ */
+const CACHE_MS = 60_000;
 /** Sparklines move slower than the ranking and cost a call each. */
 const SPARK_CACHE_MS = 5 * 60_000;
-/** Candidates to consider before ranking. */
-const CANDIDATES = 60;
+/**
+ * The pool, and why it is not the recently-traded one.
+ *
+ * The first version took the sixty most recently traded coins and ranked those.
+ * That pool has a median age of five hours, so it was the terminal's new lane
+ * wearing different clothes, and the board filled with tokens up 37,000% on a
+ * few hundred dollars because a percentage computed over a token's first hour
+ * of existence is arithmetic rather than information.
+ *
+ * Sorted by market cap and paged deep instead: a pool with a median age of
+ * about five months and real order books behind it. Ranking that by the hour's
+ * move gives things like a two-million-dollar token up 24% on five million of
+ * volume, which is what somebody opening a page called Movers came to see.
+ *
+ * Eight pages of fifty. Measured: three hundred candidates leave about a
+ * hundred and seventy above the volume floor, and this has to fill three pages
+ * of sixty.
+ */
+const CANDIDATE_PAGES = 8;
+const PAGE_SIZE = 50;
 /** DEX Screener takes thirty addresses per request. */
 const DEX_BATCH = 30;
 /** Sparkline fetches in flight at once. */
@@ -118,14 +142,36 @@ const link = (value: unknown): string | null => {
 };
 
 async function candidates(): Promise<PumpCoin[]> {
-  const url = `${PUMP_LIST}?offset=0&limit=${CANDIDATES}&sort=last_trade_timestamp&order=DESC&includeNsfw=false`;
-  const response = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(12_000),
-  });
-  if (!response.ok) return [];
-  const body = (await response.json()) as unknown;
-  return Array.isArray(body) ? (body as PumpCoin[]) : [];
+  const pages = await Promise.all(
+    Array.from({ length: CANDIDATE_PAGES }, async (_, index) => {
+      const offset = index * PAGE_SIZE;
+      const url = `${PUMP_LIST}?offset=${offset}&limit=${PAGE_SIZE}&sort=market_cap&order=DESC&includeNsfw=false`;
+      try {
+        const response = await fetch(url, {
+          headers: { 'User-Agent': UA, Accept: 'application/json' },
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (!response.ok) return [];
+        const body = (await response.json()) as unknown;
+        return Array.isArray(body) ? (body as PumpCoin[]) : [];
+      } catch {
+        // One page missing costs its fifty candidates, not the board.
+        return [];
+      }
+    }),
+  );
+
+  // Deduped: paging a list that is being reordered under you can hand back the
+  // same coin on two pages, and a board with a token on it twice looks broken.
+  const seen = new Set<string>();
+  const all: PumpCoin[] = [];
+  for (const coin of pages.flat()) {
+    const mint = typeof coin.mint === 'string' ? coin.mint : '';
+    if (mint === '' || seen.has(mint)) continue;
+    seen.add(mint);
+    all.push(coin);
+  }
+  return all;
 }
 
 /** The hour's change and the day's volume, keyed by mint. */
@@ -141,7 +187,10 @@ async function marketStats(
     batches.map(async (batch) => {
       try {
         const response = await fetch(`${DEXSCREENER}/${batch.join(',')}`, {
-          headers: { Accept: 'application/json' },
+          // DEX Screener refuses some clients on User-Agent alone: a plain
+          // library default gets a 403 where a browser's gets a 200. Sent
+          // explicitly rather than left to whatever the runtime volunteers.
+          headers: { 'User-Agent': UA, Accept: 'application/json' },
           signal: AbortSignal.timeout(12_000),
         });
         if (!response.ok) return;
@@ -237,11 +286,18 @@ async function withSparklines(movers: Omit<Mover, 'spark'>[]): Promise<Mover[]> 
   return out.filter(Boolean);
 }
 
-/** The board. Cached, so a room full of readers costs one round of calls. */
-export async function movers(limit = 24): Promise<Mover[]> {
-  const cache = store<Mover[]>(CACHE_KEY);
+export interface Board {
+  readonly movers: Mover[];
+  readonly page: number;
+  readonly pages: number;
+  readonly total: number;
+}
+
+/** The ranking, without sparklines. Cached, so readers share one round of calls. */
+async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
+  const cache = store<Omit<Mover, 'spark'>[]>(CACHE_KEY);
   const hit = cache.get('board');
-  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value.slice(0, limit);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
 
   const coins = await candidates();
   const usable = coins
@@ -260,7 +316,7 @@ export async function movers(limit = 24): Promise<Mover[]> {
     }))
     .filter((coin) => coin.mint !== '' && coin.name !== '');
 
-  if (usable.length === 0) return hit?.value.slice(0, limit) ?? [];
+  if (usable.length === 0) return hit?.value ?? [];
 
   const stats = await marketStats(usable.map((coin) => coin.mint));
 
@@ -276,14 +332,35 @@ export async function movers(limit = 24): Promise<Mover[]> {
     // Real trading behind the percentage, or the board fills with tokens that
     // moved hundreds of percent on a few dollars.
     .filter((coin) => coin.volumeH24 >= MIN_VOLUME_USD && coin.changeH1 !== null)
-    .sort((a, b) => (b.changeH1 ?? 0) - (a.changeH1 ?? 0))
-    .slice(0, limit);
-
-  const board = await withSparklines(ranked);
+    .sort((a, b) => (b.changeH1 ?? 0) - (a.changeH1 ?? 0));
 
   // Only cached when there is something to cache. An empty result from a
-  // service having a bad minute should not be served for the next thirty
-  // seconds as though it were the answer.
-  if (board.length > 0) cache.set('board', { at: Date.now(), value: board });
-  return board;
+  // service having a bad minute should not be served for the next minute as
+  // though it were the answer.
+  if (ranked.length > 0) cache.set('board', { at: Date.now(), value: ranked });
+  return ranked.length > 0 ? ranked : (hit?.value ?? []);
+}
+
+/**
+ * One page of the board.
+ *
+ * Sparklines are fetched for the page being read and no further. Drawing a line
+ * on every one of a hundred and eighty cards would be a hundred and eighty
+ * requests to somebody else's candle service before the first page could be
+ * shown, to draw a hundred and twenty lines nobody has scrolled to yet. A page
+ * is sixty, they run six at a time, and each one is cached for five minutes, so
+ * turning back to a page already read costs nothing.
+ */
+export async function movers(page = 1, perPage = 60, maxPages = 3): Promise<Board> {
+  const ranked = await ranking();
+  const pages = Math.max(1, Math.min(maxPages, Math.ceil(ranked.length / perPage)));
+  const current = Math.min(Math.max(1, Math.trunc(page)), pages);
+
+  const slice = ranked.slice((current - 1) * perPage, current * perPage);
+  return {
+    movers: await withSparklines(slice),
+    page: current,
+    pages,
+    total: Math.min(ranked.length, pages * perPage),
+  };
 }
