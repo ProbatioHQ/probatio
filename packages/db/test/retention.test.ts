@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { rulesetFor, rulesetHashHex, scheduleFrom } from '@probatio/seasons';
 import { createTestDatabase, type TestDatabase } from '../src/testing';
+import { createRankedSeason, ensureAccount, recordTrade, upsertUser } from '../src/index';
 import {
   KEEP_BY_TIMEFRAME,
   pruneCandles,
@@ -10,6 +12,7 @@ import {
 } from '../src/retention';
 
 const MINT = 'So11111111111111111111111111111111111111112';
+const TRADER = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
 const HOUR = 3_600;
 const DAY = 24 * HOUR;
 
@@ -182,5 +185,118 @@ describe('pool snapshot retention', () => {
     expect(dropped).toBe(1);
     const left = await test.db.execute('SELECT slot FROM pool_snapshots');
     expect(left.rows.map((r) => Number(r['slot']))).toEqual([2]);
+  });
+
+  /*
+   * A snapshot a trade was priced against is evidence, and it is also a foreign
+   * key. Deleting one threw, and because the passes ran as a single expression
+   * the launch prune never ran again on that database.
+   */
+  it('keeps a snapshot a trade was priced against, however old', async () => {
+    const startedAt = 1_800_000_000_000;
+    await upsertUser(test.db, TRADER, startedAt);
+
+    const rules = rulesetFor(1);
+    const schedule = scheduleFrom(startedAt, rules.durationMs, rules.entryWindowMs);
+    const seasonId = await createRankedSeason(
+      test.db,
+      {
+        ordinal: 1,
+        name: 'Season 1',
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        entryClosesAt: schedule.entryClosesAt,
+        startingBalance: rules.startingBalance.toString(),
+        entryCost: rules.entryCost.toString(),
+        houseBps: rules.houseBps,
+        houseThreshold: rules.houseThreshold.toString(),
+        latencyMs: rules.latencyMs,
+        maxPriceImpactBps: rules.maxPriceImpactBps,
+        engineVersion: rules.engineVersion,
+        rulesetHash: rulesetHashHex(rules),
+      },
+      startedAt,
+    );
+    const account = await ensureAccount(test.db, seasonId, TRADER, startedAt);
+    const accountId = account.id;
+
+    await recordTrade(test.db, {
+      snapshot: {
+        mint: MINT,
+        solReserve: '30000000000',
+        tokenReserve: '1000000000000',
+        deliverableTokens: '1000000000000',
+        tokenDecimals: 6,
+        feeBps: 125,
+        source: 'pumpfun-curve',
+        slot: 101,
+      },
+      trade: {
+        accountId,
+        seasonId,
+        userPubkey: TRADER,
+        mint: MINT,
+        side: 'buy',
+        solAmount: '1000000000',
+        tokenAmount: '1000000',
+        fee: '12500000',
+        priceImpactBps: 40,
+        partial: false,
+        poolSource: 'pumpfun-curve',
+        clickedAtSlot: 100,
+        filledAtSlot: 101,
+        latencyMs: 600,
+        engineVersion: 1,
+      },
+      position: {
+        accountId,
+        mint: MINT,
+        tokenAmount: '1000000',
+        costBasis: '1000000000',
+        realizedPnl: '0',
+        closed: false,
+      },
+      expected: { solBalance: String(account.solBalance), tokenAmount: '0' },
+      newBalance: '9000000000',
+      leafHashFor: (sequence) => `hash-${sequence}`,
+      now: startedAt,
+    });
+
+    // A newer snapshot, so the traded one is no longer the newest for its mint
+    // and nothing but the trade reference protects it.
+    await writeSnapshot(102, startedAt + 1_000);
+
+    // A month later: the traded snapshot is well past the window.
+    const nowMs = startedAt + 30 * DAY * 1_000;
+    const dropped = await prunePoolSnapshots(test.db, nowMs);
+
+    expect(dropped).toBe(0);
+    const kept = await test.db.execute('SELECT COUNT(*) AS n FROM pool_snapshots');
+    expect(Number(kept.rows[0]!['n'])).toBe(2);
+  });
+});
+
+describe('one failing pass does not disable the others', () => {
+  /*
+   * The failure that hid this: `runRetention` built its result in one
+   * expression, so the constraint error above abandoned the launch prune. The
+   * pump.fun firehose writes a row per token created, so the pass that frees
+   * the most rows was the one that silently stopped running.
+   */
+  it('still prunes launches when an earlier pass throws', async () => {
+    const nowSeconds = 1_800_000_000;
+    await test.db.execute({
+      sql: `INSERT INTO launches
+              (mint, bonding_curve, creator, name, symbol, uri, launched_at, first_seen_at)
+            VALUES (?, 'curve', 'creator', 'Name', 'SYM', 'uri', ?, ?)`,
+      args: [MINT, nowSeconds - 60 * DAY, nowSeconds - 60 * DAY],
+    });
+
+    // Break the candle pass outright, which is what a constraint failure did.
+    await test.db.execute('DROP TABLE candles');
+
+    const result = await runRetention(test.db, nowSeconds * 1_000);
+
+    expect(result.launchesDeleted).toBe(1);
   });
 });

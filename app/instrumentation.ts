@@ -75,6 +75,13 @@ export async function register(): Promise<void> {
   const { startRetention } = await import('./lib/retention');
   safely('retention', startRetention);
 
+  // The other half of retention. Raising the caps stops history being deleted;
+  // this is what fetches history that was never there, so the largest tokens
+  // open instantly instead of the first visitor waiting through eight requests.
+  // Started after the pruner, whose budget it deliberately sits under.
+  const { startChartWarm } = await import('./lib/chart-warm');
+  safely('chart warm', startChartWarm);
+
   // Measures the engine against real fills and takes farmable tokens off the
   // board. Tied to the feed switch only in the sense that both need the chain;
   // it is the one check that runs without anybody deciding to look.

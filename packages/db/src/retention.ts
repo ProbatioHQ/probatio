@@ -276,6 +276,19 @@ export async function pruneCandles(db: Client): Promise<number> {
  * age, so a token nobody has looked at in a week still has a number. Everything
  * older than the window and not the latest is history the chart already turned
  * into candles.
+ *
+ * A snapshot some trade was priced against is kept for ever, however old.
+ * `trades.pool_snapshot_id` is a foreign key, so deleting one was not merely
+ * wrong, it threw: measured on a real database, fourteen snapshots older than
+ * the window were still referenced, every sweep failed on the constraint, and
+ * because the passes ran as one expression the launch prune below never ran at
+ * all. The pump.fun firehose writes a row per token created, so what looked
+ * like a stale-snapshot bug was quietly costing tens of thousands of launch
+ * rows a day.
+ *
+ * Keeping them is also the right answer on the merits, independently of the
+ * constraint. That snapshot is the reserves the fill was quoted against. It is
+ * the evidence for the trade, and the record stops being checkable without it.
  */
 export async function prunePoolSnapshots(db: Client, now: number): Promise<number> {
   // observed_at is written in milliseconds (Date.now()), not the unix seconds
@@ -285,7 +298,8 @@ export async function prunePoolSnapshots(db: Client, now: number): Promise<numbe
   const result = await db.execute({
     sql: `DELETE FROM pool_snapshots
           WHERE observed_at < ?
-            AND id NOT IN (SELECT MAX(id) FROM pool_snapshots GROUP BY mint)`,
+            AND id NOT IN (SELECT MAX(id) FROM pool_snapshots GROUP BY mint)
+            AND id NOT IN (SELECT pool_snapshot_id FROM trades)`,
     args: [cutoff],
   });
   return Number(result.rowsAffected ?? 0);
@@ -310,16 +324,37 @@ export async function pruneLaunches(db: Client, now: number): Promise<number> {
   return Number(result.rowsAffected ?? 0);
 }
 
+/**
+ * Run one pass, and report a failure rather than taking the others down.
+ *
+ * These were a single expression, so the first pass to throw abandoned every
+ * pass after it. That is the worst possible arrangement for this job: the whole
+ * point of retention is to keep the disk from filling, and the failure mode was
+ * one broken statement silently disabling the passes that free the most space.
+ * The disk then fills exactly as though nothing were running, because nothing
+ * is. Each pass now stands alone.
+ */
+async function attempt(label: string, pass: () => Promise<number>): Promise<number> {
+  try {
+    return await pass();
+  } catch (error) {
+    console.error(`[retention] ${label} failed`, error);
+    return 0;
+  }
+}
+
 /** Run every retention pass there is. Safe to call as often as you like. */
 export async function runRetention(db: Client, now: number): Promise<RetentionResult> {
+  const candlesDeleted =
+    (await attempt('unused timeframes', () => pruneUnusedTimeframes(db))) +
+    (await attempt('idle mints', () => pruneIdleMints(db, now))) +
+    (await attempt('mint budget', () => pruneToMintBudget(db))) +
+    (await attempt('candle depth', () => pruneCandles(db)));
+
   return {
-    candlesDeleted:
-      (await pruneUnusedTimeframes(db)) +
-      (await pruneIdleMints(db, now)) +
-      (await pruneToMintBudget(db)) +
-      (await pruneCandles(db)),
-    poolSnapshotsDeleted: await prunePoolSnapshots(db, now),
-    launchesDeleted: await pruneLaunches(db, now),
+    candlesDeleted,
+    poolSnapshotsDeleted: await attempt('pool snapshots', () => prunePoolSnapshots(db, now)),
+    launchesDeleted: await attempt('launches', () => pruneLaunches(db, now)),
   };
 }
 

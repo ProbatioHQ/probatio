@@ -4,6 +4,7 @@ import { downNow } from '@/lib/health';
 import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
 import { pendingTradeMints } from '@/lib/trade-candles';
 import { driftStatus } from '@/lib/drift-watch';
+import { warmStats } from '@/lib/chart-warm';
 import { priceStreamStatus } from '@/lib/price-stream';
 import { seasonProbe, storageStats, writeProbe } from '@/lib/db-reclaim';
 import { snapshotState } from '@/lib/account-backup';
@@ -69,6 +70,15 @@ export async function GET(request: Request): Promise<Response> {
        * weeks ago and left everything looking fine.
        */
       drift: driftStatus(),
+      /*
+       * Charts being filled in ahead of anybody asking.
+       *
+       * A silent background job is the kind that stops without anyone noticing,
+       * and the symptom here is not an error: it is the volume quietly staying
+       * empty while the largest tokens keep opening slowly. `resident` against
+       * `budget` says how far through its cycle it is.
+       */
+      warm: warmStats(),
       // The push feed behind live prices.
       prices: priceStreamStatus(),
       // Stated whatever the status, because the promise matters most when

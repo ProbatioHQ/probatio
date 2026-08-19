@@ -141,37 +141,88 @@ const link = (value: unknown): string | null => {
   return raw && /^https:\/\//i.test(raw) ? raw : null;
 };
 
-async function candidates(): Promise<PumpCoin[]> {
-  const pages = await Promise.all(
-    Array.from({ length: CANDIDATE_PAGES }, async (_, index) => {
-      const offset = index * PAGE_SIZE;
-      const url = `${PUMP_LIST}?offset=${offset}&limit=${PAGE_SIZE}&sort=market_cap&order=DESC&includeNsfw=false`;
-      try {
-        const response = await fetch(url, {
-          headers: { 'User-Agent': UA, Accept: 'application/json' },
-          signal: AbortSignal.timeout(12_000),
-        });
-        if (!response.ok) return [];
-        const body = (await response.json()) as unknown;
-        return Array.isArray(body) ? (body as PumpCoin[]) : [];
-      } catch {
-        // One page missing costs its fifty candidates, not the board.
-        return [];
-      }
-    }),
-  );
+/** One page of the market-cap listing. An empty array means it did not answer. */
+async function fetchPage(offset: number): Promise<PumpCoin[]> {
+  const url = `${PUMP_LIST}?offset=${offset}&limit=${PAGE_SIZE}&sort=market_cap&order=DESC&includeNsfw=false`;
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as unknown;
+    return Array.isArray(body) ? (body as PumpCoin[]) : [];
+  } catch {
+    // One page missing costs its fifty candidates, not the board.
+    return [];
+  }
+}
 
-  // Deduped: paging a list that is being reordered under you can hand back the
-  // same coin on two pages, and a board with a token on it twice looks broken.
+/**
+ * Deduped: paging a list that is being reordered under you can hand back the
+ * same coin on two pages, and a board with a token on it twice looks broken.
+ */
+function dedupe(coins: readonly PumpCoin[]): PumpCoin[] {
   const seen = new Set<string>();
   const all: PumpCoin[] = [];
-  for (const coin of pages.flat()) {
+  for (const coin of coins) {
     const mint = typeof coin.mint === 'string' ? coin.mint : '';
     if (mint === '' || seen.has(mint)) continue;
     seen.add(mint);
     all.push(coin);
   }
   return all;
+}
+
+async function candidates(): Promise<PumpCoin[]> {
+  const pages = await Promise.all(
+    Array.from({ length: CANDIDATE_PAGES }, (_, index) => fetchPage(index * PAGE_SIZE)),
+  );
+  return dedupe(pages.flat());
+}
+
+/**
+ * The mints worth keeping a chart for, biggest first.
+ *
+ * The board reads eight pages at once because it is answering a request and the
+ * page is waiting. This reads many more than that for a background job nobody is
+ * waiting on, so it goes four pages at a time: the same listing serves the
+ * board, and being rate-limited to fill a cache would take the visible feature
+ * down with it.
+ *
+ * Cached for ten minutes. Which tokens are the largest few hundred changes over
+ * days, and the caller asks every time it warms one.
+ */
+const WARM_LIST_KEY = Symbol.for('probatio.explore-warmlist');
+const WARM_LIST_CACHE_MS = 10 * 60_000;
+const WARM_PAGE_CONCURRENCY = 4;
+
+export async function topMints(limit: number): Promise<string[]> {
+  const cache = store<string[]>(WARM_LIST_KEY);
+  const key = `top:${limit}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < WARM_LIST_CACHE_MS) return hit.value;
+
+  const pageCount = Math.ceil(limit / PAGE_SIZE);
+  const coins: PumpCoin[] = [];
+  for (let i = 0; i < pageCount; i += WARM_PAGE_CONCURRENCY) {
+    const batch = await Promise.all(
+      Array.from({ length: Math.min(WARM_PAGE_CONCURRENCY, pageCount - i) }, (_, n) =>
+        fetchPage((i + n) * PAGE_SIZE),
+      ),
+    );
+    coins.push(...batch.flat());
+  }
+
+  const mints = dedupe(coins)
+    .map((coin) => (typeof coin.mint === 'string' ? coin.mint : ''))
+    .filter((mint) => mint !== '')
+    .slice(0, limit);
+
+  // A failed sweep is not cached, so the next tick retries rather than living
+  // with an empty list for ten minutes.
+  if (mints.length > 0) cache.set(key, { at: Date.now(), value: mints });
+  return mints;
 }
 
 /** The hour's change and the day's volume, keyed by mint. */
