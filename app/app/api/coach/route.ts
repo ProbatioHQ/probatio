@@ -173,19 +173,55 @@ export async function POST(request: Request): Promise<Response> {
    * The allowance is only spent once a report is actually returned, so this
    * costs an API call rather than the trader's quota.
    */
+  /*
+   * Upstream failures that are worth trying again, and the ones that are not.
+   *
+   * A timeout, a network blip, a 429 or a 5xx are all "ask again in a moment".
+   * A 401 or a 404 are a key or a model name being wrong, and retrying those
+   * just makes the same mistake twice as fast while the trader waits.
+   */
+  const worthRetrying = (error: unknown): boolean => {
+    if (!(error instanceof CoachError)) return false;
+    if (error.code === 'timeout' || error.code === 'network' || error.code === 'empty') return true;
+    const status = error.status ?? 0;
+    return status === 429 || status >= 500;
+  };
+
   let response;
   try {
     const model = coachModel();
     const options = { apiKey, ...(model ? { model } : {}) };
-    response = await requestReport(brief, options);
+
+    try {
+      response = await requestReport(brief, options);
+    } catch (error) {
+      if (!worthRetrying(error)) throw error;
+      const detail = error instanceof CoachError ? `${error.code}/${error.status ?? '-'}` : '?';
+      console.warn(`[coach] upstream failed (${detail}), retrying once`);
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      response = await requestReport(brief, options);
+    }
+
     if (!response.report) {
       console.warn('[coach] first reply rejected, retrying', response.problems);
       response = await requestReport(brief, options);
     }
   } catch (error) {
     const code = error instanceof CoachError ? error.code : 'network';
+    const status = error instanceof CoachError ? error.status : undefined;
+    // Logged with the specifics, because "could not be reached" on its own
+    // cannot tell a wrong key from an overloaded upstream, and those need
+    // opposite responses from whoever is reading the logs.
+    console.error(
+      `[coach] unreachable: code=${code} status=${status ?? '-'} ` +
+        `message=${error instanceof Error ? error.message : String(error)}`,
+    );
     return Response.json(
-      { error: 'the coach could not be reached. Nothing was charged against your allowance.', code },
+      {
+        error: 'the coach could not be reached. Nothing was charged against your allowance.',
+        code,
+        ...(status === undefined ? {} : { status }),
+      },
       { status: 502 },
     );
   }
