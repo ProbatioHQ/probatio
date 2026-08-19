@@ -78,11 +78,21 @@ export const KEEP_BY_TIMEFRAME: Record<string, number> = {
  *
  * Six hours was a disk measure, not a product one: a token opened this morning
  * lost its history by lunchtime, so coming back to it meant watching "reading
- * history" fill the chart again from scratch. Three days on a volume with room
- * for it, which is long enough that revisiting anything you traded this week is
- * instant.
+ * history" fill the chart again from scratch. Three days fixed that for the
+ * week you are in and not for the one before it, so anything you traded a
+ * fortnight ago still refetched from nothing.
+ *
+ * Fourteen days, which is the window launches are kept for. That is not a
+ * coincidence worth breaking: past it the launch row naming the token is gone
+ * too, so a chart that outlived it would be history belonging to something this
+ * database can no longer label.
+ *
+ * This does not raise the ceiling. `MINT_BUDGET` still caps how many tokens may
+ * keep candles at all, so the size of the table is unchanged and what moves is
+ * which tokens fill it: the budget's recency ranking decides, rather than a
+ * token being dropped for going quiet for a long weekend.
  */
-const MINT_IDLE_SECONDS = 3 * 24 * 60 * 60;
+const MINT_IDLE_SECONDS = 14 * 24 * 60 * 60;
 
 /**
  * Drop every candle of a token that has gone quiet.

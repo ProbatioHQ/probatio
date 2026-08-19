@@ -139,10 +139,24 @@ export function AmbientTerminal() {
     const draw = (): void => {
       context.clearRect(0, 0, width, height);
 
-      const leftX = Math.floor(width / 2 - RAIL_HALF - GUTTER_PAD - gutter);
-      const rightX = Math.floor(width / 2 + RAIL_HALF + GUTTER_PAD);
-
-      const column = (rows: Row[], x: number): void => {
+      /*
+       * Mirrored on the viewport edges, not on the rail.
+       *
+       * Both columns used to be placed from the rail outwards, which lines up
+       * their inner edges and lets their outer edges fall wherever the row
+       * happens to end. That is only symmetrical if a row fills its gutter
+       * exactly, and it never does: the width is quantised to whole characters
+       * and then rounded down again by the byte grouping, so the right column
+       * finished about twenty pixels short of the edge while the left one,
+       * growing rightwards from a fixed start, sat flush against it.
+       *
+       * Anchored to the two edges instead and drawn outwards-in, so the pad at
+       * the viewport edge is the same on both sides whatever width a row works
+       * out to, and any slack falls on the inside where the rail already
+       * separates the column from the text.
+       */
+      const column = (rows: Row[], x: number, align: CanvasTextAlign): void => {
+        context.textAlign = align;
         rows.forEach((row, index) => {
           const y = index * LINE_HEIGHT - offset;
           if (y < -LINE_HEIGHT || y > height) return;
@@ -158,8 +172,8 @@ export function AmbientTerminal() {
         });
       };
 
-      column(left, leftX);
-      column(right, rightX);
+      column(left, GUTTER_PAD, 'left');
+      column(right, width - GUTTER_PAD, 'right');
     };
 
     const frame = (now: number): void => {
