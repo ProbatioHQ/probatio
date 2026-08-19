@@ -134,6 +134,10 @@ async function resolveOne(mint: string, now: number): Promise<void> {
           symbol: document.symbol,
           description: document.description,
           imageUrl: document.image,
+          // Fetched all along, kept from now on.
+          twitterUrl: document.twitter,
+          websiteUrl: document.website,
+          telegramUrl: document.telegram,
         },
         now,
       );

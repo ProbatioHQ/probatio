@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { launchByMint } from '@probatio/db';
+import { getTokenMetadata, launchByMint } from '@probatio/db';
 import { Onboarding } from '@/components/onboarding';
 import { TokenView } from '@/components/token-view';
 import { db } from '@/lib/db';
@@ -73,13 +73,17 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
       }),
     ]);
 
-  const [token, launch, images] = await Promise.all([
+  const [token, launch, images, meta] = await Promise.all([
     withinAMoment(
       tokenName(mint).catch(() => ({ name: shortMint(mint), symbol: null, known: false }) as const),
       { name: shortMint(mint), symbol: null, known: false } as const,
     ),
     launchByMint(client, mint).catch(() => null),
     knownImages([mint]).catch(() => new Map<string, string>()),
+    // The launcher's own links, out of the cached document. Read here rather
+    // than in the client so a page that has them renders with them, instead of
+    // popping two icons in a moment after the rest has settled.
+    getTokenMetadata(client, mint).catch(() => null),
   ]);
   const image = images.get(mint) ?? null;
 
@@ -97,6 +101,11 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
           image,
           launchedAt: launch?.launchedAt ?? null,
           shortMint: shortMint(mint),
+          links: {
+            twitter: meta?.twitterUrl ?? null,
+            website: meta?.websiteUrl ?? null,
+            telegram: meta?.telegramUrl ?? null,
+          },
         }}
       />
 

@@ -25,6 +25,10 @@ export interface CachedTokenMetadata {
   readonly offchainError: string | null;
   /** Consecutive failed fetches. Zeroed on success, so it doubles as a state. */
   readonly offchainAttempts: number;
+  /** The launcher's own links. Null where the document gave nothing usable. */
+  readonly twitterUrl: string | null;
+  readonly websiteUrl: string | null;
+  readonly telegramUrl: string | null;
 }
 
 function toRow(row: Record<string, unknown>): CachedTokenMetadata {
@@ -48,6 +52,9 @@ function toRow(row: Record<string, unknown>): CachedTokenMetadata {
     offchainFetchedAt: num('offchain_fetched_at'),
     offchainError: text('offchain_error'),
     offchainAttempts: num('offchain_attempts') ?? 0,
+    twitterUrl: text('twitter_url'),
+    websiteUrl: text('website_url'),
+    telegramUrl: text('telegram_url'),
   };
 }
 
@@ -132,6 +139,9 @@ export interface OffchainMetadataWrite {
   readonly symbol: string | null;
   readonly description: string | null;
   readonly imageUrl: string | null;
+  readonly twitterUrl?: string | null;
+  readonly websiteUrl?: string | null;
+  readonly telegramUrl?: string | null;
 }
 
 export async function recordOffchainMetadata(
@@ -143,9 +153,20 @@ export async function recordOffchainMetadata(
   await db.execute({
     sql: `UPDATE token_metadata SET
             offchain_name = ?, offchain_symbol = ?, description = ?, image_url = ?,
+            twitter_url = ?, website_url = ?, telegram_url = ?,
             offchain_fetched_at = ?, offchain_error = NULL, offchain_attempts = 0
           WHERE mint = ?`,
-    args: [entry.name, entry.symbol, entry.description, entry.imageUrl, now, mint],
+    args: [
+      entry.name,
+      entry.symbol,
+      entry.description,
+      entry.imageUrl,
+      entry.twitterUrl ?? null,
+      entry.websiteUrl ?? null,
+      entry.telegramUrl ?? null,
+      now,
+      mint,
+    ],
   });
 }
 

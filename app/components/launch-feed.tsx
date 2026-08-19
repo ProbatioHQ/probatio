@@ -80,8 +80,16 @@ const LANES: { key: LaneKey; title: string; short: string; prompt: string; blurb
   },
 ];
 
-/** Kept bounded. A feed left open all day should not grow without limit. */
-const MAX_ROWS = 60;
+/*
+ * Kept bounded, but at the server's own ceiling rather than well under it.
+ *
+ * This was 60 while `/api/launches` will serve 100, so a third of what the
+ * database was willing to hand over was left on the table for no reason. Every
+ * row is a live DOM node with a picture in it, so this is not free and it does
+ * not want to be unbounded; 100 is what the endpoint already caps at, which
+ * makes the two agree instead of the client quietly asking for less.
+ */
+const MAX_ROWS = 100;
 /** The preview shows enough to prove it is moving. The terminal shows the feed. */
 const PREVIEW_ROWS = 8;
 
@@ -469,7 +477,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   const load = useCallback(
     async (search: string, filters: string) => {
       try {
-        const limit = terminal ? 60 : 20;
+        const limit = terminal ? MAX_ROWS : 20;
         const filterQuery = filters && filters !== JSON.stringify(DEFAULT_LANE_FILTERS)
           ? `&filters=${encodeURIComponent(filters)}`
           : '';

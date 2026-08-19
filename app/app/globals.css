@@ -2573,6 +2573,29 @@ button:hover:not(:where(:disabled)),
   margin-top: 4px;
 }
 
+/*
+ * The launcher's links, beside the mint.
+ *
+ * Quiet by default and lit on hover: they are somebody else's claims about
+ * their own project, and giving them the accent at rest would read as this site
+ * endorsing where they point.
+ */
+.token-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  color: var(--text-faint);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.token-social:hover {
+  color: var(--text);
+  border-color: var(--line-bright);
+}
+
 .token-meta .sep {
   width: 3px;
   height: 3px;
@@ -2587,8 +2610,37 @@ button:hover:not(:where(:disabled)),
   gap: 20px;
 }
 
+/*
+ * The record sits under the chart, not under the whole layout.
+ *
+ * `1 / -1` spanned the chart column and the 320px trade panel beside it, so a
+ * six-column table stretched wider than either of the two things it belongs to
+ * and read as a separate page that had leaked in. Under the chart it is the
+ * width of the thing it is about.
+ */
 .trade-layout .positions-slot {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  min-width: 0;
+}
+
+/*
+ * A bordered box needs padding on the side the border is.
+ *
+ * `td` is `padding: 9px 12px 9px 0`, no left padding at all, which is right for
+ * a bare table and wrong the moment one is put in a box: inside `.trade-log`,
+ * which has a border and a radius, "buy" sat flush against the frame. Given to
+ * the box rather than to every cell, so the columns keep their own rhythm.
+ */
+.scroller.trade-log {
+  padding: 0 14px;
+}
+.scroller.trade-log th:first-child,
+.scroller.trade-log td:first-child {
+  padding-left: 0;
+}
+.scroller.trade-log th:last-child,
+.scroller.trade-log td:last-child {
+  padding-right: 0;
 }
 
 @media (max-width: 900px) {

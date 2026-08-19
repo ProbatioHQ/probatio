@@ -66,6 +66,19 @@ export interface TokenHead {
   readonly image: string | null;
   readonly launchedAt: number | null;
   readonly shortMint: string;
+  /**
+   * Where the launcher said to find them, or nulls.
+   *
+   * Their claims about themselves, not ours about them: on one real token the
+   * "website" is an x.com link. Shown so a reader can go and judge, never
+   * described as verified, and absent entirely when there is nothing to show
+   * rather than rendered as a dead icon.
+   */
+  readonly links: {
+    readonly twitter: string | null;
+    readonly website: string | null;
+    readonly telegram: string | null;
+  };
 }
 
 export function TokenView({
@@ -383,6 +396,51 @@ export function TokenView({
           </h1>
           <p className="mono dim token-meta">
             <span>{head.shortMint}</span>
+            {/* Only what exists. A launcher who gave no telegram gets no
+                telegram icon, rather than one that goes nowhere. */}
+            {head.links.twitter && (
+              <a
+                className="token-social"
+                href={head.links.twitter}
+                target="_blank"
+                rel="noreferrer noopener nofollow"
+                aria-label="The launcher's X account"
+                title="Posted by whoever launched this token"
+              >
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+                </svg>
+              </a>
+            )}
+            {head.links.website && (
+              <a
+                className="token-social"
+                href={head.links.website}
+                target="_blank"
+                rel="noreferrer noopener nofollow"
+                aria-label="The launcher's website"
+                title="Given by whoever launched this token"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18" strokeLinecap="round" />
+                </svg>
+              </a>
+            )}
+            {head.links.telegram && (
+              <a
+                className="token-social"
+                href={head.links.telegram}
+                target="_blank"
+                rel="noreferrer noopener nofollow"
+                aria-label="The launcher's Telegram"
+                title="Given by whoever launched this token"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                  <path d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.3 13.2l-4.8-1.5c-1-.3-1-1 .2-1.5l18.8-7.2c.9-.3 1.6.2 1.4 1.3z" />
+                </svg>
+              </a>
+            )}
             {head.launchedAt !== null && (
               <>
                 <span className="sep" aria-hidden="true" />

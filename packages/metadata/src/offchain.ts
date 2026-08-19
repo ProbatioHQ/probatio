@@ -23,6 +23,21 @@ export interface OffchainMetadata {
   readonly symbol: string | null;
   readonly description: string | null;
   readonly image: string | null;
+  /**
+   * The links the launcher put in the document.
+   *
+   * Read because they are the ones every other pump.fun client shows and this
+   * one did not: the fields were being fetched and dropped on the floor. They
+   * are the launcher's own claims about themselves, so they are held to the
+   * same scheme rule as the image and are never presented as verified.
+   *
+   * Empty rather than absent is the common case. A document that carries
+   * `"telegram": ""` has not given you a telegram, so an empty string is
+   * normalised to null here rather than becoming an icon that goes nowhere.
+   */
+  readonly twitter: string | null;
+  readonly website: string | null;
+  readonly telegram: string | null;
 }
 
 export interface FetchOptions {
@@ -191,6 +206,19 @@ export async function fetchOffchainMetadata(
   const document = parsed as Record<string, unknown>;
   const image = clean(document['image'], MAX_URL_CHARS);
 
+  /*
+   * A link somebody else wrote, made safe to put in an href.
+   *
+   * https only. These are rendered as anchors a reader can click, so a
+   * `javascript:` URL here would be a script the launcher gets to run in their
+   * browser, and `ipfs://` is allowed for images because a browser can be asked
+   * to render one but is not a page anyone should be sent to.
+   */
+  const link = (value: unknown): string | null => {
+    const raw = clean(value, MAX_URL_CHARS);
+    return raw && /^https:\/\//i.test(raw) ? raw : null;
+  };
+
   return {
     name: clean(document['name'], MAX_NAME_CHARS),
     symbol: clean(document['symbol'], MAX_NAME_CHARS),
@@ -199,5 +227,8 @@ export async function fetchOffchainMetadata(
     // is still held to the same scheme rules so a `javascript:` or `data:` URL
     // never reaches an <img src>.
     image: image && /^(https:\/\/|ipfs:\/\/)/i.test(image) ? image : null,
+    twitter: link(document['twitter']),
+    website: link(document['website']),
+    telegram: link(document['telegram']),
   };
 }

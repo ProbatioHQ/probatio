@@ -131,6 +131,8 @@ describe('migrations', () => {
       '028_pumpfun_history.sql',
       '029_keep_full_history.sql',
       '030_image_retry_backoff.sql',
+      '031_token_socials.sql',
+      '032_reread_for_socials.sql',
     ]);
   });
 
