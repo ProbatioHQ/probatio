@@ -21,12 +21,16 @@ import { useState } from 'react';
  */
 
 /**
- * The contract address, once there is one.
+ * The contract address.
  *
- * Null until the token launches. Set it to the mint and the strip changes over
- * on the next deploy. Nothing else in this file needs touching.
+ * Verified against pump.fun's own record before it went in here: the mint
+ * returns name "Probatio", symbol "PROB". This string is the reason the strip
+ * exists, so it is checked rather than pasted.
  */
-const CONTRACT: string | null = null;
+const CONTRACT: string | null = 'CzSDyFGHgZQP6HB1f32xuZybn8gtSSYfHj23xVgpump';
+
+/** Where the strip sends you. The launchpad's own page for the mint above. */
+const COIN_URL = `https://pump.fun/coin/${CONTRACT}`;
 
 const TICKER = '$PROB';
 
@@ -56,7 +60,7 @@ function Phrase() {
         <>
           <span className="strip-ca">{CONTRACT}</span>
           <span className="strip-dot">·</span>
-          <span>Official contract, tap to copy</span>
+          <span>Official contract</span>
         </>
       )}
       <span className="strip-dot">·</span>
@@ -112,26 +116,33 @@ export function TokenStrip() {
   };
 
   /*
-    The whole band is the control once there is an address.
+    Two things to do with an address, so two controls rather than one.
 
-    The thing worth tapping is the address, and it is moving, so aiming at it
-    would be a game. The strip takes the tap instead: anywhere on it copies.
+    The band itself goes to the launchpad, because that is what somebody
+    reading a contract address in a header actually wants next. Copying is the
+    other half and cannot share the same click, so it gets its own control at
+    the end of the strip. A button cannot be nested inside a link, so they are
+    siblings and the link is what fills the space.
   */
   return (
-    <button
-      type="button"
-      className="token-strip live"
-      onClick={copy}
-      aria-label={
-        copied
-          ? `Copied. The ${TICKER} contract address is ${CONTRACT}`
-          : `Copy the official ${TICKER} contract address, ${CONTRACT}`
-      }
-    >
-      {track}
-      <span className={copied ? 'strip-flash shown' : 'strip-flash'} aria-hidden="true">
-        Copied
-      </span>
-    </button>
+    <div className="token-strip live">
+      <a
+        className="strip-link"
+        href={COIN_URL}
+        target="_blank"
+        rel="noreferrer noopener"
+        aria-label={`The official ${TICKER} contract address is ${CONTRACT}. Opens it on pump.fun.`}
+      >
+        {track}
+      </a>
+      <button
+        type="button"
+        className="strip-copy"
+        onClick={copy}
+        aria-label={copied ? 'Copied the contract address' : 'Copy the contract address'}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
   );
 }
