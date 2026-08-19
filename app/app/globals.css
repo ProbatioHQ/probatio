@@ -6100,6 +6100,145 @@ body:has(main.home) .glow {
 }
 
 /* ================================================================== *
+ * Explore: what is moving, as cards.
+ * ================================================================== */
+
+/*
+ * One page, two names. The heading swaps with the width the same way the nav
+ * label does, so the page a phone arrives at is called what its menu called it.
+ */
+.narrow-name { display: none; }
+
+.movers {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 20px 18px;
+}
+
+.mover {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+/*
+ * The art carries the line.
+ *
+ * Over the picture rather than under the figures, because the shape of the hour
+ * and the token's face are one glance, and a separate strip would make the card
+ * taller for no more information.
+ */
+.mover-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--ink-sunken);
+  margin-bottom: 10px;
+}
+.mover-art img,
+.mover-art-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mover-art-blank {
+  background: linear-gradient(160deg, var(--ink-raised), var(--ink-sunken));
+}
+.spark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 38%;
+  /* Over somebody else's artwork, which can be any colour, so the line needs a
+     ground of its own to stay readable rather than trusting the picture. */
+  background: linear-gradient(180deg, transparent, rgb(0 0 0 / 0.45));
+}
+
+.mover-name {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mover:hover .mover-name { color: var(--accent); }
+
+.mover-ticker {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.mover-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.mover-cap {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+}
+.mover-mc {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.mover-change {
+  margin-left: auto;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 550;
+}
+.mover-change.gain { color: var(--accent); }
+.mover-change.loss { color: var(--loss); }
+
+.mover-by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  min-width: 0;
+}
+.mover-creator {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mover-age {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.mover-age.new { color: var(--accent); }
+
+/* Fewer columns before the cards become unreadable rather than after. */
+@media (max-width: 1500px) { .movers { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (max-width: 1240px) { .movers { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 980px) { .movers { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ================================================================== *
  * The feed on a phone.
  * ================================================================== */
 
@@ -6137,6 +6276,88 @@ body:has(main.home) .glow {
 /* Neither exists where all three lanes fit side by side. */
 .lane-picker,
 .feed-sub { display: none; }
+
+/* ================================================================== *
+ * Movers on a phone: the same board as a list.
+ * ================================================================== */
+
+@media (max-width: 860px) and (pointer: coarse) {
+  /*
+   * Cards become rows.
+   *
+   * Six columns of artwork is the right shape for a desk and unreadable on a
+   * phone, where the same information wants one line each: art, name, ticker
+   * and age, market cap on the right. Same component, same data, laid out for
+   * the hand rather than shrunk.
+   */
+  .explore-page .page-head,
+  .explore-page > p.dim { display: none; }
+
+  .wide-name { display: none; }
+  .narrow-name { display: inline; }
+
+  .movers {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .mover {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 2px;
+  }
+
+  .mover-art {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 0;
+    border-radius: 14px;
+  }
+  /* No room for a line under a 64px thumbnail, and the change beside the market
+     cap already says which way the hour went. */
+  .mover-art .spark { display: none; }
+
+  .mover-name {
+    grid-column: 2;
+    grid-row: 1;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 17px;
+    align-self: end;
+  }
+  .mover-ticker {
+    grid-column: 2;
+    grid-row: 2;
+    margin-bottom: 0;
+    font-size: 13px;
+    align-self: start;
+  }
+  /* The creator's key is a desk detail; a phone row has the age and no space. */
+  .mover-creator { display: none; }
+  .mover-by {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-end;
+    margin-top: 0;
+    font-size: 13px;
+    align-self: start;
+  }
+
+  .mover-figures {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .mover-cap {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 17px;
+  }
+  .mover-mc { display: none; }
+  .mover-change { margin-left: 0; font-size: 12.5px; }
+}
 
 @media (max-width: 860px) and (pointer: coarse) {
   /*

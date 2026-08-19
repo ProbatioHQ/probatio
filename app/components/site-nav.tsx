@@ -22,7 +22,17 @@ import { WalletButton } from '@/components/wallet';
  * the page behind is waiting rather than gone.
  */
 
-const LINKS: readonly { href: string; label: string }[] = [
+/**
+ * `narrow` is what the phone calls it, where the two differ.
+ *
+ * One page, two names. "Explore" is what a desk audience calls a board of
+ * what is worth a look; "Movers" is the word every mobile client uses for the
+ * same screen. Neither is a translation of the other, they are the words each
+ * audience already has, so the label follows the width rather than picking one
+ * and hoping.
+ */
+const LINKS: readonly { href: string; label: string; narrow?: string }[] = [
+  { href: '/explore', label: 'Explore', narrow: 'Movers' },
   { href: '/feed', label: 'Terminal' },
   { href: '/season', label: 'Season' },
   { href: '/store', label: 'Store' },
@@ -110,7 +120,7 @@ export function SiteNav() {
                 aria-current={isHere(link.href) ? 'page' : undefined}
                 className={isHere(link.href) ? 'here' : undefined}
               >
-                {link.label}
+                {link.narrow ?? link.label}
                 {/* A dot rather than a colour change alone, so where you are
                     survives being read by somebody who cannot separate the two
                     greens. */}
@@ -118,10 +128,15 @@ export function SiteNav() {
               </a>
             ))}
 
-            {/* The two the footer carries, which a phone reaches only after the
-                whole page, and which are the ones arguing against the product. */}
-            <a href="/verify">Verify a record</a>
-            <a href="/trust">What you have to trust</a>
+            {/*
+              Verify and Trust are not in here any more.
+              
+              They were put in the drawer because a phone reaches the footer
+              only after the whole page. They are still in the footer, still one
+              tap from the bottom of any page, and having them in a menu of six
+              destinations made the two arguments against the product compete
+              with the six places somebody actually wants to go.
+            */}
 
             {/*
               The action and the two outside links, on one row at the foot.
