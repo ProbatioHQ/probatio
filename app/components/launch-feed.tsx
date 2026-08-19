@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sprout, age, freshAge } from '@/components/sprout';
+import { imageSrc } from '@/lib/image-src';
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -238,7 +239,10 @@ function MintMark({ mint }: { mint: string }) {
 function TokenImage({ token }: { token: Token }) {
   const [broken, setBroken] = useState(false);
 
-  if (!token.image || broken) return <MintMark mint={token.mint} />;
+  // Re-pointed at a gateway that answers browsers. ipfs.io, where most of these
+  // live, returns 403 to one, which is why so many rows drew the mark instead.
+  const src = imageSrc(token.image);
+  if (!src || broken) return <MintMark mint={token.mint} />;
 
   return (
     // Not next/image: these are arbitrary hosts chosen by whoever launched the
@@ -247,7 +251,7 @@ function TokenImage({ token }: { token: Token }) {
     // by the browser, and never sent a referrer.
     <img
       className="token-img"
-      src={token.image}
+      src={src}
       alt=""
       loading="lazy"
       decoding="async"

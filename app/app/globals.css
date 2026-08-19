@@ -2623,25 +2623,7 @@ button:hover:not(:where(:disabled)),
   min-width: 0;
 }
 
-/*
- * A bordered box needs padding on the side the border is.
- *
- * `td` is `padding: 9px 12px 9px 0`, no left padding at all, which is right for
- * a bare table and wrong the moment one is put in a box: inside `.trade-log`,
- * which has a border and a radius, "buy" sat flush against the frame. Given to
- * the box rather than to every cell, so the columns keep their own rhythm.
- */
-.scroller.trade-log {
-  padding: 0 14px;
-}
-.scroller.trade-log th:first-child,
-.scroller.trade-log td:first-child {
-  padding-left: 0;
-}
-.scroller.trade-log th:last-child,
-.scroller.trade-log td:last-child {
-  padding-right: 0;
-}
+
 
 @media (max-width: 900px) {
   .trade-layout {
@@ -5380,13 +5362,22 @@ body:has(main.home) .glow {
  * instead, with the header staying put so the columns can still be read
  * halfway down.
  * ------------------------------------------------------------------ */
+/*
+ * The same table as Open positions, that happens to scroll.
+ *
+ * It had a border and a radius of its own, so two tables stacked in one panel
+ * read as two different kinds of thing: one bare, one in a box that ran wider
+ * than the table above it and pushed its first column against the frame. The
+ * box was only ever there to make the scrolling look deliberate, and it does
+ * not need to. Same treatment as the table above, and it still scrolls in place
+ * rather than lengthening the page.
+ */
 .trade-log {
   max-height: min(60vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
 }
+
 .trade-log table {
   margin: 0;
 }
@@ -5394,8 +5385,10 @@ body:has(main.home) .glow {
   position: sticky;
   top: 0;
   z-index: 1;
-  /* Opaque, or the rows scroll visibly through the header. */
-  background: var(--ink-raised);
+  /* Opaque, or the rows scroll visibly through the header. The panel's own
+     ground now that the box around this is gone, so the two tables in this
+     panel share a background instead of one sitting on a lighter card. */
+  background: var(--ink-sunken);
   box-shadow: inset 0 -1px 0 var(--line);
 }
 /* A quieter scrollbar than the platform's default, in the site's own colours. */

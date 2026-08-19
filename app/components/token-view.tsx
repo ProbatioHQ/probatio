@@ -8,6 +8,7 @@ import { Positions } from '@/components/positions';
 import { TradePanel } from '@/components/trade-panel';
 import type { PriceUnit } from '@/lib/price-display';
 import { Sprout, age, freshAge } from '@/components/sprout';
+import { imageSrc } from '@/lib/image-src';
 
 /**
  * The trading surface for one token.
@@ -337,6 +338,10 @@ export function TokenView({
 
   const launched = head.launchedAt ?? 0;
 
+  // Pointed at a gateway that serves browsers, and allowed to give up cleanly.
+  const heroSrc = imageSrc(head.image);
+  const [heroBroken, setHeroBroken] = useState(false);
+
   return (
     <>
       {/*
@@ -380,11 +385,22 @@ export function TokenView({
         opens a token to see and the chart is what they look at afterwards.
       */}
       <div className="token-head">
-        {head.image ? (
+        {heroSrc && !heroBroken ? (
           // Not next/image: an arbitrary host chosen by whoever launched the
           // token, rendered by the browser and never fetched by this server.
+          //
+          // onError matters here and was missing: without it a picture that
+          // fails leaves the browser's own torn-page glyph sitting where the
+          // token's face should be, which is uglier than having no picture and
+          // reads as this page being broken rather than that one being absent.
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="token-hero" src={head.image} alt="" referrerPolicy="no-referrer" />
+          <img
+            className="token-hero"
+            src={heroSrc}
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setHeroBroken(true)}
+          />
         ) : (
           <span className="token-hero placeholder" aria-hidden="true" />
         )}
