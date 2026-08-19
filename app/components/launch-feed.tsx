@@ -449,13 +449,33 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
     }
   }, [laneFilters, terminal]);
 
+  /*
+   * The filters, as the server needs them.
+   *
+   * Sent so the query can read past the sixty rows a lane returns and hand back
+   * sixty that actually match. Filtering only in the browser meant a filter
+   * narrowed whatever window that browser had accumulated, so two machines
+   * open for different lengths of time gave different answers to the same
+   * question and neither was showing everything.
+   *
+   * Serialised as a string rather than an object so it can be a dependency
+   * without re-firing the fetch on every render.
+   */
+  const filterParam = useMemo(
+    () => (terminal ? JSON.stringify(laneFilters) : ''),
+    [terminal, laneFilters],
+  );
+
   const load = useCallback(
-    async (search: string) => {
+    async (search: string, filters: string) => {
       try {
         const limit = terminal ? 60 : 20;
+        const filterQuery = filters && filters !== JSON.stringify(DEFAULT_LANE_FILTERS)
+          ? `&filters=${encodeURIComponent(filters)}`
+          : '';
         const url = search
           ? `/api/launches?q=${encodeURIComponent(search)}&limit=${limit}`
-          : `/api/launches?limit=${limit}`;
+          : `/api/launches?limit=${limit}${filterQuery}`;
         const body = (await (await fetch(url)).json()) as {
           lanes?: Lanes;
           results?: Token[];
@@ -474,11 +494,15 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
     [terminal],
   );
 
-  // Debounced, so typing a mint address does not fire a query per keystroke.
+  // Debounced, so typing a mint address does not fire a query per keystroke,
+  // and so dragging a market-cap field does not fire one per digit.
   useEffect(() => {
-    const timer = setTimeout(() => void load(query.trim()), query ? 250 : 0);
+    const timer = setTimeout(() => void load(query.trim(), filterParam), query ? 250 : 300);
     return () => clearTimeout(timer);
-  }, [query, load]);
+    // filterParam belongs here: changing a filter has to go back to the server,
+    // or the deep scan never happens and the filter is back to narrowing a
+    // window, which is the bug this was written to fix.
+  }, [query, filterParam, load]);
 
   // The exchange rate moves on its own clock, slower than anything else here.
   useEffect(() => {

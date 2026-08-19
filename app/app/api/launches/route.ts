@@ -11,6 +11,7 @@ import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import { capsFromChain, capsFromIndex } from '@/lib/curve-cap';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
+import { DEFAULT_FILTERS, matchesFilters, type Filters } from '@/lib/feed-filters';
 import { cacheImages, knownImages, resolveLaunchImages } from '@/lib/token-images';
 import { solUsd } from '@/lib/sol-price';
 import { resolveTokenName } from '@/lib/token-name';
@@ -268,10 +269,28 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ query, solUsd: sol, results });
   }
 
+  /*
+   * Filters are applied here, over a deep scan, not in the browser.
+   *
+   * They used to run only client-side, over the at most sixty rows a browser
+   * happened to be holding, so a filter narrowed a window instead of searching
+   * the feed. Two machines accumulate different sixties depending on how long
+   * they have been open and what arrived over the stream, which is why one
+   * showed sixty results and the other thirteen for the same filter, and why
+   * neither was showing all of them.
+   *
+   * A filtered lane therefore reads far more candidates than it returns and
+   * keeps the first `limit` that pass. Unfiltered lanes are untouched and cost
+   * exactly what they did before.
+   */
+  const laneFilters = parseFilters(url.searchParams.get('filters'));
+  const scanFor = (lane: LaneKey): number =>
+    isFiltered(laneFilters[lane]) ? Math.min(limit * SCAN_MULTIPLE, MAX_SCAN) : limit;
+
   const [fresh, bonding, bonded] = await Promise.all([
-    newLaunches(client, limit),
-    bondingLaunches(client, BONDING_FLOOR_BPS, limit),
-    bondedLaunches(client, limit),
+    newLaunches(client, scanFor('new')),
+    bondingLaunches(client, BONDING_FLOOR_BPS, scanFor('bonding')),
+    bondedLaunches(client, scanFor('bonded')),
   ]);
 
   const mints = [...new Set([...fresh, ...bonding, ...bonded].map((launch) => launch.mint))];
@@ -309,21 +328,109 @@ export async function GET(request: Request): Promise<Response> {
       return left > right ? -1 : left < right ? 1 : 0;
     });
 
+  const rate = await solUsd();
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  /*
+   * The same rule the browser runs, on the same shape, from the same module.
+   *
+   * Sharing the function rather than reimplementing it in SQL is deliberate: a
+   * filter that means one thing on the server and another in the browser is a
+   * feed that disagrees with itself, and the difference would only ever show up
+   * as a row that appears and then vanishes when the next update lands.
+   */
+  const apply = (lane: LaneKey, rows: ReturnType<typeof withImages>) => {
+    const filters = laneFilters[lane];
+    if (!isFiltered(filters)) return rows.slice(0, limit);
+    return rows
+      .filter((token) => matchesFilters(token, filters, { solUsd: rate, nowSeconds }))
+      .slice(0, limit);
+  };
+
   return Response.json({
     query: '',
     // Sent alongside rather than applied here: market caps stay lamports on
     // the wire, and the browser does the cosmetic conversion. One rate for the
     // whole page means every row on screen is priced the same way.
-    solUsd: await solUsd(),
+    solUsd: rate,
     lanes: {
-      new: withImages(fresh),
+      new: apply('new', withImages(fresh)),
       // Both of these rank by what a token is worth. Bonding used to arrive
       // ordered by curve progress, which is a different question from the
       // column of market caps beside it and reads as unsorted: a token at
       // 99.86% sat above one worth thirty thousand.
-      bonding: byMarketCap(withImages(bonding)),
-      bonded: byMarketCap(withImages(bonded)),
+      bonding: apply('bonding', byMarketCap(withImages(bonding))),
+      bonded: apply('bonded', byMarketCap(withImages(bonded))),
     },
     bondingFloorBps: BONDING_FLOOR_BPS,
   });
+}
+
+type LaneKey = 'new' | 'bonding' | 'bonded';
+
+/** How much deeper to read when a lane is filtered, and the ceiling on it. */
+const SCAN_MULTIPLE = 8;
+const MAX_SCAN = 600;
+
+function isFiltered(filters: Filters): boolean {
+  return (
+    filters.include.trim() !== '' ||
+    filters.exclude.trim() !== '' ||
+    filters.minMarketCapUsd > 0 ||
+    filters.maxMarketCapUsd > 0 ||
+    filters.minProgressPct > 0 ||
+    filters.maxProgressPct > 0 ||
+    filters.minAgeMin > 0 ||
+    filters.maxAgeMin > 0 ||
+    filters.maxCreatorLaunches > 0 ||
+    filters.hideImageless
+  );
+}
+
+/**
+ * The filters off the query string, or the defaults.
+ *
+ * Every field is read individually and coerced, because this arrives from a
+ * browser and nothing about it can be trusted to be the shape it claims. A
+ * malformed payload filters nothing rather than failing the request: a feed
+ * that returns an error because a filter was garbled is worse than one that
+ * shows everything.
+ */
+function parseFilters(raw: string | null): Record<LaneKey, Filters> {
+  const empty: Record<LaneKey, Filters> = {
+    new: { ...DEFAULT_FILTERS },
+    bonding: { ...DEFAULT_FILTERS },
+    bonded: { ...DEFAULT_FILTERS },
+  };
+  if (!raw) return empty;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<Record<LaneKey, Partial<Filters>>>;
+    const text = (value: unknown): string =>
+      typeof value === 'string' ? value.slice(0, 200) : '';
+    const count = (value: unknown): number => {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 ? Math.min(n, 1e12) : 0;
+    };
+
+    for (const lane of ['new', 'bonding', 'bonded'] as const) {
+      const given = parsed[lane];
+      if (!given) continue;
+      empty[lane] = {
+        include: text(given.include),
+        exclude: text(given.exclude),
+        minMarketCapUsd: count(given.minMarketCapUsd),
+        maxMarketCapUsd: count(given.maxMarketCapUsd),
+        minProgressPct: count(given.minProgressPct),
+        maxProgressPct: count(given.maxProgressPct),
+        minAgeMin: count(given.minAgeMin),
+        maxAgeMin: count(given.maxAgeMin),
+        maxCreatorLaunches: count(given.maxCreatorLaunches),
+        hideImageless: given.hideImageless === true,
+      };
+    }
+    return empty;
+  } catch {
+    return empty;
+  }
 }
