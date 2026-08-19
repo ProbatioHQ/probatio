@@ -135,6 +135,25 @@ main {
   /* Set here rather than relying on the `body > *` rule above, because this is
      not always a direct child of body and the flash is positioned against it. */
   position: relative;
+  /*
+   * Above the page, on the header's layer, or the home page paints over it.
+   *
+   * The `body > *` rule puts everything on z-index 1, and at equal z-index the
+   * later element in the DOM wins. `.page-root` comes after this, so its whole
+   * stacking context paints on top, and the home page's hero puts a fixed,
+   * full-viewport `.scene` with an opaque background inside it. The strip was
+   * rendered, measured, coloured and completely invisible on that one page,
+   * while every other page was fine.
+   *
+   * It took a while to find because `.scene` sets `pointer-events: none`, so
+   * hit testing the strip's own coordinates reported the strip on top. Painting
+   * order and hit testing are not the same question.
+   *
+   * The header's 10 rather than a 2 that clears today's layout: the two bands
+   * belong together, and as the page scrolls the sticky header passes over this
+   * one, which at equal z-index it wins by coming later in the DOM.
+   */
+  z-index: 10;
   display: block;
   width: 100%;
   height: 30px;
@@ -1056,6 +1075,15 @@ hr {
  * when focused. Anything absolutely positioned directly under `body` belongs
  * on this list.
  *
+ * The token strip is excluded for the same reason as the header, and learned
+ * the same way. Clamped to z-index 1 it sat level with `.page-root`, which
+ * comes later in the DOM and therefore wins at equal z-index, so the home
+ * page's hero painted its fixed opaque `.scene` straight over the strip: fully
+ * rendered, correctly coloured, and invisible on that one page. Note that this
+ * selector chains five class-bearing `:not()`s and so scores (0,5,1); a
+ * `.token-strip { z-index: 10 }` of its own is (0,1,0) and loses, which is why
+ * the fix has to be here rather than there.
+ *
  * The header is excluded for the opposite reason: it must sit ABOVE the
  * content, not level with it. This selector is specific enough to beat the
  * header's own `z-index: 10`, so without the exclusion the header was clamped
@@ -1065,7 +1093,7 @@ hr {
  * content box sat under them: the top of the menu was clickable, the bottom was
  * not, which read as some menu links simply not working.
  */
-body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link):not(.site-header) {
+body > *:not(.grain):not(.glow):not(.ambient):not(.skip-link):not(.site-header):not(.token-strip) {
   position: relative;
   z-index: 1;
 }
