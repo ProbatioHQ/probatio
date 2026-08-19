@@ -103,6 +103,18 @@ const PACKAGES = [
     keywords: ['probatio', 'solana', 'trading', 'verification', 'merkle', 'audit'],
     dependencies: { '@probatio/commit': `^${VERSION}` },
   },
+  {
+    dir: 'cli',
+    name: '@probatio/cli',
+    description:
+      'Verify a Probatio record from your terminal. Prints every check and sets its exit code to the verdict.',
+    keywords: ['probatio', 'cli', 'verification', 'solana', 'trading', 'audit'],
+    dependencies: { '@probatio/sdk': `^${VERSION}` },
+    // Bundled by esbuild rather than compiled by tsc: it needs a shebang, one
+    // executable file and no import of its own internals at runtime.
+    bundled: true,
+    bin: { probatio: './dist/bin.js' },
+  },
 ];
 
 function run(command, args) {
@@ -116,11 +128,19 @@ for (const pkg of PACKAGES) {
   console.log(`\n[npm] building ${pkg.name}`);
   rmSync(out, { recursive: true, force: true });
   rmSync(join(from, 'dist'), { recursive: true, force: true });
-  run('npx', ['tsc', '-p', join('packages', pkg.dir, 'tsconfig.build.json')]);
+  if (pkg.bundled) {
+    execFileSync('node', ['build.mjs'], { cwd: from, stdio: 'inherit' });
+  } else {
+    run('npx', ['tsc', '-p', join('packages', pkg.dir, 'tsconfig.build.json')]);
+  }
 
   mkdirSync(out, { recursive: true });
   cpSync(join(from, 'dist'), join(out, 'dist'), { recursive: true });
-  console.log(`[npm] extensions added in ${addExtensions(join(out, 'dist'))} file(s)`);
+  // A bundle has no relative imports left to fix, and rewriting inside one
+  // would only risk touching a string that happens to look like a specifier.
+  if (!pkg.bundled) {
+    console.log(`[npm] extensions added in ${addExtensions(join(out, 'dist'))} file(s)`);
+  }
   // tsc leaves its incremental state in the output directory; it is not part of
   // the package and publishing it would leak absolute paths from this machine.
   rmSync(join(out, 'dist', 'tsconfig.tsbuildinfo'), { force: true });
@@ -144,6 +164,16 @@ for (const pkg of PACKAGES) {
     files: ['dist', 'README.md', 'LICENSE'],
     dependencies: pkg.dependencies,
   };
+
+  // A command is not imported, so it publishes a `bin` and none of the entry
+  // points a library needs. Leaving `main` pointing at an index that the
+  // bundle does not emit would be a broken import waiting for someone to try.
+  if (pkg.bin) {
+    manifest.bin = pkg.bin;
+    delete manifest.exports;
+    delete manifest.main;
+    delete manifest.types;
+  }
 
   writeFileSync(join(out, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`[npm] staged at packages/${pkg.dir}/npm`);

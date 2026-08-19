@@ -20,7 +20,7 @@ const stdoutIo: CliIo = {
   err: (line) => process.stderr.write(`${line}\n`),
 };
 
-const HELP = `probatio, the open prop firm
+const HELP = `probatio, a trading record you can check yourself
 
 Usage
   probatio verify <wallet> [--season <n>] [--api <url>] [--json]
