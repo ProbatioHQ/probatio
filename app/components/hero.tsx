@@ -88,7 +88,7 @@ export function Hero() {
             one after the other instead of the block fading in together. */}
         <h1 className="display">
           <span className="reveal">
-            <span>Trade fake money</span>
+            <span>Trade paper money</span>
           </span>
           <span className="reveal">
             <span>on real tokens.</span>

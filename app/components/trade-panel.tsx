@@ -507,7 +507,7 @@ export function TradePanel({
     <section className="term trade" aria-label="Trade" ref={panel}>
       <div className="term-bar">
         <span className="prompt">~/trade</span>
-        <span>practice money</span>
+        <span>paper money</span>
         <span className="lights">
           <i />
           <i />

@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env['APP_URI'] ?? 'http://localhost:3000'),
   title: { default: 'Probatio', template: '%s' },
   description:
-    'Trade live Solana markets with practice money. Honest fills, and a record kept honestly.',
+    'Trade live Solana markets with paper money. Honest fills, and a record kept honestly.',
 };
 
 /**
@@ -134,7 +134,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             {/* The tagline is the front page's job. In a phone footer it is a
                 line of marketing between somebody and the four links they
                 actually came down here for. */}
-            <span className="footer-say">Practice money. Real prices. Records kept honestly.</span>
+            <span className="footer-say">Paper money. Real prices. Records kept honestly.</span>
             <span>
               <a href="/docs">How it works</a> · <a href="/roadmap">Roadmap</a> ·{' '}
               <a href="/verify">Verify a record</a> · <a href="/trust">What you have to trust</a>

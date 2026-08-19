@@ -25,7 +25,7 @@ export default function FeedPage() {
       <div className="page-head">
         <h1>Terminal</h1>
         <p className="dim">
-          Every pump.fun launch as it happens. Pick anything and trade it with practice money against
+          Every pump.fun launch as it happens. Pick anything and trade it with paper money against
           the prices, the liquidity and the fees are the real ones.
         </p>
       </div>

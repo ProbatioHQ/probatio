@@ -156,7 +156,7 @@ const PHASES: readonly Phase[] = [
       {
         title: 'Real capital for proven traders',
         detail:
-          'A record of ranked seasons finishing near the top becomes the thing real money is allocated against, on a profit share. Trade fake money, prove you are good, get real money. The whole idea, made real.',
+          'A record of ranked seasons finishing near the top becomes the thing real money is allocated against, on a profit share. Trade paper money, prove you are good, get real money. The whole idea, made real.',
       },
       {
         title: 'Strategy vaults',

@@ -5,7 +5,7 @@ import { FeedPortfolio } from '@/components/feed-portfolio';
 export const metadata: Metadata = {
   title: 'Explore, Probatio',
   description:
-    'What is moving on pump.fun right now, ranked on the hour. Pick anything and trade it with practice money against the real prices.',
+    'What is moving on pump.fun right now, ranked on the hour. Pick anything and trade it with paper money against the real prices.',
 };
 
 export const revalidate = 30;
@@ -30,7 +30,7 @@ export default function ExplorePage() {
         </h1>
         <p className="dim">
           The biggest moves of the last hour, up or down, among tokens with real trading behind
-          them. Pick anything and trade it with practice money against the real prices.
+          them. Pick anything and trade it with paper money against the real prices.
         </p>
       </div>
 

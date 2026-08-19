@@ -32,7 +32,7 @@ const STEPS = [
   {
     title: 'Make a trade',
     body:
-      'You start with 10 SOL of practice money. The fill is quoted when you click and lands after a real delay, ' +
+      'You start with 10 SOL of paper money. The fill is quoted when you click and lands after a real delay, ' +
       'so the price moves while you wait, and sometimes the trade fails, exactly as it would with real money.',
   },
 ] as const;

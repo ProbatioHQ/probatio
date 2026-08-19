@@ -4,7 +4,7 @@ import { ImageResponse } from 'next/og';
 
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'Probatio: trade fake money on real tokens, prove you are good';
+export const alt = 'Probatio: trade paper money on real tokens, prove you are good';
 
 /**
  * The card the site itself turns into when a link is pasted.
@@ -63,7 +63,7 @@ export default function SiteCard() {
           people will ever see of this.
         */}
         <div style={{ fontSize: 62, fontWeight: 700, lineHeight: 1.22, display: 'flex' }}>
-          Trade fake money on real tokens.
+          Trade paper money on real tokens.
         </div>
         <div
           style={{

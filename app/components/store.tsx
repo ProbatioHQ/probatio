@@ -170,7 +170,7 @@ export function Store({ tiers, available }: { tiers: Tier[]; available: boolean 
       <div className="term-body">
         <h1 style={{ fontSize: 26 }}>Buy practice balance</h1>
         <p className="dim">
-          Free play gives everyone 10 SOL of practice money. Buy more if you want to practise at
+          Free play gives everyone 10 SOL of paper money. Buy more if you want to practise at
           the size you actually trade. Bigger sizes cost less per SOL.
         </p>
 

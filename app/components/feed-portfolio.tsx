@@ -73,7 +73,7 @@ export function FeedPortfolio() {
   if (!signedIn) {
     return (
       <div className="feed-portfolio out">
-        <span className="feed-portfolio-k">Practice money, real prices</span>
+        <span className="feed-portfolio-k">Paper money, real prices</span>
         {/*
           The action inside the sentence, not underneath it.
           
@@ -92,7 +92,7 @@ export function FeedPortfolio() {
           that length it was a wall to be scrolled past rather than read. What
           went is the explanation of how signing works, which belongs on the
           page about trust and not in front of a feed. What stayed is the two
-          things that decide whether to tap: what the practice money is, and
+          things that decide whether to tap: what the paper money is, and
           that nothing real can move.
         */}
         <span className="feed-portfolio-say">
@@ -105,7 +105,7 @@ export function FeedPortfolio() {
           >
             {status === 'working' ? 'Waiting for your wallet…' : 'Connect a wallet'}
           </button>{' '}
-          to trade with 10 SOL of practice money. Nothing ever moves real funds.
+          to trade with 10 SOL of paper money. Nothing ever moves real funds.
         </span>
       </div>
     );
