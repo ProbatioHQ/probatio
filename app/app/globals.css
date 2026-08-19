@@ -288,8 +288,20 @@ main {
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink) 85%, transparent);
   backdrop-filter: blur(8px);
-  position: sticky;
-  top: 0;
+  /*
+   * Sits at the top of the page and stays there, rather than following.
+   *
+   * It was `sticky`, which on a phone spends 64px of a short screen on a bar
+   * you are not using while you read the thing under it.
+   *
+   * Still positioned with a layer, which is not left over from the sticky
+   * version and must not be removed: the wallet menu hangs down out of the
+   * header into the content below it, and the `body > *` rule puts that
+   * content on z-index 1. Without this the lower half of that menu paints
+   * behind the first content box under it, which reads as some of its links
+   * simply not working.
+   */
+  position: relative;
   z-index: 10;
 }
 
@@ -1318,7 +1330,10 @@ button,
 
 .docs-nav {
   position: sticky;
-  top: 92px;
+  /* Clear of the top edge, not of the header: the 92px here was the 64px bar
+     plus a gap, and the bar no longer follows the page down. Leaving it would
+     have pinned the contents list a header's height below nothing. */
+  top: 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1724,13 +1739,6 @@ button,
   background: transparent;
   border-bottom: 1px solid transparent;
   backdrop-filter: none;
-  transition: background 260ms ease, border-color 260ms ease, backdrop-filter 260ms ease;
-}
-
-.site-header.stuck {
-  background: color-mix(in srgb, var(--ink) 78%, transparent);
-  border-bottom-color: var(--line);
-  backdrop-filter: blur(14px) saturate(140%);
 }
 
 .wordmark {
@@ -5405,30 +5413,16 @@ button {
  *
  * It sat on its own ground with its own edge, so the top of the one
  * full-screen page on the site was a bar with a line under it and then
- * the page. Over the hero it is nothing at all, and what it gains on
- * scroll is a fade rather than an edge: no border, just the page
- * darkening under it so the links stay readable as content passes.
+ * the page. Over the hero it is nothing at all. It used to gain a fade
+ * once it stuck to the top; it no longer sticks, so it is nothing at all
+ * for as long as it is on screen.
  * ------------------------------------------------------------------ */
 body:has(main.home) .site-header {
   background: transparent;
   border-bottom-color: transparent;
   backdrop-filter: none;
 }
-body:has(main.home) .site-header.stuck {
-  border-bottom-color: transparent;
-  backdrop-filter: blur(16px) saturate(130%);
-  /* Deepest at the top and gone by the bottom edge, so there is no line where
-     the header stops and the page starts. */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ink) 92%, transparent) 40%,
-    color-mix(in srgb, var(--ink) 55%, transparent) 78%,
-    transparent
-  );
-  mask-image: linear-gradient(180deg, #000 62%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
-  padding-bottom: 10px;
-}
+
 
 /* ------------------------------------------------------------------ *
  * The front page has one ground, and the header stands on it.
@@ -6215,8 +6209,7 @@ body:has(main.home) .glow {
   body:has(main.home) .site-header .wordmark {
     display: none;
   }
-  body:has(main.home) .site-header,
-  body:has(main.home) .site-header.stuck {
+  body:has(main.home) .site-header {
     background: none;
     border-bottom-color: transparent;
     backdrop-filter: none;

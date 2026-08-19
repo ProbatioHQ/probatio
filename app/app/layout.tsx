@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { Archivo, Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AmbientTerminal } from '@/components/ambient-terminal';
-import { HeaderScroll } from '@/components/header-scroll';
 import { PageTransition } from '@/components/page-transition';
 import { SiteNav } from '@/components/site-nav';
 import { TokenStrip } from '@/components/token-strip';
@@ -72,7 +71,6 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <TokenStrip />
 
         <WalletProvider>
-        <HeaderScroll />
         <header className="site-header">
           <div className="shell">
             {/* A plain anchor, not next/link, and the same goes for every
