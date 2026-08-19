@@ -23,6 +23,8 @@ export interface CachedTokenMetadata {
   readonly imageUrl: string | null;
   readonly offchainFetchedAt: number | null;
   readonly offchainError: string | null;
+  /** Consecutive failed fetches. Zeroed on success, so it doubles as a state. */
+  readonly offchainAttempts: number;
 }
 
 function toRow(row: Record<string, unknown>): CachedTokenMetadata {
@@ -45,6 +47,7 @@ function toRow(row: Record<string, unknown>): CachedTokenMetadata {
     imageUrl: text('image_url'),
     offchainFetchedAt: num('offchain_fetched_at'),
     offchainError: text('offchain_error'),
+    offchainAttempts: num('offchain_attempts') ?? 0,
   };
 }
 
@@ -140,7 +143,7 @@ export async function recordOffchainMetadata(
   await db.execute({
     sql: `UPDATE token_metadata SET
             offchain_name = ?, offchain_symbol = ?, description = ?, image_url = ?,
-            offchain_fetched_at = ?, offchain_error = NULL
+            offchain_fetched_at = ?, offchain_error = NULL, offchain_attempts = 0
           WHERE mint = ?`,
     args: [entry.name, entry.symbol, entry.description, entry.imageUrl, now, mint],
   });
@@ -159,7 +162,9 @@ export async function recordOffchainFailure(
   now: number,
 ): Promise<void> {
   await db.execute({
-    sql: `UPDATE token_metadata SET offchain_fetched_at = ?, offchain_error = ?
+    sql: `UPDATE token_metadata SET
+            offchain_fetched_at = ?, offchain_error = ?,
+            offchain_attempts = offchain_attempts + 1
           WHERE mint = ?`,
     args: [now, error.slice(0, 500), mint],
   });

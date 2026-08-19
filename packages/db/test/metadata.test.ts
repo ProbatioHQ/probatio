@@ -125,6 +125,37 @@ describe('off-chain half', () => {
     expect(entry.offchainError).toBe('gateway down');
   });
 
+  /*
+   * The counter is what lets a failure be retried in minutes instead of a day.
+   *
+   * Nothing recorded how many times a document had been tried, so the refetch
+   * gate could only be a single flat window, and it was 24 hours for a success
+   * and a failure alike. One timed-out fetch therefore hid a token's picture
+   * until the next day.
+   */
+  it('counts consecutive failures and clears the count on success', async () => {
+    await seedOnchain();
+
+    await recordOffchainFailure(db, MINT, 'gateway down', NOW);
+    expect((await getTokenMetadata(db, MINT))!.offchainAttempts).toBe(1);
+
+    await recordOffchainFailure(db, MINT, 'gateway down again', NOW + 1_000);
+    await recordOffchainFailure(db, MINT, 'and again', NOW + 2_000);
+    expect((await getTokenMetadata(db, MINT))!.offchainAttempts).toBe(3);
+
+    await recordOffchainMetadata(
+      db,
+      MINT,
+      { name: 'n', symbol: 's', description: 'd', imageUrl: 'https://x/i.png' },
+      NOW + 3_000,
+    );
+
+    const entry = (await getTokenMetadata(db, MINT))!;
+    expect(entry.offchainAttempts).toBe(0);
+    expect(entry.offchainError).toBeNull();
+    expect(entry.imageUrl).toBe('https://x/i.png');
+  });
+
   it('truncates a very long error', async () => {
     await seedOnchain();
     await recordOffchainFailure(db, MINT, 'x'.repeat(5_000), NOW);

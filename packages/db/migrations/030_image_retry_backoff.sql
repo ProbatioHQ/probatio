@@ -1,0 +1,18 @@
+-- Count the failed attempts, so a failure can be retried instead of buried.
+--
+-- `offchain_fetched_at` was stamped on success and on failure alike, and the
+-- refetch gate was a flat 24 hours either way. So a token whose document timed
+-- out once, which happens constantly during a launch burst against a public
+-- IPFS gateway on a six second leash, showed a placeholder for a full day. It
+-- was measured: twenty mints asked to resolve, still zero of twenty four
+-- minutes later, and they would not have resolved today.
+--
+-- A success should stay cached for a day; metadata is mutable but rarely moves.
+-- A failure should come back in minutes. Keeping the count lets the wait grow
+-- with each attempt, so a genuinely dead host is not asked forever at the same
+-- rate while a gateway that was merely busy is picked up almost immediately.
+--
+-- Existing rows start at zero, which is right: a row carrying an error has
+-- never been counted, and treating it as a first failure retries it soon, which
+-- is the behaviour that was wanted all along.
+ALTER TABLE token_metadata ADD COLUMN offchain_attempts INTEGER NOT NULL DEFAULT 0;

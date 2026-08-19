@@ -327,6 +327,26 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
   const terminal = variant === 'terminal';
 
   const [lanes, setLanes] = useState<Lanes | null>(null);
+  /*
+   * The lanes, readable synchronously.
+   *
+   * The two stream handlers used to do their work inside a `setLanes` updater
+   * and call `setArrived` from within it. A state updater has to be pure:
+   * React is free to run it more than once, and a `setState` inside one is a
+   * render-phase update that can send React round again, re-running the updater
+   * and scheduling another update, until it gives up with "Maximum update depth
+   * exceeded" and the error boundary replaces the page. On a feed taking a
+   * launch every few seconds that is a page that breaks while you sit and watch
+   * it, which is exactly what was reported.
+   *
+   * With the current value in a ref, both handlers compute the next lanes and
+   * the arrival set as plain values and then set each once.
+   */
+  const lanesRef = useRef<Lanes | null>(null);
+  const commitLanes = useCallback((next: Lanes | null) => {
+    lanesRef.current = next;
+    setLanes(next);
+  }, []);
   const [results, setResults] = useState<Token[] | null>(null);
   const [query, setQuery] = useState('');
   /** This connection is open. */
@@ -445,7 +465,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
         if (search) setResults(body.results ?? []);
         else {
           setResults(null);
-          if (body.lanes) setLanes(body.lanes);
+          if (body.lanes) commitLanes(body.lanes);
         }
       } catch {
         if (search) setResults([]);
@@ -511,35 +531,33 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
 
       const incoming = JSON.parse((event as MessageEvent<string>).data) as Token[];
 
-      setLanes((current) => {
-        if (!current) return current;
+      const current = lanesRef.current;
+      if (!current) return;
 
-        // Every lane, not just the new one: a replayed launch for a token that
-        // has since bonded would otherwise appear in two columns at once.
-        const seen = new Set(
-          [...current.new, ...current.bonding, ...current.bonded].map((token) => token.mint),
-        );
+      // Every lane, not just the new one: a replayed launch for a token that
+      // has since bonded would otherwise appear in two columns at once.
+      const seen = new Set(
+        [...current.new, ...current.bonding, ...current.bonded].map((token) => token.mint),
+      );
 
-        // A reconnecting socket replays recent history, so repeats are normal.
-        // Deduped within the batch as well as against it — one flush can carry
-        // the same mint twice, and filtering only against what is already on
-        // screen would let both copies through.
-        const additions: Token[] = [];
-        for (const token of incoming) {
-          if (seen.has(token.mint)) continue;
-          seen.add(token.mint);
-          additions.push(token);
-        }
-        if (additions.length === 0) return current;
+      // A reconnecting socket replays recent history, so repeats are normal.
+      // Deduped within the batch as well as against it: one flush can carry the
+      // same mint twice, and filtering only against what is already on screen
+      // would let both copies through.
+      const additions: Token[] = [];
+      for (const token of incoming) {
+        if (seen.has(token.mint)) continue;
+        seen.add(token.mint);
+        additions.push(token);
+      }
+      if (additions.length === 0) return;
 
-        setArrived((was) => {
-          const next = new Set(was);
-          for (const token of additions) next.add(token.mint);
-          return next;
-        });
-
-        // Always the new lane. A token cannot launch already bonded.
-        return { ...current, new: [...additions, ...current.new].slice(0, MAX_ROWS) };
+      // Always the new lane. A token cannot launch already bonded.
+      commitLanes({ ...current, new: [...additions, ...current.new].slice(0, MAX_ROWS) });
+      setArrived((was) => {
+        const next = new Set(was);
+        for (const token of additions) next.add(token.mint);
+        return next;
       });
     });
 
@@ -555,9 +573,10 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
 
       const byMint = new Map(updates.map((update) => [update.mint, update]));
 
-      setLanes((current) => {
-        if (!current) return current;
+      const current = lanesRef.current;
+      if (!current) return;
 
+      {
         // Apply the new numbers wherever the token already is.
         const applied: Lanes = {
           new: current.new.map((token) => merge(token, byMint.get(token.mint))),
@@ -599,16 +618,16 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
         next.bonding.sort(byMarketCap);
         next.bonded.sort(byMarketCap);
 
-        if (promoted.size > 0) {
-          setArrived((was) => new Set([...was, ...promoted]));
-        }
-
-        return {
+        commitLanes({
           new: next.new.slice(0, MAX_ROWS),
           bonding: next.bonding.slice(0, MAX_ROWS),
           bonded: next.bonded.slice(0, MAX_ROWS),
-        };
-      });
+        });
+
+        if (promoted.size > 0) {
+          setArrived((was) => new Set([...was, ...promoted]));
+        }
+      }
     });
 
     source.onerror = () => setLive(false);
@@ -649,15 +668,16 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
           if (!body || Object.keys(body.images).length === 0) return;
           const paint = (token: Token): Token =>
             token.image ? token : { ...token, image: body.images[token.mint] ?? null };
-          setLanes((current) =>
-            current
-              ? {
-                  new: current.new.map(paint),
-                  bonding: current.bonding.map(paint),
-                  bonded: current.bonded.map(paint),
-                }
-              : current,
-          );
+          // Through the ref as well, or the next stream event computes from a
+          // copy of the lanes that never got its pictures and paints them out
+          // again on the very next launch.
+          const current = lanesRef.current;
+          if (!current) return;
+          commitLanes({
+            new: current.new.map(paint),
+            bonding: current.bonding.map(paint),
+            bonded: current.bonded.map(paint),
+          });
         })
         .catch(() => undefined);
     }, 3_000);

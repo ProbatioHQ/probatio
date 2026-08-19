@@ -130,6 +130,7 @@ describe('migrations', () => {
       '027_daily_history.sql',
       '028_pumpfun_history.sql',
       '029_keep_full_history.sql',
+      '030_image_retry_backoff.sql',
     ]);
   });
 

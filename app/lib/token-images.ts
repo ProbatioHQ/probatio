@@ -1,4 +1,5 @@
 import 'server-only';
+import type { CachedTokenMetadata } from '@probatio/db';
 import {
   getManyTokenMetadata,
   getTokenMetadata,
@@ -26,12 +27,43 @@ import { sharedRpc } from './rpc';
  * so a token whose gateway is dead is not retried on every page load.
  */
 
-/** Never hold up a feed for one slow gateway. */
-const TIMEOUT_MS = 6_000;
+/**
+ * Never hold up a feed for one slow gateway.
+ *
+ * Ten rather than six. Almost every one of these documents is on a public IPFS
+ * gateway, which is slow under load rather than broken, and a six second leash
+ * turned "busy" into "failed" often enough to blank a screenful of tokens.
+ */
+const TIMEOUT_MS = 10_000;
 /** How many documents to have in flight at once. */
-const CONCURRENCY = 4;
-/** Refresh an image at most this often. Metadata is mutable but rarely moves. */
+const CONCURRENCY = 6;
+/** Refresh a picture we have at most this often. Metadata rarely moves. */
 const STALE_MS = 24 * 60 * 60 * 1_000;
+
+/**
+ * How long to wait before trying a document that failed, by attempt.
+ *
+ * A success and a failure both stamped `offchain_fetched_at`, and the refetch
+ * gate was `STALE_MS` for both, so one timed-out fetch hid a token's picture for
+ * a full day. Measured before this changed: twenty mints asked to resolve, still
+ * zero of twenty four minutes later.
+ *
+ * A failure is usually a busy gateway, so the first retry is soon. The wait
+ * grows with each attempt so a genuinely dead host is not asked at the same rate
+ * forever, and after the last step it falls back to the daily refresh, which is
+ * where a document that truly does not exist belongs.
+ */
+const RETRY_AFTER_MS = [30_000, 2 * 60_000, 10 * 60_000, 60 * 60_000] as const;
+
+function readyToRetry(entry: CachedTokenMetadata, now: number): boolean {
+  if (entry.offchainFetchedAt === null) return true;
+
+  // No error recorded means the last attempt worked; that is the daily refresh.
+  if (entry.offchainError === null) return entry.offchainFetchedAt < now - STALE_MS;
+
+  const wait = RETRY_AFTER_MS[Math.min(entry.offchainAttempts, RETRY_AFTER_MS.length - 1)] ?? STALE_MS;
+  return entry.offchainFetchedAt < now - wait;
+}
 
 /**
  * Mints being resolved right now, so two callers do not fetch the same one.
@@ -137,9 +169,7 @@ export function resolveLaunchImages(mints: readonly string[]): void {
 
     const wanted = mints.filter((mint) => {
       const entry = cached.get(mint);
-      if (!entry) return true;
-      if (entry.offchainFetchedAt === null) return true;
-      return entry.offchainFetchedAt < now - STALE_MS;
+      return entry ? readyToRetry(entry, now) : true;
     });
 
     // A plain worker pool: a launch burst can be a hundred mints, and a
