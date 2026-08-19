@@ -4,8 +4,20 @@
 
 <br/>
 
+### $PROB
+
+**`CzSDyFGHgZQP6HB1f32xuZybn8gtSSYfHj23xVgpump`**
+
+[View on pump.fun](https://pump.fun/coin/CzSDyFGHgZQP6HB1f32xuZybn8gtSSYfHj23xVgpump) &nbsp;·&nbsp; [probatiotrade.com](https://probatiotrade.com)
+
+This repository is the only place, besides the site itself, where that address is
+published by the project. Any token presenting itself as Probatio with a different
+address is not ours.
+
+<br/>
+
 <a href="https://readme-typing-svg.demolab.com">
-  <img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=21&duration=2600&pause=900&color=3FE08A&center=true&vCenter=true&width=800&height=44&lines=Trade+fake+money+on+real+tokens.;Prove+you're+good.;Get+paid+for+it.;Every+trade+committed+on-chain%2C+verified+by+anyone." alt="Probatio" />
+  <img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=21&duration=2600&pause=900&color=3FE08A&center=true&vCenter=true&width=800&height=44&lines=Trade+paper+money+on+real+tokens.;Real+slippage.+Real+latency.;Every+fill+sealed+as+it+lands.;Check+the+record+yourself." alt="Probatio" />
 </a>
 
 <br/><br/>
@@ -14,7 +26,7 @@
 [![CLI](https://img.shields.io/badge/CLI-passing-3fe08a?style=flat-square)](#sdk-cli-and-mcp)
 [![MCP](https://img.shields.io/badge/MCP-passing-3fe08a?style=flat-square)](#sdk-cli-and-mcp)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-3fe08a?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-1321%20passing-3fe08a?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-1402%20passing-3fe08a?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-Anchor-dea584?style=flat-square&logo=rust&logoColor=white)
 ![Self-hostable](https://img.shields.io/badge/self--hostable-yes-3fe08a?style=flat-square)
@@ -27,11 +39,11 @@
 
 <br/>
 
-**An open prop firm.** Trade fake money on live markets with fills that model real
-slippage and real delay, prove you can do it with a record that cannot be revised,
-and get paid for a season you win. Every trade is committed to the chain as it is
-made, so the result is verified by anyone, without trusting the site that produced
-it.
+**An open trading simulator.** Trade paper money on live markets with fills quoted
+from the pool's real reserves, carrying the slippage your size actually causes and a
+real delay before they land. Every fill is sealed with a hash the moment it is made,
+over the exact figures it was priced from, so the record can be rechecked by anyone
+without trusting the site that produced it.
 
 ---
 
@@ -66,26 +78,28 @@ events. Throwing away most of the data is what makes the number mean anything.
 ### The records cannot be revised
 
 Each fill is hashed into a fixed-width leaf carrying the pool reserves it was quoted
-against, so a verifier needs nothing from us. Leaves are batched into a merkle root,
-and roots are folded one at a time into a running value:
+against, so a verifier needs nothing from us:
 
 ```
-accumulator = sha256(accumulator ‖ root ‖ leaves ‖ engine_version)
+leaf = sha256(prefix ‖ mint ‖ side ‖ amounts ‖ fee ‖ reserves ‖ slots)
 ```
 
-Thirty-two bytes on chain covering every trade in order. Changing an old trade
-changes every value after it, and those were already witnessed publicly at the time.
-The `/verify` page rebuilds every trade from its own recorded inputs, recomputes each
-root, folds the chain, and compares against Solana, in the reader's browser, against
-an endpoint they choose.
+That hash is written beside the fill at the moment it lands. Change any figure
+afterwards, to improve a price or shave a fee, and the hash recomputed from the
+stored figures stops matching the seal recorded with it. The server cannot make the
+comparison come out right without forging the seal, and it cannot forge the seal
+without the figures that produce it, which are the figures it hands the verifier.
+Leaves are folded into a merkle tree, so a record also proves its own order and
+completeness.
 
-### Winning a season pays
+The `/verify` page does this in the reader's browser, and the SDK and CLI do it
+anywhere else. There is no chain in it: no RPC, no program, no account to read.
 
-Seasons are ranked by return, on a scoring rule published and hashed up front. When
-one ends, the standings, the split and the payout root are derived from the committed
-records, and any winner claims their prize on chain against a merkle proof. The root
-follows provably from the trades, so who gets paid is not something the operator
-decides. Nobody has to trust that the leaderboard is honest; they can recompute it.
+### Seasons
+
+Seasons are ranked by return, on a scoring rule published and hashed up front, and
+the standings follow from the sealed records. Nobody has to trust that the
+leaderboard is honest; they can recompute it from the same data.
 
 ---
 
@@ -93,11 +107,14 @@ decides. Nobody has to trust that the leaderboard is honest; they can recompute 
 
 A record does not need Probatio to be believed, so the same verification the site
 runs ships three ways: a library, a command, and an MCP server. All three do the one
-thing that matters, and none of them takes a server's word for it. They fetch the
-trades a trader committed, rebuild the hashes, fold them into an accumulator, and
-compare it to the one Solana holds, at an address derived from constants in the
-package, over an RPC you choose. A `verified: true` is a claim about the chain, not
-about us.
+thing that matters, and none of them takes a server's word for it. They fetch a
+trader's fills together with the seal written over each one, recompute those seals
+from the figures, and rebuild the root. A `verified: true` is arithmetic the caller
+ran, not a claim by us.
+
+```bash
+npx @probatio/cli verify <wallet>
+```
 
 ### `@probatio/sdk`
 
@@ -216,7 +233,7 @@ Requires Node 22 or later and a Solana RPC endpoint.
 ```bash
 npm install
 cp app/.env.example app/.env.local     # then fill in SESSION_SECRET
-npm test                                # 1321 tests, no network
+npm test                                # 1402 tests, no network
 npm --prefix app run dev
 ```
 
