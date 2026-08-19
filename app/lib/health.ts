@@ -134,12 +134,60 @@ function feedFailure(): string | null {
 
 async function probeRpc(): Promise<string | null> {
   try {
-    const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 8_000, maxRetries: 0 });
+    // Retries, where this used to take the first answer as final. A paid
+    // endpoint returns 429 "connection rate limits exceeded" under load, and
+    // treating one of those as an outage is how a healthy site tells visitors
+    // it is unavailable. Measured against the endpoint in use: ten getSlot
+    // calls in a row all returned 429 while the site was serving normally.
+    const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 8_000, maxRetries: 2 });
     await rpc.getSlot();
     return null;
   } catch (error) {
     return error instanceof Error ? error.message.slice(0, 200) : 'unreachable';
   }
+}
+
+/**
+ * How many probes in a row must fail before a dependency is called down.
+ *
+ * Slow to alarm, immediate to recover. One failed probe used to open an outage
+ * on its own, which put a 503 on /api/health and an outage banner across every
+ * page for a blip that was over before anyone read it. At a thirty second
+ * interval, three in a row is a minute and a half of genuine unreachability
+ * before the site says so, and a single success clears it at once.
+ *
+ * The counter is deliberately not persisted. It describes the last few seconds
+ * of one process, and a restart should start from a clean slate rather than
+ * inherit suspicion from a process that is gone.
+ */
+const FAILURES_BEFORE_DOWN = 3;
+const STRIKES_KEY = Symbol.for('probatio.probe-strikes');
+
+function strikes(): Map<Dependency, number> {
+  const store = globalThis as typeof globalThis & { [STRIKES_KEY]?: Map<Dependency, number> };
+  store[STRIKES_KEY] ??= new Map<Dependency, number>();
+  return store[STRIKES_KEY];
+}
+
+/** Record a probe result, holding off on an outage until it has happened thrice. */
+async function recordSteady(
+  dependency: Dependency,
+  failure: string | null,
+  now: number,
+): Promise<void> {
+  const counts = strikes();
+  if (failure === null) {
+    counts.set(dependency, 0);
+    await record(dependency, null, now);
+    return;
+  }
+  const count = (counts.get(dependency) ?? 0) + 1;
+  counts.set(dependency, count);
+  if (count < FAILURES_BEFORE_DOWN) {
+    console.warn(`[health] ${dependency} probe failed (${count}/${FAILURES_BEFORE_DOWN})`, failure);
+    return;
+  }
+  await record(dependency, failure, now);
 }
 
 async function record(dependency: Dependency, failure: string | null, now: number): Promise<void> {
@@ -154,8 +202,8 @@ export async function probeOnce(): Promise<void> {
   // The database is probed by being used. If this throws, nothing below can be
   // written anyway, and an outage nobody can record is one the next healthy
   // process will notice.
-  await record('rpc', await probeRpc(), now);
-  await record('feed', feedFailure(), now);
+  await recordSteady('rpc', await probeRpc(), now);
+  await recordSteady('feed', feedFailure(), now);
 
   // A feature that was never switched on is absent, not broken. Recording it
   // as an outage put a permanent warning strip across every page for something
