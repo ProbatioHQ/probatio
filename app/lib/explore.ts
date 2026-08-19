@@ -112,6 +112,28 @@ const MIN_ABS_CHANGE = 1;
  */
 const MIN_MARKET_CAP_USD = 200_000;
 
+/**
+ * How long a token must have existed before an hour of it means anything.
+ *
+ * The market cap floor was measured against one pool and looked sufficient
+ * there. It is not: on production the board opened at +1,529% with a $529k
+ * market cap, comfortably past that floor, and the token was one hour old. Its
+ * hourly change was its entire life, which is the same arithmetic-not-
+ * information failure the pool was switched to avoid, arriving by a different
+ * door.
+ *
+ * Age is what actually separates the two, and neither cap nor volume can see
+ * it. In the same snapshot a token up 110% was nearly two days old with six
+ * million dollars of volume behind it, which is a real move and belongs on the
+ * board. So the rule is about the measurement rather than the size: the window
+ * has to be a small part of the token's life, not the whole of it. Six hours
+ * makes the hour at most a sixth.
+ *
+ * Cheap, because this pool is mostly months old. It costs the handful of cards
+ * that were launch artifacts and leaves everything else.
+ */
+const MIN_AGE_SECONDS = 6 * 60 * 60;
+
 export interface Mover {
   readonly mint: string;
   readonly name: string;
@@ -428,6 +450,9 @@ async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
 
   const stats = await marketStats(usable.map((coin) => coin.mint));
 
+  // Read once, so every card on a board is judged against the same clock.
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
   const ranked = usable
     .map((coin) => {
       const stat = stats.get(coin.mint);
@@ -443,6 +468,7 @@ async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
       (coin) =>
         coin.volumeH24 >= MIN_VOLUME_USD &&
         coin.marketCapUsd >= MIN_MARKET_CAP_USD &&
+        nowSeconds - coin.createdAt >= MIN_AGE_SECONDS &&
         coin.changeH1 !== null,
     )
     /*
