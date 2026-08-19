@@ -4,12 +4,12 @@ import { verifyRecord, type VerifyOptions } from './verify';
 import type { ProfileRecord, ProofBundle, SeasonInfo, Standings, VerifiedRecord } from './types';
 
 /**
- * A configured client, so the base URL, RPC and fetch are set once.
+ * A configured client, so the base URL and fetch are set once.
  *
  * ```ts
- * const probatio = new Probatio({ rpc: 'https://api.mainnet-beta.solana.com' });
+ * const probatio = new Probatio();
  * const result = await probatio.verifyRecord(wallet);
- * if (result.verified) console.log('checks out against the chain');
+ * if (result.verified) console.log('every fill matches its seal');
  * ```
  *
  * Every method also exists as a standalone function for callers who prefer not
@@ -18,12 +18,15 @@ import type { ProfileRecord, ProofBundle, SeasonInfo, Standings, VerifiedRecord 
 export interface ProbatioConfig {
   /** Base URL of a Probatio instance. Defaults to https://probatiotrade.com. */
   readonly apiBase?: string | undefined;
-  /** A Solana RPC endpoint, used by `verifyRecord`. */
-  readonly rpc?: string | undefined;
-  /** Injected fetch, for tests or a non-browser runtime. */
+  /**
+   * Injected fetch, for tests or a non-browser runtime.
+   *
+   * The only network this library does. There were an `rpc` and a `programId`
+   * here, read by nothing: verification is over hashes and never opens a
+   * connection to a chain. Config that implies otherwise is a claim, so they
+   * are gone rather than accepted and ignored.
+   */
   readonly fetchImpl?: typeof fetch | undefined;
-  /** Override the program id. Defaults to the canonical one. */
-  readonly programId?: string | undefined;
 }
 
 export class Probatio {

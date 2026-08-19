@@ -93,8 +93,8 @@ export function verifyTrade(input: VerificationInput): VerificationResult {
   }
 
   // The trade has to be one of the leaves the batch was built from. Comparing
-  // hashes rather than fields means any difference at all — a changed amount, a
-  // changed slot — shows up here.
+  // hashes rather than fields means any difference at all, a changed amount or
+  // a changed slot, shows up here.
   const hashes = input.batchLeaves.map((leaf) => hashLeaf(leaf));
   const index = hashes.findIndex((hash) => equalHashes(hash, leafHash));
 
@@ -103,7 +103,7 @@ export function verifyTrade(input: VerificationInput): VerificationResult {
       status: 'leaf_not_in_batch',
       verified: false,
       detail:
-        'this trade is not one of the leaves in that batch — either it was never committed, ' +
+        'this trade is not one of the leaves in that batch: either it was never committed, ' +
         'or the version being checked differs from the one that was',
       steps: [...steps, step('find the trade in its batch', false, 'not present')],
       leafHash: leafHex,
@@ -124,7 +124,7 @@ export function verifyTrade(input: VerificationInput): VerificationResult {
       verified: false,
       detail:
         `these leaves produce root ${computedRoot.slice(0, 16)}… but the batch was committed ` +
-        `as ${batch.root.slice(0, 16)}… — the batch contents do not match what was committed`,
+        `as ${batch.root.slice(0, 16)}…, so the batch contents do not match what was committed`,
       steps: [
         ...steps,
         step('rebuild the batch root', false, 'the leaves do not produce the committed root'),
@@ -175,7 +175,7 @@ export function verifyTrade(input: VerificationInput): VerificationResult {
       verified: false,
       detail:
         `these ${input.history.length} batches produce ${expected.slice(0, 16)}… but the chain ` +
-        `holds ${input.onChainAccumulator.slice(0, 16)}… — the history being checked is not the ` +
+        `holds ${input.onChainAccumulator.slice(0, 16)}…, so the history being checked is not the ` +
         'one that was committed',
       steps: [...steps, step('match the chain', false, 'the accumulator does not match')],
       leafHash: leafHex,
@@ -202,9 +202,9 @@ export function verifyTrade(input: VerificationInput): VerificationResult {
 
 /** A short human-readable summary, for a verification page. */
 export function explainVerification(result: VerificationResult): string {
-  const lines = [result.verified ? 'VERIFIED' : `NOT VERIFIED — ${result.status}`, ''];
+  const lines = [result.verified ? 'VERIFIED' : `NOT VERIFIED: ${result.status}`, ''];
   for (const entry of result.steps) {
-    lines.push(`  ${entry.ok ? 'ok  ' : 'FAIL'} ${entry.name} — ${entry.detail}`);
+    lines.push(`  ${entry.ok ? 'ok  ' : 'FAIL'} ${entry.name}: ${entry.detail}`);
   }
   lines.push('', result.detail);
   return lines.join('\n');

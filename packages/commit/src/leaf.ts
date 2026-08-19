@@ -6,7 +6,7 @@ import bs58 from 'bs58';
  *
  * A leaf has to carry everything a stranger needs to recheck the trade without
  * asking us for anything. That includes the pool reserves it was quoted
- * against — otherwise verification would mean trusting our database for the
+ * against. Otherwise verification would mean trusting our database for the
  * one number the whole result depends on, which is precisely the trust the
  * project claims not to need.
  *
@@ -176,7 +176,7 @@ export function encodeLeaf(leaf: TradeLeaf): Uint8Array {
  *
  * Leaves and internal nodes are hashed with different prefixes so an internal
  * node can never be presented as a leaf. Without this, a proof could pass off
- * a pair of hashes as a single trade — the second-preimage weakness that has
+ * a pair of hashes as a single trade, the second-preimage weakness that has
  * bitten merkle implementations repeatedly.
  */
 export const LEAF_PREFIX = 0x00;

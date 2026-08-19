@@ -9,7 +9,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
  * accumulator = sha256(accumulator || batch_root || leaves_le_u32 || engine_version_le_u32)
  * ```
  *
- * Duplicating the logic in two languages is a real risk — the two can drift
+ * Duplicating the logic in two languages is a real risk, since the two can drift
  * apart and nobody notices until a verification fails in front of a user. So
  * the shapes are pinned by tests that check known vectors, and the keeper
  * compares its predicted accumulator against what the chain actually stored

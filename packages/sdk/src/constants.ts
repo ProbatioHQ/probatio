@@ -1,20 +1,24 @@
 /**
  * The fixed facts a verifier needs, and none it should take from a server.
  *
- * The program id and the seeds are what let anyone derive a record's on-chain
- * address themselves. If these came from the instance being checked, that
- * instance could name an account it controls and the comparison would prove
- * nothing. They live here, in the open, for exactly that reason.
+ * There is exactly one now. This file used to carry a Solana program id, two
+ * PDA seeds and an Anchor account discriminator, so that a caller could derive
+ * a record's on-chain address themselves rather than being handed one by the
+ * instance under scrutiny. That reasoning was sound and the program was never
+ * deployed, so what it actually shipped was an address for an account that does
+ * not exist, exported from a package whose verification never reads it.
+ *
+ * Verification is over hashes (see verify.ts), and needs no chain constants at
+ * all. They are gone rather than kept for later: a published package saying a
+ * program id is what proves a record would be describing something this library
+ * does not do.
  */
 
-/** The default Probatio instance the read endpoints are served from. */
+/**
+ * The Probatio instance the read endpoints are served from by default.
+ *
+ * Only ever the source of the figures. Every check runs on them afterwards, on
+ * the caller's machine, so pointing this at an instance you do not trust is the
+ * intended use rather than a risk.
+ */
 export const DEFAULT_API_BASE = 'https://probatiotrade.com';
-
-/** The on-chain program that holds the records. */
-export const PROGRAM_ID = 'HRGEAiqX4qw7B1fgNsR64oRAKF4QwkjkZFx9YXDFxaXA';
-
-export const SEASON_SEED = new TextEncoder().encode('season');
-export const RECORD_SEED = new TextEncoder().encode('record');
-
-/** Anchor's account discriminator for a TraderRecord, hex. */
-export const TRADER_RECORD_DISCRIMINATOR = 'f9159451b5a2ad97';

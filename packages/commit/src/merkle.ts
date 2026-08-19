@@ -11,7 +11,7 @@ import { NODE_PREFIX } from './leaf';
  * pass off a pair of hashes as a single trade.
  *
  * An odd node is promoted to the next level unchanged rather than duplicated.
- * Duplicating it — the well-known Bitcoin approach — lets two different trees
+ * Duplicating it, the well-known Bitcoin approach, lets two different trees
  * produce the same root, which would mean a record could be swapped for a
  * different one with the same commitment.
  */

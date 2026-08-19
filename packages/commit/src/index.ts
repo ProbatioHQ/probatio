@@ -1,5 +1,5 @@
 /**
- * @probatio/commit — canonical trade encoding, merkle trees and proofs.
+ * @probatio/commit: canonical trade encoding, merkle trees and proofs.
  *
  * What turns "we say these trades happened" into something a stranger can
  * check without trusting us. A leaf carries everything needed to recompute the
