@@ -1,6 +1,5 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { hashLeaf, toHex } from '@probatio/commit';
 import {
   ConcurrentTradeError,
   claimName,
@@ -10,17 +9,15 @@ import {
   bondingLaunches,
   isSpent,
   isSuspended,
-  openPosition,
   openPositions,
-  recordTrade,
   startOver,
   upsertUser,
 } from '@probatio/db';
-import { PUMPFUN_TOKEN_DECIMALS, PoolReader, RpcClient } from '@probatio/pools';
-import { DEFAULT_RULES, quoteBuy, quoteSell, simulateFill, totalFeeBps } from '@probatio/sim';
-import { applyFill, emptyPosition, TradingError, type AccountState } from '@probatio/trading';
+import { PoolReader, RpcClient } from '@probatio/pools';
+import { quoteBuy, quoteSell } from '@probatio/sim';
 import { background } from './background-write';
 import { db } from './db';
+import { executeTrade } from './execute-trade';
 import { rpcEndpoint } from './env';
 import { hasDedicatedRpc } from './env';
 import { movingMints, risingMints, topMints } from './explore';
@@ -714,153 +711,43 @@ async function trade(index: number, turn: number): Promise<void> {
     if (size <= 0n) return;
   }
 
-  if (side === 'sell' && (await isSuspended(client, mint))) return;
-
-  const atClick = await readMarket(mint);
-  if (!atClick.pool) return;
-
-  // The wait that makes the fill honest.
-  await new Promise((resolve) => setTimeout(resolve, account.latencyMs));
-
-  const atFill = await readMarket(mint);
-  if (!atFill.pool) return;
-
-  const position = await openPosition(client, account.id, mint);
-  const accountState: AccountState = {
-    solBalance: BigInt(account.solBalance),
-    position: position
-      ? {
-          mint: position.mint,
-          tokenAmount: BigInt(position.tokenAmount),
-          costBasis: BigInt(position.costBasis),
-          realizedPnl: BigInt(position.realizedPnl),
-        }
-      : null,
-  };
-
-  if (side === 'buy' && size > accountState.solBalance) return;
-  if (side === 'sell' && size > (accountState.position?.tokenAmount ?? 0n)) return;
-
-  const outcome = simulateFill({
-    side,
-    size,
-    atClick: atClick.pool,
-    atFill: atFill.pool,
-    rules: {
-      latencyMs: account.latencyMs,
-      slippageBps: DEFAULT_RULES.slippageBps,
-      /*
-       * The engine holds the same line the sizing does.
-       *
-       * Sizing is checked against the pool as it stands at the click, and the
-       * fill happens after the latency wait against a pool that has moved. One
-       * sell went through at 32% impact through exactly that gap. Handing the
-       * engine the same ceiling closes it: a fill that would land above it is
-       * refused outright, which is a rejection rather than a bad trade.
-       */
-      maxPriceImpactBps: Math.min(account.maxPriceImpactBps, MAX_IMPACT_BPS),
-      allowPartialFills: true,
-    },
-  });
-
-  if (outcome.status === 'rejected') {
-    // A rejection is a real outcome, not a failure. Real transactions revert,
-    // and these accounts are meant to show that as much as anything else.
-    state().rejected += 1;
-    return;
-  }
-
-  const pool = atFill.pool;
-  let applied;
-  try {
-    applied = applyFill(accountState, outcome.quote, mint);
-  } catch (error) {
-    if (error instanceof TradingError) {
-      state().rejected += 1;
-      return;
-    }
-    throw error;
-  }
-
-  const nextPosition = applied.account.position ?? emptyPosition(mint);
-  const leafBase = {
-    seasonOrdinal: account.seasonOrdinal,
-    trader: pubkey,
+  /*
+   * The same fill everybody else gets, through the same code.
+   *
+   * This used to be a second copy of the sequence in the trade route, which is
+   * how two implementations of something whose every step matters quietly stop
+   * agreeing. It reads the pool, waits out the latency, reads again and quotes
+   * against the second reading, exactly as a person's click does, because these
+   * accounts are only worth anything if their records are the same kind of
+   * record as everybody else's.
+   */
+  const outcome = await executeTrade({
+    client,
+    account,
+    seasonId,
+    userPubkey: pubkey,
     mint,
     side,
-    solAmount: outcome.quote.solAmount,
-    tokenAmount: outcome.quote.tokenAmount,
-    feeLamports: outcome.quote.feeLamports,
-    solReserve: pool.solReserve,
-    tokenReserve: pool.tokenReserve,
-    deliverableTokens: pool.deliverableTokens,
-    feeBps: totalFeeBps(pool.fees),
-    poolSource: pool.source,
-    priceImpactBps: outcome.quote.priceImpactBps,
-    partial: outcome.quote.partial,
-    clickedAtSlot: atClick.slot,
-    filledAtSlot: pool.slot,
-    latencyMs: account.latencyMs,
-    engineVersion: outcome.quote.engineVersion,
-    createdAt: now,
-  };
+    size,
+    market: { atClick: readMarket, atFill: readMarket },
+    now,
+  });
 
-  try {
-    await background(() =>
-      recordTrade(client, {
-      snapshot: {
-        mint,
-        solReserve: pool.solReserve.toString(),
-        tokenReserve: pool.tokenReserve.toString(),
-        deliverableTokens: pool.deliverableTokens.toString(),
-        tokenDecimals: pool.tokenDecimals || PUMPFUN_TOKEN_DECIMALS,
-        feeBps: totalFeeBps(pool.fees),
-        source: pool.source,
-        slot: pool.slot,
-      },
-      trade: {
-        accountId: account.id,
-        seasonId,
-        userPubkey: pubkey,
-        mint,
-        side,
-        solAmount: outcome.quote.solAmount.toString(),
-        tokenAmount: outcome.quote.tokenAmount.toString(),
-        fee: outcome.quote.feeLamports.toString(),
-        priceImpactBps: outcome.quote.priceImpactBps,
-        partial: outcome.quote.partial,
-        poolSource: pool.source,
-        clickedAtSlot: atClick.slot,
-        filledAtSlot: pool.slot,
-        latencyMs: account.latencyMs,
-        engineVersion: outcome.quote.engineVersion,
-      },
-      position: {
-        accountId: account.id,
-        mint,
-        tokenAmount: nextPosition.tokenAmount.toString(),
-        costBasis: nextPosition.costBasis.toString(),
-        realizedPnl: nextPosition.realizedPnl.toString(),
-        closed: applied.closed,
-      },
-      expected: {
-        solBalance: account.solBalance,
-        tokenAmount: position?.tokenAmount ?? null,
-      },
-      newBalance: applied.account.solBalance.toString(),
-        leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
-        now,
-      }),
-    );
-    const current = state();
+  const current = state();
+  if (outcome.status === 'filled') {
     current.filled += 1;
     current.mints.add(mint);
-  } catch (error) {
-    // Another write landed on this account first. Nothing changed, and the
-    // next tick quotes fresh, exactly as a person would have to.
-    if (error instanceof ConcurrentTradeError) return;
-    throw error;
+    return;
   }
+  /*
+   * Everything else is counted and dropped.
+   *
+   * A rejection is a real outcome and these accounts exist partly to show that,
+   * so it is not retried and not logged as a fault. A suspended token, an
+   * unreadable chain and a market that vanished mid-trade are all simply
+   * reasons this turn did nothing.
+   */
+  if (outcome.status === 'rejected') current.rejected += 1;
 }
 
 /**
