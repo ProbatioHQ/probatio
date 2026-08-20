@@ -39,8 +39,26 @@ export async function register(): Promise<void> {
   safely('health probing', startProbing);
 
   if (process.env['PROBATIO_DISABLE_FEED'] !== '1') {
-    const { startLiveFeed } = await import('./lib/live-feed');
-    safely('launch feed', startLiveFeed);
+    /*
+     * Launches come from pump.fun's own list by default, not from the chain.
+     *
+     * The socket version subscribed to every transaction touching the pump.fun
+     * program, which is thousands a minute, to pick out the handful that are
+     * launches. On a metered endpoint that was the single most expensive thing
+     * the site owned, it ran whether or not anybody was here, and it emptied a
+     * month of credits in six days.
+     *
+     * The socket is still here and still carries every trade, which is the one
+     * thing polling cannot do. It is opt-in now, for an endpoint where a
+     * firehose is free.
+     */
+    if (process.env['PROBATIO_FEED_SOURCE'] === 'stream') {
+      const { startLiveFeed } = await import('./lib/live-feed');
+      safely('launch feed', startLiveFeed);
+    } else {
+      const { startPolledFeed } = await import('./lib/polled-feed');
+      safely('launch feed', startPolledFeed);
+    }
 
     // Which lane a token sits in changes with its curve, not its age, so the
     // curve accounts are polled. Tied to the feed switch because without a feed
