@@ -8318,3 +8318,96 @@ main.wide section {
   min-width: 156px;
   text-align: right;
 }
+
+
+/* ============================================ the new pages, on a phone */
+
+/*
+ * The stacked-row layout above already solved this for six columns. These
+ * pages arrived with a seventh, an action button, a movement caret and a live
+ * feed, and none of them were told about it: the copy button pushed the grid
+ * past the screen and the fills feed pinned its impact and latency to a three
+ * hundred and twenty pixel column, which is most of a phone on its own.
+ *
+ * Same gate as the rest, `pointer: coarse`, so a narrow desktop window keeps
+ * the table it can afford.
+ */
+@media (max-width: 860px) and (pointer: coarse) {
+  /* The action gets its own line under the figures rather than a column. */
+  .board-row:has(.board-copy) {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .board-copy {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-top: 2px;
+  }
+
+  /*
+   * The two boards mean different things by the same columns, and a label that
+   * says Return over a figure that is SOL made is worse than no label at all.
+   * The real-wallet board is the one with a copy button in its rows.
+   */
+  .board-row:has(.board-copy) .board-return::before { content: 'Made'; }
+  .board-row:has(.board-copy) .board-equity::before { content: 'Traded'; }
+  .board-row:has(.board-copy) .board-trades::before { content: 'Exits'; }
+  .board-row:has(.board-copy) .board-pays::before { content: 'Hit rate'; }
+
+  /* Movement sits with the rank it changed, not on a line of its own. */
+  .board-rank {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .board-move { margin-left: 0; }
+
+  .board-live {
+    gap: 8px;
+    font-size: 12px;
+  }
+  .board-search { max-width: none; }
+
+  /*
+   * A fill in two lines, with the impact and the latency kept.
+   *
+   * They were hidden here on the reasoning that a row is glanced at on a phone
+   * and three lines is too many. The reasoning is sound and the conclusion is
+   * wrong for this product: those two numbers are the only thing that makes a
+   * fill on Probatio different from a fill anywhere else, and a feed that drops
+   * them on the device most people will see it on is showing everybody else's
+   * feed. Two lines, in a grid rather than a wrap, so it is exactly two whatever
+   * the token is called.
+   */
+  .spectate-head { padding: 12px 14px; gap: 10px; }
+  .spectate-title { font-size: 12px; }
+
+  .spectate-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 7px 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    align-items: center;
+  }
+  .spectate-side { grid-area: 1 / 1 / 2 / 2; }
+  .spectate-token { grid-area: 1 / 2 / 2 / 4; min-width: 0; }
+  .spectate-name { font-size: 13.5px; }
+  .spectate-size { grid-area: 1 / 4 / 2 / 5; text-align: right; }
+  .spectate-detail {
+    display: block;
+    grid-area: 2 / 1 / 3 / 3;
+    width: auto;
+    text-align: left;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .spectate-who { grid-area: 2 / 3 / 3 / 4; font-size: 12px; text-align: right; }
+  .spectate-ago { grid-area: 2 / 4 / 3 / 5; font-size: 12px; text-align: right; }
+
+  /* The copy panel is a paragraph on a phone, not a table. */
+  .copy-figures { gap: 16px; }
+  .copy-fig b { font-size: 32px; }
+  .copy-legs li { flex-wrap: wrap; gap: 6px 10px; }
+  .copy-panel { padding: 16px; }
+}
