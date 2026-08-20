@@ -50,6 +50,7 @@ export type {
 
 export {
   getBackfill,
+  lastPrices,
   priceRange,
   readCandles,
   recordBackfill,
@@ -174,6 +175,35 @@ export { activeOn, allActivity, recordActivity } from './activity';
 export type { ActivityRow } from './activity';
 
 export { closeOutage, openOutage, openOutages, outagesBetween } from './outages';
+export {
+  copyableSwaps,
+  observedBoard,
+  observedCoverage,
+  observedTraders,
+  pruneObservedSwaps,
+  recordObservedSwaps,
+  recordTraderWalk,
+  walkCandidates,
+  walkedTraderCount,
+} from './observed';
+export type { CopyableSwap, ObservedBoard, ObservedSwap, ObservedTrader } from './observed';
+export { allTimeRows } from './seasons';
+export type { AllTimeRow } from './seasons';
+export {
+  follow,
+  followCounts,
+  followedTrades,
+  followerList,
+  followers,
+  following,
+  followingList,
+  isFollowing,
+  markFollowersSeen,
+  newFollowerCount,
+  traderTrades,
+  unfollow,
+} from './follows';
+export type { FollowCounts, FollowedTrade, FollowEntry } from './follows';
 export type { OutageRow } from './outages';
 
 export { coachReportHistory, latestCoachReport, recordCoachReport } from './coach';
@@ -192,7 +222,10 @@ export {
   isRankedSeason,
   openRankedSeason,
   openPosition,
+  heldMints,
+  isSpent,
   openPositions,
+  startOver,
   recordTrade,
   totalRealizedPnl,
   tradeHistory,

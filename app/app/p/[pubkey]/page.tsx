@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { activeName, shortAddressSafe } from '@/lib/profile-data';
 import { ProfileView } from '@/components/profile-view';
+import { FollowButton } from '@/components/follow-button';
+import { Spectate } from '@/components/spectate';
 
 export async function generateMetadata({
   params,
@@ -45,7 +47,16 @@ export default async function ProfilePage({
       <p className="mono dim" style={{ fontSize: 13, wordBreak: 'break-all' }}>
         {pubkey}
       </p>
+
+      {/* Above the record, because whether to follow somebody is decided by
+          the numbers underneath and the button should be where the eye already
+          is rather than at the bottom of a long page. */}
+      <FollowButton pubkey={pubkey} />
+
       <ProfileView pubkey={pubkey} />
+
+      {/* The record is what they have done. This is what they are doing. */}
+      <Spectate trader={pubkey} mode="trader" />
     </main>
   );
 }

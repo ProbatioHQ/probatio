@@ -5,6 +5,9 @@ import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
 import { pendingTradeMints } from '@/lib/trade-candles';
 import { driftStatus } from '@/lib/drift-watch';
 import { warmStats } from '@/lib/chart-warm';
+import { traderWarmStats } from '@/lib/trader-warm';
+import { houseTraderStats } from '@/lib/house-traders';
+import { markStats } from '@/lib/mark-prices';
 import { priceStreamStatus } from '@/lib/price-stream';
 import { seasonProbe, storageStats, writeProbe } from '@/lib/db-reclaim';
 import { snapshotState } from '@/lib/account-backup';
@@ -30,6 +33,16 @@ export async function GET(request: Request): Promise<Response> {
   return Response.json(
     {
       status: level,
+      /*
+       * Which build is answering.
+       *
+       * Added after several rounds of looking at a page, deciding a fix had not
+       * worked, and rewriting code that was never deployed. A screenshot cannot
+       * say which commit produced it, and neither could this endpoint, so
+       * "still broken" and "not shipped yet" were indistinguishable from the
+       * outside. Railway sets this on every deploy.
+       */
+      build: process.env['RAILWAY_GIT_COMMIT_SHA']?.slice(0, 7) ?? 'local',
       down,
       /*
        * Room on the volume.
@@ -79,6 +92,18 @@ export async function GET(request: Request): Promise<Response> {
        * `budget` says how far through its cycle it is.
        */
       warm: warmStats(),
+      /* The harvester behind the real-trader board. */
+      traders: traderWarmStats(),
+      /* The accounts trading free play through the engine. */
+      house: houseTraderStats(),
+      /*
+       * Prices kept on what people hold.
+       *
+       * `holding` against `priced` is the number that says whether the
+       * leaderboard can move at all: everything held and nothing priced is a
+       * board marked at cost, which reads as every trader flat forever.
+       */
+      marks: markStats(),
       // The push feed behind live prices.
       prices: priceStreamStatus(),
       // Stated whatever the status, because the promise matters most when

@@ -263,3 +263,55 @@ export async function priceRange(
 
   return high === null || low === null ? null : { high, low };
 }
+
+/**
+ * The last price each of these mints was seen at, from candles already stored.
+ *
+ * A leaderboard has to mark open positions at something. Reading the chain for
+ * every held token is the accurate way and it does not finish: fourteen
+ * accounts holding twenty-nine tokens is twenty-nine pool resolutions, each
+ * several round trips, racing a four second budget against every other job on
+ * the box. Twenty-nine of twenty-nine came back unpriced, so every position was
+ * held at cost and every row on the board read exactly what it started with, no
+ * matter how well or badly it had traded.
+ *
+ * This is the same number, already on disk. The curve watcher, the price feed
+ * and the chart warmer all write candles, so the most recent close of the
+ * shortest timeframe is a price the site has already paid for. It costs one
+ * query for the whole board and it cannot time out.
+ *
+ * Deliberately not a substitute for reading the chain when a fill is being
+ * quoted. A fill must never be priced from anything cached, and is not. This is
+ * for marking, where a price a minute old is the difference between a board
+ * that works and a board of ties.
+ */
+export async function lastPrices(
+  db: Client,
+  mints: readonly string[],
+  /** Ignore anything older than this, in unix seconds. */
+  notBefore = 0,
+): Promise<Map<string, string>> {
+  const prices = new Map<string, string>();
+  if (mints.length === 0) return prices;
+
+  for (let i = 0; i < mints.length; i += 200) {
+    const batch = mints.slice(i, i + 200);
+    const holes = batch.map(() => '?').join(', ');
+    const result = await db.execute({
+      sql: `SELECT mint, close, open_time FROM candles
+            WHERE mint IN (${holes}) AND open_time >= ?
+              AND open_time = (
+                SELECT MAX(open_time) FROM candles c2
+                WHERE c2.mint = candles.mint AND c2.timeframe = candles.timeframe
+              )
+            GROUP BY mint
+            HAVING MAX(open_time)`,
+      args: [...batch, notBefore],
+    });
+    for (const row of result.rows) {
+      const close = String(row['close'] ?? '');
+      if (close !== '') prices.set(String(row['mint']), close);
+    }
+  }
+  return prices;
+}

@@ -34,6 +34,8 @@ import { WalletButton } from '@/components/wallet';
 const LINKS: readonly { href: string; label: string; narrow?: string }[] = [
   { href: '/explore', label: 'Explore', narrow: 'Movers' },
   { href: '/feed', label: 'Terminal' },
+  { href: '/watching', label: 'Watching' },
+  { href: '/traders', label: 'Traders' },
   { href: '/season', label: 'Season' },
   { href: '/store', label: 'Store' },
   { href: '/roadmap', label: 'Roadmap' },

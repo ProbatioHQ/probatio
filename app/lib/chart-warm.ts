@@ -5,6 +5,7 @@ import { backfillInFlight } from './chart-backfill';
 import { db } from './db';
 import { hasDedicatedRpc, rpcEndpoint } from './env';
 import { topMints } from './explore';
+import { background } from './background-write';
 import { splicePumpfunHistory } from './pumpfun-history';
 
 /**
@@ -239,7 +240,9 @@ async function warmOne(mint: string): Promise<number> {
   );
   if (!(anchor > 0)) return 0;
 
-  return await splicePumpfunHistory(client, mint, anchor);
+  // Thousands of candles a token, queued with the other background writers so
+  // a warm does not collide with a wallet walk or with retention.
+  return await background(() => splicePumpfunHistory(client, mint, anchor));
 }
 
 async function tick(): Promise<void> {

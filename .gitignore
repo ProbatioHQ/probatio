@@ -34,6 +34,11 @@ id.json
 *.db-shm
 *.db-wal
 *.db-journal
+# The recovery path renames a database it cannot read to `.corrupt`, and those
+# do not match `*.db`. One was staged by an `add -A` before this line existed.
+*.db.corrupt
+*.db.corrupt-shm
+*.db.corrupt-wal
 backups/
 
 # The account snapshot, which is the database in another coat.

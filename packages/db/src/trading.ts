@@ -578,3 +578,102 @@ function toSeasonRow(row: Record<string, unknown>): SeasonRow {
     rulesetHash: String(row['scoring_formula_hash']),
   };
 }
+
+/**
+ * Every token somebody on this site is currently holding.
+ *
+ * The leaderboard has to mark these at something, and the price for them has to
+ * come from somewhere. The curve watcher follows new launches and the price feed
+ * follows whatever a visitor has open on screen, so a token that is only held
+ * and not being looked at had nothing keeping its price current: twenty-three of
+ * about thirty open positions had no recent candle at all, were marked at what
+ * they cost, and every row on the board sat on the balance it started with.
+ *
+ * This is the list that answers "what does the site owe a price for".
+ */
+export async function heldMints(db: Client): Promise<string[]> {
+  const result = await db.execute(
+    `SELECT DISTINCT mint FROM positions
+     WHERE closed_at IS NULL AND token_amount != '0'`,
+  );
+  return result.rows.map((row) => String(row['mint']));
+}
+
+/**
+ * Whether an account is out of road.
+ *
+ * Broke is not a zero balance. It is a balance too small to open anything with,
+ * while holding nothing worth selling, which is a state the site had no answer
+ * for at all: the store sells practice balance and buying it counts against the
+ * return by design, so the only way back was to pay and lose your rank for it.
+ */
+export async function isSpent(
+  db: Client,
+  accountId: number,
+  floor: bigint,
+): Promise<boolean> {
+  const account = await db.execute({
+    sql: 'SELECT sol_balance FROM accounts WHERE id = ?',
+    args: [accountId],
+  });
+  const row = account.rows[0];
+  if (!row) return false;
+  if (BigInt(String(row['sol_balance'])) >= floor) return false;
+
+  const open = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM positions
+          WHERE account_id = ? AND closed_at IS NULL AND token_amount != '0'`,
+    args: [accountId],
+  });
+  return Number(open.rows[0]?.['n'] ?? 0) === 0;
+}
+
+/**
+ * Start a free-play account again, at the season's opening balance.
+ *
+ * A new generation rather than a reset of the old row, which is what the schema
+ * was built for and what nothing ever did: the column existed, the comment on
+ * FREE_PLAY_ORDINAL described it, and no code path incremented it. A trader who
+ * ran out simply stopped, permanently, holding whatever was left.
+ *
+ * Nothing is deleted or edited. The old account keeps its trades, its positions
+ * and its sealed record exactly as they were, because a record that can be
+ * wiped by going broke is not a record. The new generation is a new account
+ * beside it, and the board shows both.
+ *
+ * Ranked seasons are refused outright. Somebody who paid to enter and blew up
+ * does not get another ten SOL to try again on, and a function that could do
+ * that by being called with the wrong id has no business existing.
+ */
+export async function startOver(
+  db: Client,
+  seasonId: number,
+  userPubkey: string,
+  now: number,
+): Promise<AccountRow> {
+  const season = await db.execute({
+    sql: 'SELECT * FROM seasons WHERE id = ?',
+    args: [seasonId],
+  });
+  const seasonRow = season.rows[0];
+  if (!seasonRow) throw new Error(`no season ${seasonId}`);
+  if (Number(seasonRow['ordinal']) !== FREE_PLAY_ORDINAL) {
+    throw new Error('only free play can be started over');
+  }
+
+  const previous = await db.execute({
+    sql: `SELECT generation FROM accounts WHERE season_id = ? AND user_pubkey = ?
+          ORDER BY generation DESC LIMIT 1`,
+    args: [seasonId, userPubkey],
+  });
+  const generation = Number(previous.rows[0]?.['generation'] ?? -1) + 1;
+
+  await db.execute({
+    sql: `INSERT INTO accounts (season_id, user_pubkey, generation, sol_balance, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT (season_id, user_pubkey, generation) DO NOTHING`,
+    args: [seasonId, userPubkey, generation, String(seasonRow['starting_balance']), now, now],
+  });
+
+  return ensureAccount(db, seasonId, userPubkey, now);
+}

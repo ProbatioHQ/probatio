@@ -528,6 +528,46 @@ async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
  * is sixty, they run six at a time, and each one is cached for five minutes, so
  * turning back to a page already read costs nothing.
  */
+/**
+ * The mints that are actually moving, largest absolute change first.
+ *
+ * `topMints` is the market cap ranking, which is where the liquidity is and
+ * also where almost nothing happens: a token in the top few hundred moves a
+ * percent or two an hour. Anything trading against that list alone comes out
+ * flat, whatever it does. This is the other list, and between them they are
+ * the difference between a board of traders and a board of ties.
+ */
+export async function movingMints(limit: number): Promise<string[]> {
+  const rows = await ranking();
+  return rows
+    .filter((row) => row.changeH1 !== null && Math.abs(row.changeH1) >= 3)
+    .map((row) => row.mint)
+    .filter((mint) => mint !== '')
+    .slice(0, limit);
+}
+
+/**
+ * The ones going up, strongest first.
+ *
+ * `movingMints` takes absolute change, which is right for a board of what is
+ * happening and wrong as a shopping list: half of it is falling. Buying into a
+ * fall and paying fees both ways is a losing strategy, and it produced exactly
+ * that, thirteen of fourteen accounts down and two of them halved.
+ *
+ * Direction is not a prediction. A token up on the hour is one somebody else is
+ * buying, and being on the right side of that for the next few minutes is the
+ * whole of what a short-term trader does.
+ */
+export async function risingMints(limit: number): Promise<string[]> {
+  const rows = await ranking();
+  return rows
+    .filter((row) => row.changeH1 !== null && row.changeH1 >= 4)
+    .sort((a, b) => (b.changeH1 ?? 0) - (a.changeH1 ?? 0))
+    .map((row) => row.mint)
+    .filter((mint) => mint !== '')
+    .slice(0, limit);
+}
+
 export async function movers(page = 1, perPage = 60, maxPages = 3): Promise<Board> {
   const ranked = await ranking();
   const pages = Math.max(1, Math.min(maxPages, Math.ceil(ranked.length / perPage)));

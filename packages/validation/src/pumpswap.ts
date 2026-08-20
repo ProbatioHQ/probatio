@@ -28,6 +28,15 @@ import type { Sample, SkipReason, ValidationReport } from './replay';
 /** One swap on one pool, with the market as it stood either side of it. */
 export interface PoolSwap {
   readonly signature: string;
+  /**
+   * Who made the trade: the fee payer, which on a swap is the trader.
+   *
+   * Was discarded until now, and it was the one field standing between a walk
+   * this code already does and knowing which real wallets are any good. It
+   * costs nothing to keep: the account keys are already decoded to read the
+   * balances, and the payer is the first of them by definition.
+   */
+  readonly trader: string | null;
   readonly slot: number;
   /** Unix seconds, from the block. Null when the node did not carry it. */
   readonly blockTime: number | null;
@@ -209,6 +218,9 @@ export function asPoolSwap(
 
   return {
     signature: transaction.signature,
+    // The fee payer is always the first account key. Null rather than a guess
+    // if a node hands back a transaction without them.
+    trader: transaction.accountKeys[0] ?? null,
     slot: transaction.slot,
     blockTime: transaction.blockTime,
     isBuy,

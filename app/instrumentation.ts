@@ -82,6 +82,22 @@ export async function register(): Promise<void> {
   const { startChartWarm } = await import('./lib/chart-warm');
   safely('chart warm', startChartWarm);
 
+  // Fills the real-trader board by walking pools on a schedule. Without it that
+  // board waits for somebody to open exactly the right token and stays empty.
+  const { startTraderWarm } = await import('./lib/trader-warm');
+  safely('trader warm', startTraderWarm);
+
+  // Keeps a price on every token somebody holds. Without it a position nobody
+  // is looking at has no recent price, gets marked at cost, and the whole
+  // leaderboard sits on its starting balance whatever anybody does.
+  const { startMarkPrices } = await import('./lib/mark-prices');
+  safely('mark prices', startMarkPrices);
+
+  // House accounts trading free play through the real engine, so a fresh
+  // deploy shows the simulator working rather than an empty board.
+  const { startHouseTraders } = await import('./lib/house-traders');
+  safely('house traders', startHouseTraders);
+
   // Measures the engine against real fills and takes farmable tokens off the
   // board. Tied to the feed switch only in the sense that both need the chain;
   // it is the one check that runs without anybody deciding to look.

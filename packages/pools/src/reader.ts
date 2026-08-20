@@ -1,6 +1,12 @@
 import type { FeeSchedule, PoolState } from '@probatio/sim';
 import { LayoutError } from './layout';
-import { PUMP_PROGRAM_ID, bondingCurveAddress, decodeBondingCurve } from './pumpfun';
+import {
+  BONDING_CURVE_MIN_BYTES,
+  PUMP_PROGRAM_ID,
+  bondingCurveAddress,
+  decodeBondingCurve,
+  type BondingCurveAccount,
+} from './pumpfun';
 import { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 import {
   POOL_OFFSETS,
@@ -135,10 +141,29 @@ export class PoolReader {
       throw new LayoutError(`mint ${mint} does not exist`);
     }
 
-    const curve = decodeBondingCurve(curveAccount.data);
+    /*
+     * A curve account too small to decode is a curve that is over.
+     *
+     * pump.fun shrinks the account once a token has graduated, and it comes
+     * back as forty-nine bytes: still owned by the program, no longer holding
+     * reserves. Decoding threw on it, which took out every caller in turn. The
+     * chart warmer stopped mid-run, and the accounts trading through the engine
+     * failed on any token that had graduated since it was picked, which on
+     * pump.fun is most of the interesting ones.
+     *
+     * There is nothing ambiguous about the state it describes: no curve to
+     * quote, so the successor pool is where trading is, exactly as for a curve
+     * that reports itself complete.
+     */
+    let curve: BondingCurveAccount | null = null;
+    try {
+      curve = decodeBondingCurve(curveAccount.data);
+    } catch (error) {
+      if (curveAccount.data.length >= BONDING_CURVE_MIN_BYTES) throw error;
+    }
     const tokenDecimals = decodeMintDecimals(mintAccount.data);
 
-    if (!curve.complete) {
+    if (curve && !curve.complete) {
       return {
         mint,
         venue: { kind: 'pumpfun-curve', curveAddress },

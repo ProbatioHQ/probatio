@@ -31,6 +31,8 @@ export type { FeeSchedule, PoolSource, PoolState, Side } from './types';
 export { QuoteError, applyQuote, quoteBuy, quoteSell } from './engine';
 export type { Quote, QuoteErrorCode } from './engine';
 
+export { backtestCopy } from './copy';
+export type { CopyInput, CopyLeg, CopyOptions, CopyResult } from './copy';
 export { DEFAULT_RULES, simulateFill } from './execution';
 export type {
   ExecutionRules,

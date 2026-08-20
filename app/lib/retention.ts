@@ -1,5 +1,6 @@
 import 'server-only';
 import { runRetention } from '@probatio/db';
+import { background } from './background-write';
 import { snapshotAccounts } from './account-backup';
 import { db } from './db';
 import { reclaimIfTight } from './db-reclaim';
@@ -52,7 +53,11 @@ async function sweep(): Promise<void> {
   await reclaimIfTight().catch((error) => console.error('[retention] reclaim failed', error));
 
   const client = await db();
-  const result = await runRetention(client, Date.now());
+  // Queued with the other background writers. Retention is a long run of
+  // deletes and it lost whole passes to a busy file the moment the wallet
+  // walker went parallel: it is the least urgent writer here and the one that
+  // should wait, rather than the one that should fail.
+  const result = await background(() => runRetention(client, Date.now()));
   if (result.candlesDeleted > 0 || result.poolSnapshotsDeleted > 0 || result.launchesDeleted > 0) {
     console.log(
       `[retention] dropped ${result.candlesDeleted} candles, ` +

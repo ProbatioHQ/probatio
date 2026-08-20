@@ -7,7 +7,13 @@ import {
   type Observation,
   type Timeframe,
 } from '@probatio/candles';
-import { getBackfill, recordBackfill, writeCandles, type Client } from '@probatio/db';
+import {
+  getBackfill,
+  recordBackfill,
+  recordObservedSwaps,
+  writeCandles,
+  type Client,
+} from '@probatio/db';
 import { PoolReader, RpcClient, bondingCurveAddress, pumpSwapReserveOffset } from '@probatio/pools';
 import { collectPoolSwaps, type PoolSwap } from '@probatio/validation';
 import { db } from './db';
@@ -160,6 +166,14 @@ interface PoolBackfill {
   count: number;
   oldest: number | null;
   newest: number | null;
+  /**
+   * Real swaps recorded against their traders.
+   *
+   * Counted separately from `count`, which is candle observations. A harvest
+   * runs with candles switched off, so it would otherwise be told nothing
+   * happened on every successful walk.
+   */
+  recorded: number;
 }
 
 /**
@@ -170,19 +184,24 @@ interface PoolBackfill {
  * fills in behind it. Candle writes merge, so a later page's older buckets sit
  * beside the earlier page's recent ones without either overwriting the other.
  */
-async function poolBackfill(
+export async function poolBackfill(
   rpc: RpcClient,
   reader: PoolReader,
   mint: string,
   client: Client,
+  options?: { readonly maxTransactions?: number; readonly candles?: boolean },
 ): Promise<PoolBackfill> {
   const pools = await reader.findPumpSwapPools(mint);
   const pool = await reader.deepestPool(pools);
-  if (!pool) return { count: 0, oldest: null, newest: null };
+  if (!pool) return { count: 0, recorded: 0, oldest: null, newest: null };
 
   const config = await reader.globalConfig();
   const [account] = await rpc.getAccounts([pool.address]);
   const offset = account ? pumpSwapReserveOffset(account.data) : 0n;
+
+  // A harvest wants who traded and nothing else, so it walks shallower and
+  // skips the candle writing entirely.
+  const candles = options?.candles !== false;
 
   const toObservations = (swaps: readonly PoolSwap[]): Observation[] => {
     const out: Observation[] = [];
@@ -202,6 +221,7 @@ async function poolBackfill(
   };
 
   let count = 0;
+  let recorded = 0;
   let oldest: number | null = null;
   let newest: number | null = null;
 
@@ -210,9 +230,47 @@ async function poolBackfill(
     pool.address,
     pool.pool,
     {
-      maxTransactions: POOL_MAX_TRANSACTIONS,
+      maxTransactions: options?.maxTransactions ?? POOL_MAX_TRANSACTIONS,
       concurrency: WALK_CONCURRENCY,
       onBatch: async (pageSwaps) => {
+        /*
+         * Who traded, kept on the way past.
+         *
+         * This walk is happening anyway to draw the chart, and every swap in it
+         * carries the wallet that made it. Recording them is what turns a page
+         * of candles into a board of real traders without a single extra RPC
+         * call or a data vendor.
+         *
+         * Never allowed to break the chart. A failure here costs a row on a
+         * board nobody is waiting for; throwing would cost the history somebody
+         * is watching load.
+         */
+        try {
+          recorded += await recordObservedSwaps(
+            client,
+            pageSwaps
+              .filter((swap): swap is typeof swap & { trader: string } => swap.trader !== null)
+              .map((swap) => ({
+                signature: swap.signature,
+                trader: swap.trader,
+                mint,
+                isBuy: swap.isBuy,
+                solAmount: (swap.isBuy ? swap.grossIn : swap.netOut).toString(),
+                tokenAmount: swap.tokens.toString(),
+                slot: swap.slot,
+                blockTime: swap.blockTime,
+                // The pool their own order left behind, which is the price
+                // anybody copying them would actually have arrived at.
+                solAfter: swap.solAfter.toString(),
+                tokenAfter: swap.tokenAfter.toString(),
+              })),
+            Date.now(),
+          );
+        } catch (error) {
+          console.warn('[chart] could not record observed swaps for', mint, error);
+        }
+
+        if (!candles) return;
         const observations = toObservations(pageSwaps);
         if (observations.length === 0) return;
         count += observations.length;
@@ -226,7 +284,7 @@ async function poolBackfill(
     config?.protocolFeeRecipients ?? [],
   );
 
-  return { count, oldest, newest };
+  return { count, recorded, oldest, newest };
 }
 
 /**
@@ -338,7 +396,7 @@ export function backfillChart(mint: string): void {
        * the refresh above, which is what the coarse timeframes actually need.
        */
       let curve: readonly Observation[] = [];
-      let pool: PoolBackfill = { count: 0, oldest: null, newest: null };
+      let pool: PoolBackfill = { count: 0, recorded: 0, oldest: null, newest: null };
       let truncated = false;
 
       if (!walked) {

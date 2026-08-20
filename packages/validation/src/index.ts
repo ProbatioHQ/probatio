@@ -17,5 +17,8 @@ export { formatReport } from './format';
 export { asPoolSwap, collectPoolSwaps, joins, replayPool, swapCount } from './pumpswap';
 export type { CollectPoolOptions, PoolSwap } from './pumpswap';
 
+export { collectWalletSwaps, deriveWalletSwap } from './wallet';
+export type { WalletSwap, WalletWalkOptions } from './wallet';
+
 export { DEFAULT_THRESHOLDS, assessDrift, assessToken } from './drift';
 export type { DriftAssessment, DriftSeverity, DriftThresholds, TokenDrift } from './drift';

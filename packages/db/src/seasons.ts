@@ -269,3 +269,105 @@ export async function leaderboardRows(
     };
   });
 }
+
+/**
+ * Every account that has ever traded here, across every season.
+ *
+ * `leaderboardRows` is scoped to one season, which is right for a season board
+ * and wrong for the question "who trades here". Production had fifteen traders
+ * and ninety-three fills while the board showed a single row, because everybody
+ * else was on free play and only one person had paid a ranked entry. A site
+ * whose front page is a leaderboard should not look abandoned because of how a
+ * WHERE clause is scoped.
+ *
+ * Accounts with no fills are left out. An account is created on first sign-in,
+ * so including them would fill the board with people who have never traded,
+ * ranked identically at zero.
+ *
+ * `purchasedBalance` is what makes the returns comparable. Buying practice SOL
+ * in the store adds to `sol_balance` and never touches `starting_balance`, so a
+ * return computed the obvious way would put anybody who bought balance at the
+ * top of the board with a number they did not earn. The credit is recomputed
+ * from the price actually paid rather than stored, which is the same thing the
+ * settlement does, so it cannot drift from what was really bought.
+ */
+export interface AllTimeRow extends LeaderboardRow {
+  readonly seasonId: number;
+  readonly seasonOrdinal: number;
+  readonly seasonName: string;
+  /** Practice SOL bought in the store, in lamports. Belongs in the denominator. */
+  readonly purchasedBalance: string;
+}
+
+export async function allTimeRows(db: Client): Promise<AllTimeRow[]> {
+  const accounts = await db.execute(
+    `SELECT a.id, a.user_pubkey, a.sol_balance, a.season_id,
+            s.starting_balance, s.ordinal, s.name,
+            COALESCE(e.entered_at, a.created_at) AS entered_at
+     FROM accounts a
+     JOIN seasons s ON s.id = a.season_id
+     LEFT JOIN entries e ON e.season_id = a.season_id AND e.user_pubkey = a.user_pubkey`,
+  );
+
+  const positions = await db.execute(
+    `SELECT p.account_id, p.mint, p.token_amount, p.cost_basis, p.realized_pnl
+     FROM positions p`,
+  );
+
+  const counts = await db.execute('SELECT account_id, COUNT(*) AS n FROM trades GROUP BY account_id');
+
+  // What each trader paid for practice SOL, per season, still as lamports of
+  // real SOL. The caller converts it to a credit, because the tier table lives
+  // in the payments package and this one does not depend on it.
+  const purchases = await db.execute(
+    `SELECT user_pubkey, season_id, amount
+     FROM payments
+     WHERE purpose = 'practice_sol' AND status = 'settled'`,
+  );
+
+  const held = new Map<number, LeaderboardPosition[]>();
+  const realized = new Map<number, bigint>();
+  for (const row of positions.rows) {
+    const accountId = Number(row['account_id']);
+    realized.set(accountId, (realized.get(accountId) ?? 0n) + BigInt(String(row['realized_pnl'])));
+    if (BigInt(String(row['token_amount'])) === 0n) continue;
+    const list = held.get(accountId) ?? [];
+    list.push({
+      mint: String(row['mint']),
+      tokenAmount: String(row['token_amount']),
+      costBasis: String(row['cost_basis']),
+    });
+    held.set(accountId, list);
+  }
+
+  const tradeCounts = new Map<number, number>();
+  for (const row of counts.rows) tradeCounts.set(Number(row['account_id']), Number(row['n']));
+
+  const paid = new Map<string, bigint>();
+  for (const row of purchases.rows) {
+    const key = `${String(row['user_pubkey'])}:${Number(row['season_id'])}`;
+    paid.set(key, (paid.get(key) ?? 0n) + BigInt(String(row['amount'])));
+  }
+
+  return accounts.rows
+    .map((row) => {
+      const accountId = Number(row['id']);
+      const seasonId = Number(row['season_id']);
+      const pubkey = String(row['user_pubkey']);
+      return {
+        accountId,
+        userPubkey: pubkey,
+        seasonId,
+        seasonOrdinal: Number(row['ordinal']),
+        seasonName: String(row['name']),
+        startingBalance: String(row['starting_balance']),
+        solBalance: String(row['sol_balance']),
+        realizedPnl: (realized.get(accountId) ?? 0n).toString(),
+        tradeCount: tradeCounts.get(accountId) ?? 0,
+        enteredAt: Number(row['entered_at']),
+        positions: held.get(accountId) ?? [],
+        purchasedBalance: (paid.get(`${pubkey}:${seasonId}`) ?? 0n).toString(),
+      };
+    })
+    .filter((row) => row.tradeCount > 0);
+}

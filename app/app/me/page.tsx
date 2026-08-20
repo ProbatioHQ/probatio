@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AccountOverview } from '@/components/account-overview';
+import { NewFollowers } from '@/components/new-followers';
 import { Coach } from '@/components/coach';
 import { NameClaim } from '@/components/name-claim';
 import { Positions } from '@/components/positions';
@@ -42,6 +43,10 @@ export default async function AccountPage() {
           anyone.
         </p>
       </div>
+
+      {/* Above the account, because an audience arriving is news and a balance
+          is not. Reading the list is what clears it. */}
+      <NewFollowers pubkey={user.pubkey} />
 
       <AccountOverview />
       <Positions refreshKey={0} />

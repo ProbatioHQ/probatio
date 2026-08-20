@@ -1,4 +1,5 @@
 import type { Client } from '@libsql/client';
+import { pruneObservedSwaps } from './observed';
 
 /**
  * Keeping the database from growing without bound.
@@ -152,6 +153,7 @@ export interface RetentionResult {
   readonly candlesDeleted: number;
   readonly poolSnapshotsDeleted: number;
   readonly launchesDeleted: number;
+  readonly observedSwapsDeleted: number;
 }
 
 /**
@@ -365,6 +367,9 @@ export async function runRetention(db: Client, now: number): Promise<RetentionRe
     candlesDeleted,
     poolSnapshotsDeleted: await attempt('pool snapshots', () => prunePoolSnapshots(db, now)),
     launchesDeleted: await attempt('launches', () => pruneLaunches(db, now)),
+    // Grows with every pool walked, so it is the next thing that would fill the
+    // volume if nothing swept it.
+    observedSwapsDeleted: await attempt('observed swaps', () => pruneObservedSwaps(db, now)),
   };
 }
 

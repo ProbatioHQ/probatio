@@ -469,6 +469,7 @@ export class RpcClient {
       slot: result.slot,
       blockTime: result.blockTime ?? null,
       err: result.meta?.err ?? null,
+      fee: BigInt(result.meta?.fee ?? 0),
       accountKeys: allAccountKeys(result),
       preBalances: (result.meta?.preBalances ?? []).map((value) => BigInt(value)),
       postBalances: (result.meta?.postBalances ?? []).map((value) => BigInt(value)),
@@ -512,6 +513,7 @@ function tokenBalances(raw: RawTokenBalance[] | undefined): TokenBalanceChange[]
     accountIndex: entry.accountIndex,
     mint: entry.mint,
     amount: BigInt(entry.uiTokenAmount?.amount ?? '0'),
+    owner: entry.owner ?? null,
   }));
 }
 
@@ -528,6 +530,15 @@ export interface TokenBalanceChange {
   readonly accountIndex: number;
   readonly mint: string;
   readonly amount: bigint;
+  /**
+   * Whose token account this is.
+   *
+   * The wallet, for a trader's own account; the pool's authority, for a vault.
+   * It is what lets a transaction be read from the outside without knowing
+   * which venue it went through: the side that moved opposite to the trader is
+   * the pool, and its two vaults share this owner.
+   */
+  readonly owner?: string | null;
 }
 
 export interface ConfirmedTransaction {
@@ -535,6 +546,13 @@ export interface ConfirmedTransaction {
   readonly slot: number;
   readonly blockTime: number | null;
   readonly err: unknown;
+  /**
+   * What the network charged to run this, in lamports.
+   *
+   * Not part of any trade, and a wallet's lamport change includes it, so
+   * reading a trade's size out of balances means taking this back off.
+   */
+  readonly fee: bigint;
   /** In the transaction's own order, which is what the balance arrays index. */
   readonly accountKeys: readonly string[];
   readonly preBalances: readonly bigint[];
@@ -547,6 +565,7 @@ export interface ConfirmedTransaction {
 interface RawTokenBalance {
   accountIndex: number;
   mint: string;
+  owner?: string;
   uiTokenAmount?: { amount?: string };
 }
 
@@ -556,6 +575,7 @@ interface RawFullTransaction {
   transaction?: { message?: { accountKeys?: string[] } };
   meta?: {
     err?: unknown;
+    fee?: number;
     preBalances?: number[];
     postBalances?: number[];
     preTokenBalances?: RawTokenBalance[];

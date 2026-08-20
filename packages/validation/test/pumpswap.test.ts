@@ -45,6 +45,7 @@ function transaction(b: Balances): ConfirmedTransaction {
     slot: 10,
     blockTime: 1,
     err: null,
+    fee: 0n,
     accountKeys: KEYS,
     preBalances: [],
     postBalances: [],
@@ -221,7 +222,7 @@ describe('counting swaps in a transaction', () => {
 
 describe('whether one swap follows another', () => {
   const base = {
-    signature: 's', slot: 1, blockTime: 1, isBuy: true,
+    signature: 's', trader: null, slot: 1, blockTime: 1, isBuy: true,
     grossIn: 0n, netOut: 0n, tokens: 0n,
   };
 

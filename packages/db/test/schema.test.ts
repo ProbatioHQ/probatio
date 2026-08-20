@@ -133,6 +133,11 @@ describe('migrations', () => {
       '030_image_retry_backoff.sql',
       '031_token_socials.sql',
       '032_reread_for_socials.sql',
+      '033_follows.sql',
+      '034_followers_seen.sql',
+      '035_observed_swaps.sql',
+      '036_observed_reserves.sql',
+      '037_trader_walks.sql',
     ]);
   });
 
