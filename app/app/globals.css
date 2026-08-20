@@ -8405,6 +8405,67 @@ main.wide section {
   .spectate-who { grid-area: 2 / 3 / 3 / 4; font-size: 12px; text-align: right; }
   .spectate-ago { grid-area: 2 / 4 / 3 / 5; font-size: 12px; text-align: right; }
 
+  /*
+   * The lists scroll inside themselves rather than making the page enormous.
+   *
+   * Two hundred wallets stacked as cards is a page somebody has to flick
+   * through for a minute to reach the footer, and the second board on /traders
+   * is unreachable without doing it. Each list gets a height and its own
+   * scroll, so the page stays the length of the page and the list stays the
+   * length of the list.
+   *
+   * The shadows at the top and bottom edges are the affordance, and they are
+   * doing real work: the two gradients that scroll with the content mask the
+   * two that do not, so a shadow only appears on an edge there is genuinely
+   * more content beyond. Nothing to hook up, nothing to get out of sync.
+   *
+   * `overscroll-behavior` is deliberately left alone. Containing it would trap
+   * a thumb at the end of the list; chaining to the page is what a reader
+   * expects when they reach the bottom.
+   */
+  .board,
+  .spectate-list {
+    max-height: 66vh;
+    overflow-y: auto;
+  }
+
+  /*
+   * The masking gradients have to be painted in the colour that is actually
+   * behind the list, or they are a pale stripe rather than a mask. The board
+   * sits on the page, the fills sit inside a sunken panel, so the two lists do
+   * not get the same one.
+   */
+  .board {
+    background:
+      linear-gradient(var(--ink) 30%, rgba(7, 9, 11, 0)) top / 100% 26px no-repeat local,
+      linear-gradient(rgba(7, 9, 11, 0), var(--ink) 70%) bottom / 100% 26px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)) top / 100% 14px
+        no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)) bottom /
+        100% 14px no-repeat scroll;
+  }
+
+  .spectate-list {
+    background:
+      linear-gradient(var(--ink-sunken) 30%, rgba(5, 6, 7, 0)) top / 100% 26px no-repeat local,
+      linear-gradient(rgba(5, 6, 7, 0), var(--ink-sunken) 70%) bottom / 100% 26px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)) top / 100% 14px
+        no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)) bottom /
+        100% 14px no-repeat scroll;
+  }
+
+  /* Thin, and only while it is being used. */
+  .board::-webkit-scrollbar,
+  .spectate-list::-webkit-scrollbar {
+    width: 3px;
+  }
+  .board::-webkit-scrollbar-thumb,
+  .spectate-list::-webkit-scrollbar-thumb {
+    background: var(--line-bright);
+    border-radius: 3px;
+  }
+
   /* The copy panel is a paragraph on a phone, not a table. */
   .copy-figures { gap: 16px; }
   .copy-fig b { font-size: 32px; }
