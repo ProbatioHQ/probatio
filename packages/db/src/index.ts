@@ -174,6 +174,27 @@ export type { ClaimOutcome, DisplayName } from './names';
 export { activeOn, allActivity, recordActivity } from './activity';
 export type { ActivityRow } from './activity';
 
+export { claimUpdate, pruneUpdates } from './telegram';
+export {
+  CODE_TTL_MS,
+  claimLinkCode,
+  issueLinkCode,
+  linkedTelegram,
+  linkedWallet,
+  pruneLinkCodes,
+  unlinkTelegram,
+} from './telegram-links';
+export type { ClaimOutcome as TelegramClaimOutcome, LinkCode } from './telegram-links';
+export {
+  MAX_WATCHES_PER_CHAT,
+  advanceWatch,
+  dropChat,
+  pendingFills,
+  unwatchTrader,
+  watchTrader,
+  watchesFor,
+} from './telegram-watch';
+export type { WatchRow, WatchResult, WatchedFill } from './telegram-watch';
 export { closeOutage, openOutage, openOutages, outagesBetween } from './outages';
 export {
   copyableSwaps,

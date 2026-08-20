@@ -1,4 +1,5 @@
 import type { Client } from '@libsql/client';
+import { pruneUpdates } from './telegram';
 import { pruneObservedSwaps } from './observed';
 
 /**
@@ -154,6 +155,7 @@ export interface RetentionResult {
   readonly poolSnapshotsDeleted: number;
   readonly launchesDeleted: number;
   readonly observedSwapsDeleted: number;
+  readonly telegramUpdatesDeleted: number;
 }
 
 /**
@@ -370,6 +372,9 @@ export async function runRetention(db: Client, now: number): Promise<RetentionRe
     // Grows with every pool walked, so it is the next thing that would fill the
     // volume if nothing swept it.
     observedSwapsDeleted: await attempt('observed swaps', () => pruneObservedSwaps(db, now)),
+    // The Telegram dedupe table grows with every update the bot is sent and is
+    // only useful for as long as an update can still be retried.
+    telegramUpdatesDeleted: await attempt('telegram updates', () => pruneUpdates(db, now)),
   };
 }
 

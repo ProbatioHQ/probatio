@@ -138,6 +138,9 @@ describe('migrations', () => {
       '035_observed_swaps.sql',
       '036_observed_reserves.sql',
       '037_trader_walks.sql',
+      '038_telegram_updates.sql',
+      '039_telegram_links.sql',
+      '040_telegram_watch.sql',
     ]);
   });
 

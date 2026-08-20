@@ -2,7 +2,7 @@
   "name": "probatio",
   "version": "0.0.0",
   "private": true,
-  "description": "Probatio — a proving ground for traders. Honest simulation, unfakeable records.",
+  "description": "Probatio \u2014 a proving ground for traders. Honest simulation, unfakeable records.",
   "license": "AGPL-3.0",
   "workspaces": [
     "packages/*",
@@ -11,7 +11,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsx scripts/typecheck.mts"
+    "typecheck": "tsx scripts/typecheck.mts",
+    "bot": "tsx --tsconfig tsconfig.scripts.json scripts/telegram-bot.mts",
+    "bot:setup": "tsx --tsconfig tsconfig.scripts.json scripts/telegram-setup.mts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

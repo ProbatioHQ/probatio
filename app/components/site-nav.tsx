@@ -38,6 +38,7 @@ const LINKS: readonly { href: string; label: string; narrow?: string }[] = [
   { href: '/traders', label: 'Traders' },
   { href: '/season', label: 'Season' },
   { href: '/store', label: 'Store' },
+  { href: '/telegram', label: 'Telegram' },
   { href: '/roadmap', label: 'Roadmap' },
   { href: '/docs', label: 'How it works' },
 ];

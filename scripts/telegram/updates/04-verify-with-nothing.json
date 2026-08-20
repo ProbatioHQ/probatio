@@ -1,0 +1,16 @@
+{
+  "update_id": 9004,
+  "message": {
+    "message_id": 500,
+    "date": 1787000000,
+    "from": {
+      "id": 42,
+      "first_name": "Someone"
+    },
+    "chat": {
+      "id": -1001,
+      "type": "group"
+    },
+    "text": "/verify"
+  }
+}

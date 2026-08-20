@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+
+  // Only for scripts run through tsx, never for a build.
+  //
+  // Everything under app/lib begins with `import 'server-only'`, which is Next's
+  // build-time guard against server code reaching a client bundle. It has no
+  // runtime behaviour and no entry point outside Next's bundler, so a plain
+  // script importing any of it fails to resolve before it runs a line. The unit
+  // tests already stand it in with a Vite alias; this is the same stand-in for
+  // tsx, so a script can drive the real modules rather than a copy of them.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "server-only": ["./test-support/server-only.ts"],
+      "@/*": ["./app/*"]
+    }
+  }
+}

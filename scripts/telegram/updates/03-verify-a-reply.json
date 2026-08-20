@@ -1,0 +1,29 @@
+{
+  "update_id": 9003,
+  "message": {
+    "message_id": 500,
+    "date": 1787000000,
+    "from": {
+      "id": 42,
+      "first_name": "Someone"
+    },
+    "chat": {
+      "id": -1001,
+      "type": "group"
+    },
+    "text": "/verify",
+    "reply_to_message": {
+      "message_id": 499,
+      "date": 1787000000,
+      "from": {
+        "id": 77,
+        "first_name": "Them"
+      },
+      "chat": {
+        "id": -1001,
+        "type": "group"
+      },
+      "text": "up 40x today on 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU trust me"
+    }
+  }
+}

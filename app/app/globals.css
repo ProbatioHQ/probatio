@@ -1286,6 +1286,144 @@ button,
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
 }
 
+/* ============================================================ telegram */
+
+/*
+ * Three rows, hairline separated, no boxes.
+ *
+ * They are choices rather than cards: what a reader needs is to tell them
+ * apart, and a rule between them does that with less furniture than a border
+ * around each one.
+ */
+.tg-list {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.tg-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 18px 2px;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+
+a.tg-item:hover {
+  background: var(--ink-raised);
+}
+
+/* The heading that follows draws its own rule, and two hairlines a few pixels
+   apart read as a mistake rather than as a division. */
+.tg-item:last-child {
+  border-bottom: 0;
+}
+
+.tg-name {
+  grid-column: 1;
+  font-weight: 650;
+  font-size: 17px;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tg-handle {
+  font-family: var(--font-geist-mono, ui-monospace, Menlo, monospace);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+}
+
+.tg-what {
+  grid-column: 1;
+  font-size: 15px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* The arrow is drawn rather than typed, so it never falls back to a glyph the
+   font does not have and never inherits a text colour it should not. */
+.tg-go {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 9px;
+  height: 9px;
+  border-top: 1.5px solid var(--text-faint);
+  border-right: 1.5px solid var(--text-faint);
+  transform: rotate(45deg);
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+
+a.tg-item:hover .tg-go {
+  border-color: var(--accent);
+  transform: rotate(45deg) translate(2px, -2px);
+}
+
+.tg-soon .tg-name,
+.tg-soon .tg-what {
+  color: var(--text-faint);
+}
+
+.tg-badge {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/*
+ * On a phone the description gets the whole width.
+ *
+ * The arrow and the badge sat in a column of their own spanning both rows,
+ * which is right on a wide screen and wrong on a narrow one: it took forty
+ * pixels off a measure that only had three hundred and fifty to begin with, and
+ * pushed a sentence that fits in three lines onto four or five. They move up
+ * beside the name, which is the row they describe anyway, and the sentence runs
+ * the full width underneath.
+ */
+@media (max-width: 560px) {
+  .tg-item {
+    gap: 6px 12px;
+    padding: 16px 2px;
+  }
+
+  .tg-go,
+  .tg-badge {
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .tg-what {
+    grid-column: 1 / -1;
+    font-size: 14.5px;
+  }
+
+  .tg-name {
+    font-size: 16.5px;
+    /* The handle drops under the name rather than squeezing it, since a long
+       bot username plus a name is wider than a phone. */
+    gap: 2px 10px;
+  }
+
+  .tg-handle {
+    font-size: 12.5px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page,
   .page.leaving,

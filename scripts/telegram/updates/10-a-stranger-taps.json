@@ -1,0 +1,20 @@
+{
+  "update_id": 9010,
+  "callback_query": {
+    "id": "cb1",
+    "from": {
+      "id": 99,
+      "first_name": "Stranger"
+    },
+    "data": "b:1:16:DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "message": {
+      "message_id": 501,
+      "date": 1787000000,
+      "chat": {
+        "id": -1001,
+        "type": "group"
+      },
+      "text": "a card"
+    }
+  }
+}

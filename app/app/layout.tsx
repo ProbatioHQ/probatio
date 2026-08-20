@@ -137,7 +137,8 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             <span className="footer-say">Paper money. Real prices. Records kept honestly.</span>
             <span>
               <a href="/docs">How it works</a> · <a href="/roadmap">Roadmap</a> ·{' '}
-              <a href="/verify">Verify a record</a> · <a href="/trust">What you have to trust</a>
+              <a href="/telegram">Telegram</a> · <a href="/verify">Verify a record</a> ·{' '}
+              <a href="/trust">What you have to trust</a>
             </span>
           </div>
         </footer>

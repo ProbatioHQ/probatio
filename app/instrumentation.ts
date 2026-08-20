@@ -116,6 +116,12 @@ export async function register(): Promise<void> {
   const { startHouseTraders } = await import('./lib/house-traders');
   safely('house traders', startHouseTraders);
 
+  // Pushes watched traders' fills into the chats that asked for them. Does
+  // nothing without a bot token, and says so rather than querying every twenty
+  // seconds for a result it would throw away.
+  const { startWatchNotifier } = await import('./lib/telegram/notify');
+  safely('telegram watches', startWatchNotifier);
+
   // Measures the engine against real fills and takes farmable tokens off the
   // board. Tied to the feed switch only in the sense that both need the chain;
   // it is the one check that runs without anybody deciding to look.
