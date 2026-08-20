@@ -111,6 +111,7 @@ function rpc(): RpcClient {
     timeoutMs: 15_000,
     minIntervalMs: 200,
     maxRetries: 5,
+    priority: 'background',
   });
   return rpcClient;
 }

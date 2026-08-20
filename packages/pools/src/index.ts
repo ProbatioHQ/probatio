@@ -69,6 +69,8 @@ export {
 export type { ProgramDataAccount } from './upgradeable';
 
 export { RpcClient, RpcError } from './rpc';
+export { RpcGovernor, creditsFor, governorFor, governorStats, resetGovernors } from './governor';
+export type { GovernorStats, RpcPriority } from './governor';
 export type {
   AccountData,
   ConfirmedTransaction,

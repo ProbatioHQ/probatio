@@ -44,6 +44,7 @@ function reader(): PoolReader {
     timeoutMs: 15_000,
     minIntervalMs: 150,
     maxRetries: 6,
+    priority: 'background',
   });
   houseReader ??= new PoolReader(houseRpc);
   return houseReader;

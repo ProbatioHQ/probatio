@@ -277,7 +277,12 @@ export function startCurveWatch(): void {
   if (started) return;
   started = true;
 
-  const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 20_000, minIntervalMs: 120 });
+  const rpc = new RpcClient({
+    endpoint: rpcEndpoint(),
+    timeoutMs: 20_000,
+    minIntervalMs: 120,
+    priority: 'background',
+  });
   const reader = new PoolReader(rpc);
 
   // Each pass reads through one rate-limited RPC, so on a slow node a pass can

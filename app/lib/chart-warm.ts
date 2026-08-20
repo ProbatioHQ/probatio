@@ -225,6 +225,7 @@ function poolReader(): PoolReader {
       timeoutMs: 30_000,
       minIntervalMs: DEDICATED ? 50 : 400,
       maxRetries: 5,
+      priority: 'background',
     }),
   );
   return reader;

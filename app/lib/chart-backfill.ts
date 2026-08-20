@@ -333,6 +333,9 @@ export function backfillChart(mint: string): void {
         // paid node serves the burst at once, so there it is fast and parallel.
         minIntervalMs: READ_INTERVAL_MS,
         maxRetries: READ_RETRIES,
+        // Nobody waits on a backfill: the route answers at once and says it is
+        // still filling. So it queues behind anything a trader is waiting for.
+        priority: 'background',
       });
 
       // Resolve the pool once: its current reserves are the live price the index

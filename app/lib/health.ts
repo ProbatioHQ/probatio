@@ -3,7 +3,7 @@ import { RpcClient } from '@probatio/pools';
 import { closeOutage, openOutage, openOutages } from '@probatio/db';
 import type { Dependency } from '@probatio/health';
 import { db } from './db';
-import { coachApiKey, rpcEndpoint } from './env';
+import { coachApiKey, rpcEndpoint, rpcFallbackEndpoint } from './env';
 
 /**
  * Noticing that something is down, and writing it down.
@@ -133,16 +133,35 @@ function feedFailure(): string | null {
 }
 
 async function probeRpc(): Promise<string | null> {
+  // Retries, where this used to take the first answer as final. A paid
+  // endpoint returns 429 "connection rate limits exceeded" under load, and
+  // treating one of those as an outage is how a healthy site tells visitors
+  // it is unavailable. Measured against the endpoint in use: ten getSlot
+  // calls in a row all returned 429 while the site was serving normally.
   try {
-    // Retries, where this used to take the first answer as final. A paid
-    // endpoint returns 429 "connection rate limits exceeded" under load, and
-    // treating one of those as an outage is how a healthy site tells visitors
-    // it is unavailable. Measured against the endpoint in use: ten getSlot
-    // calls in a row all returned 429 while the site was serving normally.
     const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 8_000, maxRetries: 2 });
     await rpc.getSlot();
     return null;
   } catch (error) {
+    /*
+     * The main endpoint is refusing. That is not the same as the chain being
+     * unreadable, and the difference is what this probe is for.
+     *
+     * A paid plan halts when its monthly credits run out, and every read fails
+     * with 429 until it resets. Reporting that as an outage puts a banner on
+     * every page and turns trading off, when the request path is quite capable
+     * of reading the same chain from the spare endpoint. So the probe asks the
+     * spare before it calls anything down, exactly as a trade would.
+     */
+    const spare = rpcFallbackEndpoint();
+    if (spare) {
+      try {
+        await new RpcClient({ endpoint: spare, timeoutMs: 8_000, maxRetries: 1 }).getSlot();
+        return null;
+      } catch {
+        /* Both refused, which is the outage this was always meant to report. */
+      }
+    }
     return error instanceof Error ? error.message.slice(0, 200) : 'unreachable';
   }
 }

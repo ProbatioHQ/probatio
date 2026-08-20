@@ -237,6 +237,10 @@ export async function allTimeBoard(client: Client, now: number): Promise<AllTime
   const missing = mints.filter((mint) => !prices.has(mint));
 
   if (missing.length > 0) {
+    // Interactive despite being a sweep: somebody is looking at this page. It
+    // already gives up after four seconds and marks the rest at cost, and
+    // queueing it behind the warmers would make that the usual outcome rather
+    // than the unusual one.
     const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 6_000, minIntervalMs: 60 });
     const reader = new PoolReader(rpc);
 

@@ -57,7 +57,12 @@ export function startKeeper(): void {
 
   started = true;
 
-  const rpc = new RpcClient({ endpoint: rpcEndpoint(), timeoutMs: 30_000, minIntervalMs: 100 });
+  const rpc = new RpcClient({
+    endpoint: rpcEndpoint(),
+    timeoutMs: 30_000,
+    minIntervalMs: 100,
+    priority: 'background',
+  });
   const gateway = new SolanaGateway({ rpc, keeperSecret: secret });
   console.log(`[keeper] committing as ${gateway.keeper}`);
 

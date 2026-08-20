@@ -10,6 +10,8 @@
  * has to be quoted against a known point in time rather than against "now".
  */
 
+import { creditsFor, governorFor, type RpcPriority } from './governor';
+
 export class RpcError extends Error {
   readonly code: number | undefined;
 
@@ -60,6 +62,21 @@ export interface RpcOptions {
    * With it the spike queues instead.
    */
   readonly maxConcurrent?: number;
+  /**
+   * Whether somebody is waiting on this call.
+   *
+   * Background readers share one adaptive budget per endpoint, so a dozen
+   * well-behaved sweeps cannot add up to a rate limit between them. Interactive
+   * reads skip that budget entirely: a trader clicking buy is waiting, their
+   * traffic is a rounding error next to the sweeps, and the whole point of
+   * throttling background work is that the request path keeps working while it
+   * happens.
+   *
+   * Defaults to interactive, so nothing is slowed down by accident. Every
+   * worker sets it explicitly, which is the way round that fails safe for a
+   * trader and loudly for whoever adds the next worker.
+   */
+  readonly priority?: RpcPriority;
   /** Injected in tests so backoff does not actually sleep. */
   readonly sleepImpl?: (ms: number) => Promise<void>;
 }
@@ -208,6 +225,16 @@ export class RpcClient {
 
     let lastError: RpcError | undefined;
 
+    /*
+     * The shared budget, before this client's own pacing.
+     *
+     * Both are wanted. This client's interval is what a single sweep decided it
+     * needs; the governor is what every sweep on this endpoint gets between
+     * them, and it is the one that adapts when the endpoint starts refusing.
+     */
+    const governor = governorFor(this.#options.endpoint);
+    if (this.#options.priority === 'background') await governor.admit(method, sleep);
+
     // Claim a slot in the outgoing queue before doing anything else, so
     // concurrent workers space out rather than all firing at once.
     const minInterval = this.#options.minIntervalMs ?? 0;
@@ -247,14 +274,28 @@ export class RpcClient {
 
       if (!response.ok) {
         lastError = new RpcError(`${method} returned HTTP ${response.status}`, response.status);
-        if (!isRetryable(response.status) || attempt === maxRetries) throw lastError;
-
         const retryAfter = Number(response.headers.get('retry-after'));
-        if (Number.isFinite(retryAfter) && retryAfter > 0) {
-          await sleep(Math.min(retryAfter * 1000, 30_000));
-        }
+        const retryAfterMs =
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : undefined;
+
+        /*
+         * Reported however this call was prioritised, and before the decision to
+         * give up.
+         *
+         * A refusal is evidence about the endpoint whoever provoked it, and an
+         * interactive 429 is the strongest evidence there is that the sweeps
+         * need to get out of the way. Ignoring those would leave the one caller
+         * that must not be slowed down as the one caller whose pain teaches
+         * nothing.
+         */
+        if (isRetryable(response.status)) governor.refused(retryAfterMs);
+
+        if (!isRetryable(response.status) || attempt === maxRetries) throw lastError;
+        if (retryAfterMs !== undefined) await sleep(Math.min(retryAfterMs, 30_000));
         continue;
       }
+
+      governor.served();
 
       const body = (await response.json()) as RpcResponse<T>;
       if (body.error) {

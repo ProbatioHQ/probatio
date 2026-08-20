@@ -1,4 +1,5 @@
 import { capabilities, overall } from '@probatio/health';
+import { governorStats } from '@probatio/pools';
 import { rateLimit } from '@/lib/rate-limit';
 import { downNow } from '@/lib/health';
 import { launchListenerCount, openStreamCount } from '@/lib/launch-stream';
@@ -106,6 +107,17 @@ export async function GET(request: Request): Promise<Response> {
       marks: markStats(),
       // The push feed behind live prices.
       prices: priceStreamStatus(),
+      /*
+       * The shared budget every background reader draws on.
+       *
+       * Here because the failure it exists to prevent was invisible from the
+       * outside: a dozen individually well behaved workers adding up to a rate
+       * limit, and the site reporting the chain unreadable when nothing was
+       * wrong with the chain. `floorMs` climbing above its base is the endpoint
+       * pushing back, and `cooling` is every sweep currently standing down.
+       * Keyed by host, never by URL, because the endpoint carries the API key.
+       */
+      rpcBudget: governorStats(),
       // Stated whatever the status, because the promise matters most when
       // something is broken.
       promise:

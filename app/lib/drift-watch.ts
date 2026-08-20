@@ -218,6 +218,7 @@ export async function runDriftCycle(): Promise<void> {
     endpoint: rpcEndpoint(),
     timeoutMs: 25_000,
     minIntervalMs: RPC_INTERVAL_MS,
+    priority: 'background',
   });
   const reader = new PoolReader(rpc);
 

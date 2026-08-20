@@ -224,6 +224,7 @@ function rpc(): RpcClient {
      * and nothing at all on a quiet one.
      */
     maxRetries: 7,
+    priority: 'background',
   });
   return rpcClient;
 }

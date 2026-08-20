@@ -47,7 +47,35 @@ export function appUri(): string {
  * rate-limits hard and is not suitable for anything beyond trying the app out.
  */
 export function rpcEndpoint(): string {
-  return process.env['RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+  return process.env['RPC_URL'] ?? PUBLIC_CLUSTER;
+}
+
+const PUBLIC_CLUSTER = 'https://api.mainnet-beta.solana.com';
+
+/**
+ * Where a read goes when the main endpoint will not serve it.
+ *
+ * A paid plan can stop serving for reasons that have nothing to do with the
+ * chain: a monthly credit allowance runs out and the provider halts the
+ * account, and every read fails with 429 until the plan resets. That happened,
+ * and because there was nowhere else to go, a billing state took the whole site
+ * down — trading off, charts frozen, the status page honestly reporting that
+ * the chain could not be read while the chain was perfectly readable.
+ *
+ * The public cluster is slow and throttles hard, which is why it is not the
+ * main endpoint. It is still the difference between a site that is slow and a
+ * site that is gone.
+ *
+ * Only the request path uses it. Background sweeps that cannot run are a
+ * degradation nobody is waiting on, and pointing ninety-six requests a second
+ * at a free endpoint is how this happened in the first place.
+ *
+ * Returns null when it would be the same endpoint, so nothing retries a refusal
+ * against the thing that just refused it.
+ */
+export function rpcFallbackEndpoint(): string | null {
+  const fallback = process.env['RPC_FALLBACK_URL'] ?? PUBLIC_CLUSTER;
+  return fallback === rpcEndpoint() ? null : fallback;
 }
 
 /**

@@ -1,6 +1,6 @@
 import 'server-only';
 import { PoolReader, RpcClient, type Resolution } from '@probatio/pools';
-import { rpcEndpoint } from './env';
+import { rpcEndpoint, rpcFallbackEndpoint } from './env';
 
 /**
  * One RPC client for the request paths, shared across every request.
@@ -42,6 +42,60 @@ export function sharedReader(): PoolReader {
   return reader;
 }
 
+let spare: PoolReader | null | undefined;
+
+/**
+ * Somewhere else to read from when the main endpoint will not serve.
+ *
+ * A paid plan stops serving for reasons that have nothing to do with the chain:
+ * the month's credit allowance runs out, the provider halts the account, and
+ * every read fails with 429 until it resets. With nowhere else to go, that
+ * billing state took the whole site down for as long as it lasted.
+ *
+ * Slower and throttled, which is why it is not the main endpoint. It is still
+ * the difference between a site that is slow and a site that is gone.
+ */
+function spareReader(): PoolReader | null {
+  if (spare !== undefined) return spare;
+  const endpoint = rpcFallbackEndpoint();
+  spare = endpoint
+    ? new PoolReader(
+        new RpcClient({
+          endpoint,
+          timeoutMs: 15_000,
+          // Patient, because this is the public cluster's pace and a read that
+          // arrives late still beats a page that says the chain is unreadable.
+          minIntervalMs: 120,
+          maxRetries: 2,
+          maxConcurrent: 8,
+        }),
+      )
+    : null;
+  return spare;
+}
+
+/**
+ * Read a pool, and try the spare endpoint if the main one refuses.
+ *
+ * The fill stays honest either way. Both endpoints read the same chain and
+ * return the same reserves at the same slot; what changes is who served it and
+ * how quickly. Nothing here is ever answered from a cache, which is the promise
+ * that actually matters.
+ *
+ * The original error is thrown when there is no spare or the spare fails too,
+ * because "the chain cannot be read" has to stay a real outcome that stops
+ * trading rather than something quietly papered over.
+ */
+async function readSomewhere(mint: string): Promise<Resolution> {
+  try {
+    return await sharedReader().resolve(mint);
+  } catch (error) {
+    const other = spareReader();
+    if (!other) throw error;
+    return await other.resolve(mint);
+  }
+}
+
 /**
  * Read a token's live market, collapsing concurrent identical reads into one.
  *
@@ -60,11 +114,9 @@ export function resolveMint(mint: string): Promise<Resolution> {
   const existing = inflight.get(mint);
   if (existing) return existing;
 
-  const pending = sharedReader()
-    .resolve(mint)
-    .finally(() => {
-      inflight.delete(mint);
-    });
+  const pending = readSomewhere(mint).finally(() => {
+    inflight.delete(mint);
+  });
   inflight.set(mint, pending);
   return pending;
 }
@@ -82,5 +134,5 @@ export function resolveMint(mint: string): Promise<Resolution> {
  * shared client's in-flight cap still bounds the load a crowd of fills makes.
  */
 export function resolveFill(mint: string): Promise<Resolution> {
-  return sharedReader().resolve(mint);
+  return readSomewhere(mint);
 }
