@@ -18,6 +18,7 @@ import { PoolReader, RpcClient, bondingCurveAddress, pumpSwapReserveOffset } fro
 import { collectPoolSwaps, type PoolSwap } from '@probatio/validation';
 import { db } from './db';
 import { hasDedicatedRpc, rpcEndpoint } from './env';
+import { resolveMint } from './rpc';
 import { spliceGeckoHistory } from './gecko-history';
 import { splicePumpfunHistory } from './pumpfun-history';
 
@@ -47,9 +48,22 @@ import { splicePumpfunHistory } from './pumpfun-history';
  * something else.
  */
 const DEDICATED = hasDedicatedRpc();
-const MAX_TRANSACTIONS = Number(
-  process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '4000' : '400'),
-);
+/*
+ * How far back a walk reads, and no longer a function of having paid.
+ *
+ * It was four thousand transactions on a dedicated endpoint against four
+ * hundred on the public one, on the reasoning that a paid node serves the burst.
+ * It does. What it does not do is serve it for free: at ten credits a
+ * transaction read, four thousand is forty thousand credits for one token, and
+ * a month's allowance is ten million. A hundred charts would have spent the lot.
+ *
+ * That equation is the whole lesson of the outage this followed: "dedicated"
+ * was being read as "unlimited" in six different places, and every one of them
+ * was individually reasonable. So the walk now costs the same either way, and
+ * the deep past comes from pump.fun's own history, which is free and matches
+ * theirs at every timeframe.
+ */
+const MAX_TRANSACTIONS = Number(process.env['PROBATIO_BACKFILL_TRANSACTIONS'] ?? '400');
 // Enough recent pool history to draw the last day or two accurately and to give
 // the index splice a solid overlap to fix its scale against — not the whole life
 // of a token doing thousands of swaps a day, which would be tens of thousands of
@@ -57,7 +71,7 @@ const MAX_TRANSACTIONS = Number(
 // which already has it from launch; the walk covers the recent end at the live
 // price's own scale, and the two meet where the walk's oldest candle sits.
 const POOL_MAX_TRANSACTIONS = Number(
-  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? (DEDICATED ? '5000' : '400'),
+  process.env['PROBATIO_POOL_BACKFILL_TRANSACTIONS'] ?? '400',
 );
 /** How many trade reads run at once during a walk. */
 const WALK_CONCURRENCY = DEDICATED ? 12 : 2;
@@ -132,7 +146,30 @@ function isFresh(mint: string, now: number): boolean {
   return at !== undefined && now - at < REFRESH_MS;
 }
 
+/**
+ * Mints that have enough history to draw, whatever else is still running.
+ *
+ * The walk and the fetched history are one job to this module and two things to
+ * a reader: the fetch puts a whole chart on screen in seconds, the walk spends
+ * the next several minutes refining its recent end. Reporting the job as
+ * in-flight until both are done left every chart on the site saying it was
+ * still reading from the chain while a perfectly good chart sat underneath.
+ */
+const charted = new Set<string>();
+const CHARTED_MAX = 512;
+
+function markCharted(mint: string): void {
+  charted.delete(mint);
+  charted.add(mint);
+  while (charted.size > CHARTED_MAX) {
+    const oldest = charted.keys().next().value;
+    if (oldest === undefined) break;
+    charted.delete(oldest);
+  }
+}
+
 export function backfillInFlight(mint: string): boolean {
+  if (charted.has(mint)) return false;
   return running.has(mint) || pending.has(mint);
 }
 
@@ -338,12 +375,23 @@ export function backfillChart(mint: string): void {
         priority: 'background',
       });
 
-      // Resolve the pool once: its current reserves are the live price the index
-      // history anchors to, and the walk reuses the same resolution.
+      /*
+       * The anchor read, through the request path rather than the walk's client.
+       *
+       * Somebody is watching a spinner for this one read: it is what the fetched
+       * history is scaled against, so nothing appears on the chart until it
+       * comes back. Behind the background budget it queued behind the walk and
+       * took minutes, and every chart on the site said it was still reading from
+       * the chain.
+       *
+       * `resolveMint` is the same shared, coalesced reader a trade quotes
+       * against, so a hundred people opening the same token share one read, and
+       * it falls back to the spare endpoint when the main one refuses.
+       */
       const reader = new PoolReader(rpc);
       let resolution: Awaited<ReturnType<typeof reader.resolve>> | null = null;
       try {
-        resolution = await reader.resolve(mint);
+        resolution = await resolveMint(mint);
       } catch (error) {
         console.error('[chart] resolve failed for', mint, error);
       }
@@ -388,6 +436,10 @@ export function backfillChart(mint: string): void {
             console.error('[chart] index history failed for', mint, error);
           }
         }
+        // There is a chart now. Whatever the walk does next is a refinement,
+        // and the reader should be looking at candles rather than at a sentence
+        // about the chain.
+        if (historyAdded > 0) markCharted(mint);
       }
 
       /*
