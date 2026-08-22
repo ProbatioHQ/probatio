@@ -55,6 +55,24 @@ export default function ExplorePage() {
       */}
       <FeedPortfolio />
 
+      {/*
+        The same door, for a phone.
+
+        The paragraph above carries the only link to the backtest, and the phone
+        layout hides that whole header to make room for the board. Which left
+        the feature reachable on a desk and unreachable in a hand: the page
+        still answered at its address, but nothing anywhere pointed at it.
+
+        A row rather than a repeat of the sentence, because a phone has no space
+        for the explanation and this is a place to tap.
+      */}
+      <a className="bt-entry" href="/backtest">
+        <span>
+          Backtest a rule
+          <em>What a take profit and a stop would really have got</em>
+        </span>
+      </a>
+
       <ExploreBoard />
 
       {/*

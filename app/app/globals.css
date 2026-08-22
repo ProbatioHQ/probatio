@@ -1445,6 +1445,15 @@ button,
   text-decoration: none;
 }
 
+/*
+ * The phone-only door into the backtest, hidden by default.
+ *
+ * Defined here so the element is off on a wide screen, where the Explore
+ * paragraph already links to it in a full sentence. The coarse-pointer block
+ * further down turns it on.
+ */
+.bt-entry { display: none; }
+
 /* ============================================================ backtest */
 
 /*
@@ -1649,6 +1658,28 @@ button,
 
   .bt-big {
     font-size: 28px;
+  }
+}
+
+/*
+ * Thumb-sized controls, matching the rest of the site on a touchscreen.
+ *
+ * The rule fields and the replay button came out 38px tall, which is fine under
+ * a cursor and under the 44px the trade panel and the season controls already
+ * use on the same gate. A backtest is three taps into small boxes, so it is
+ * exactly the panel that should not be the one place holding out.
+ *
+ * Gated on `pointer: coarse` rather than width alone, so a narrow desktop
+ * window keeps the tighter layout it was designed with.
+ */
+@media (max-width: 860px) and (pointer: coarse) {
+  .bt-field input,
+  .bt-run {
+    min-height: 44px;
+  }
+
+  .bt-input {
+    min-height: 44px;
   }
 }
 
@@ -6990,6 +7021,49 @@ body:has(main.home) .glow {
    */
   .explore-page .page-head,
   .explore-page > p.dim { display: none; }
+
+  /*
+   * The backtest's only door on a phone.
+   *
+   * Hiding `.page-head` above takes the sentence that links to it with it, so
+   * without this the feature is desk-only: reachable at its address and pointed
+   * at from nowhere. Shown here rather than always, because on a wide screen
+   * the paragraph already says it better and twice is clutter.
+   */
+  .explore-page .bt-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin: 4px 0 2px;
+    padding: 15px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .explore-page .bt-entry em {
+    display: block;
+    margin-top: 3px;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* An arrow drawn as a shape, so it needs no font and no character. */
+  .explore-page .bt-entry::after {
+    content: '';
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-top: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+    transform: rotate(45deg);
+  }
 
   .wide-name { display: none; }
   .narrow-name { display: inline; }
