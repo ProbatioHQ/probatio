@@ -1,0 +1,16 @@
+-- A token's own swaps, in the order they happened.
+--
+-- Every index on this table leads with the trader, because everything that read
+-- it until now was asking about a wallet: what one person did, and what copying
+-- them would have cost. A backtest asks the opposite question. It wants one
+-- token and everybody who traded it, so that the pool can be walked forward
+-- through the reserves each swap really left behind.
+--
+-- Without this the walk is a scan of every swap ever recorded to find the few
+-- thousand belonging to one mint, which is fine at ten thousand rows and is not
+-- fine later.
+--
+-- Ordered by block time rather than slot, because that is the clock a rule's
+-- timeout runs on and the order a replay reads in. Slot breaks the tie, since
+-- two swaps in one block share a time and only their slot ordering is real.
+CREATE INDEX observed_swaps_by_mint ON observed_swaps (mint, block_time, slot);

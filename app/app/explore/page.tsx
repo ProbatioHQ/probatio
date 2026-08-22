@@ -30,7 +30,17 @@ export default function ExplorePage() {
         </h1>
         <p className="dim">
           The biggest moves of the last hour, up or down, among tokens with real trading behind
-          them. Pick anything and trade it with paper money against the real prices.
+          them. Pick anything and trade it with paper money against the real prices, or{' '}
+          {/*
+            The one entry point the backtest has beside a token page.
+
+            It belongs here rather than in the navigation: somebody arrives at a
+            board of tokens wondering whether a setup would have worked, which
+            is the question it answers. A feature with no address cannot be
+            linked from a post or a roadmap, and one nobody links to is one
+            nobody finds.
+          */}
+          <a href="/backtest">replay an exit rule against what it really traded at</a>.
         </p>
       </div>
 

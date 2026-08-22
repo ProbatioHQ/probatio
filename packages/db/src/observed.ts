@@ -390,6 +390,58 @@ export async function copyableSwaps(
 }
 
 /**
+ * One token's swaps in order, with the pool each one left behind.
+ *
+ * The mirror of `copyableSwaps` above: that one asks what a wallet did, this
+ * one asks what happened to a token. A rule backtest walks the pool forward
+ * through the reserves real orders really left, so what it needs is every
+ * swap against one mint rather than every swap by one trader.
+ *
+ * Oldest first, because a replay reads forward. Block time is the clock a
+ * rule's timeout runs on; slot breaks the tie, since two swaps in one block
+ * share a time and only their slot ordering is real.
+ *
+ * Only swaps carrying reserves come back. A point without them cannot price
+ * anything, and a replay that guessed at one would be worth less than no
+ * replay at all.
+ *
+ * The limit takes the oldest, because a replay starts at the beginning. One
+ * more row than asked for is fetched so the caller can tell a window that ended
+ * because the token stopped trading from one that ended because the read did.
+ * Those are different answers and only one of them is a verdict.
+ */
+export async function tokenTimeline(
+  db: Client,
+  mint: string,
+  limit = 5_000,
+): Promise<{ swaps: CopyableSwap[]; truncated: boolean }> {
+  const result = await db.execute({
+    sql: `SELECT trader, mint, is_buy, sol_amount, token_amount, sol_after, token_after, block_time
+          FROM observed_swaps
+          WHERE mint = ?
+            AND block_time IS NOT NULL
+            AND sol_after IS NOT NULL AND token_after IS NOT NULL
+            AND CAST(sol_after AS INTEGER) > 0 AND CAST(token_after AS INTEGER) > 0
+          ORDER BY block_time ASC, slot ASC
+          LIMIT ?`,
+    args: [mint, limit + 1],
+  });
+
+  const swaps = result.rows.slice(0, limit).map((row) => ({
+    trader: String(row['trader']),
+    mint: String(row['mint']),
+    isBuy: Number(row['is_buy']) === 1,
+    solAmount: String(row['sol_amount']),
+    tokenAmount: String(row['token_amount']),
+    solAfter: String(row['sol_after']),
+    tokenAfter: String(row['token_after']),
+    blockTime: Number(row['block_time']),
+  }));
+
+  return { swaps, truncated: result.rows.length > limit };
+}
+
+/**
  * Wallets worth reading in full, most active first.
  *
  * A pool walk turns up hundreds of wallets and can score almost none of them,

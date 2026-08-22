@@ -33,6 +33,15 @@ export type { Quote, QuoteErrorCode } from './engine';
 
 export { backtestCopy } from './copy';
 export type { CopyInput, CopyLeg, CopyOptions, CopyResult } from './copy';
+export { backtestRule } from './backtest';
+export type {
+  BacktestLeg,
+  BacktestOptions,
+  BacktestResult,
+  ExitReason,
+  ReplayPoint,
+  Rule,
+} from './backtest';
 export { DEFAULT_RULES, simulateFill } from './execution';
 export type {
   ExecutionRules,

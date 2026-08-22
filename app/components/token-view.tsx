@@ -5,6 +5,7 @@ import { DexChart } from '@/components/dex-chart';
 import { PriceChart } from '@/components/price-chart';
 import { useWallet } from '@/components/wallet';
 import { Positions } from '@/components/positions';
+import { RuleBacktest } from '@/components/rule-backtest';
 import { TradePanel } from '@/components/trade-panel';
 import type { PriceUnit } from '@/lib/price-display';
 import { Sprout, age, freshAge } from '@/components/sprout';
@@ -580,6 +581,11 @@ export function TokenView({
       </section>
 
       <TradePanel mint={mint} onTraded={() => setTradeCount((n) => n + 1)} />
+
+      {/* Under the trade panel rather than under the chart. Somebody asks what a
+          rule would have done after they have looked at the price and thought
+          about buying, not instead of it. */}
+      <RuleBacktest mint={mint} />
 
       {/* Only once there is something to show. A bare line of text reading
           "sign in to see your positions" under a chart is furniture, not

@@ -1286,6 +1286,372 @@ button,
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
 }
 
+/* ============================================================ backtest picker */
+
+/*
+ * Choosing a token, in the same furniture as the panel it feeds.
+ *
+ * A search box and a short list of hits, which collapse once one is taken so
+ * the answer is not competing with the question that produced it.
+ */
+.bp {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bp-search {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: none;
+}
+
+.bp-caption {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.bp-search input {
+  padding: 12px 14px;
+  background: var(--ink-sunken);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.bp-search input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.bp-hits {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+/*
+ * A row, not a button, whatever the element is.
+ *
+ * The global button rule sets `align-self: flex-start`, which inside a flex
+ * column makes every row shrink to the width of its own text. Eight results
+ * came out as a staircase, each one a different width and each one carrying
+ * the raised button styling. The rules that follow are all undoing that.
+ */
+.bp-hit {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  align-self: stretch;
+  padding: 11px 4px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bp-hit:hover {
+  background: var(--ink-raised);
+}
+
+.bp-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.bp-img-none {
+  background: var(--ink-raised);
+  border: 1px solid var(--line);
+}
+
+.bp-name {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  font-weight: 650;
+  font-size: 15.5px;
+  min-width: 0;
+}
+
+.bp-full {
+  font-weight: 400;
+  font-size: 13.5px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-cap {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-said {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text-dim);
+}
+
+.bp-chosen {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+  color: var(--text-dim);
+}
+
+.bp-chosen strong {
+  color: var(--text);
+}
+
+.bp-open {
+  margin-left: 14px;
+  color: var(--accent);
+}
+
+/*
+ * "change" is a word in a sentence, not a control with furniture around it.
+ *
+ * It carries `.linklike`, which is the house reset for a button that reads as
+ * text. Doing that reset by hand here is what put a box and a glow around it:
+ * background and border were cleared, `box-shadow` was not, and the bare
+ * `button` rule paints a raised inset shadow that drew the outline on its own.
+ * `.linklike` clears all three, so the only thing left is the underline it adds
+ * and the link beside this does not have.
+ */
+/*
+ * Both classes in the selector on purpose. `.linklike` is defined further down
+ * this file and underlines, so a plain `.bp-clear` ties on specificity and
+ * loses on order, which is the same cascade mistake one layer along.
+ */
+.bp-clear.linklike {
+  margin-left: 14px;
+  text-decoration: none;
+}
+
+/* ============================================================ backtest */
+
+/*
+ * The rule panel, in the same terminal furniture as the chart above it.
+ *
+ * Two numbers side by side carry the whole idea, so they get the size and
+ * everything else stays out of their way.
+ */
+.bt-body {
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bt-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/*
+ * Label above the control, which is this terminal's convention, with the unit
+ * beside the box rather than under it. The global label rule already stacks,
+ * so the row that needs to be a row says so.
+ */
+.bt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.bt-input {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+}
+
+.bt-field input {
+  width: 72px;
+  padding: 7px 9px;
+  background: var(--ink-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 14px;
+  text-align: right;
+}
+
+.bt-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.bt-unit {
+  color: var(--text-faint);
+  text-transform: none;
+}
+
+.bt-run {
+  margin-left: auto;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.bt-run:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/*
+ * The whole argument, in two figures. What you would have got, and what the
+ * chart claimed. The second is deliberately quieter: it is the number being
+ * corrected, not the answer.
+ */
+.bt-headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 40px;
+  padding: 14px 0 2px;
+  border-top: 1px solid var(--line);
+}
+
+.bt-big {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 34px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-big .gain {
+  color: var(--gain);
+}
+
+.bt-big .loss {
+  color: var(--loss);
+}
+
+.bt-dim {
+  color: var(--text-faint);
+  font-weight: 650;
+}
+
+.bt-big-note {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/*
+ * The caveat that changes what the headline means.
+ *
+ * Marked rather than left as another sentence, because it is the difference
+ * between a figure that means what it looks like and one that does not, and a
+ * reader skimming for the percentage will skim past prose.
+ */
+.bt-warn {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--loss);
+  background: color-mix(in srgb, var(--loss) 7%, transparent);
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.bt-said {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.bt-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.bt-facts dt {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.bt-facts dd {
+  margin: 4px 0 0;
+  font-size: 15.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.bt-facts dd.loss {
+  color: var(--loss);
+}
+
+.bt-foot {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+@media (max-width: 560px) {
+  .bt-body {
+    padding: 16px 14px 18px;
+  }
+
+  .bt-run {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .bt-big {
+    font-size: 28px;
+  }
+}
+
 /* ============================================================ telegram */
 
 /*

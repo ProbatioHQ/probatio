@@ -198,6 +198,7 @@ export type { WatchRow, WatchResult, WatchedFill } from './telegram-watch';
 export { closeOutage, openOutage, openOutages, outagesBetween } from './outages';
 export {
   copyableSwaps,
+  tokenTimeline,
   observedBoard,
   observedCoverage,
   observedTraders,

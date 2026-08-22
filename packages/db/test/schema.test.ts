@@ -141,6 +141,7 @@ describe('migrations', () => {
       '038_telegram_updates.sql',
       '039_telegram_links.sql',
       '040_telegram_watch.sql',
+      '041_swaps_by_mint.sql',
     ]);
   });
 
