@@ -294,3 +294,41 @@ describe('who it applies to', () => {
     expect(governorFor(endpoint).stats().floorMs).toBe(before);
   });
 });
+
+describe('one budget, not one per bundle', () => {
+  /*
+   * A bundler compiles this module once per bundle that imports it, so the
+   * chart warmer, the curve watcher and the health route can each end up
+   * holding a private copy of what was meant to be one shared budget.
+   *
+   * It showed exactly as it would: the health endpoint reported nothing spent
+   * while the provider's meter showed thousands of credits an hour going out.
+   * Every worker was being governed and none of them together, which is the
+   * same failure this module exists to fix, one level down.
+   */
+  it('hands the same governor to callers that never met', () => {
+    const endpoint = 'https://shared.example';
+    const first = governorFor(endpoint);
+    first.refused();
+
+    // A second importer, which in production is a different bundle entirely.
+    expect(governorFor(endpoint)).toBe(first);
+    expect(governorFor(endpoint).stats().refusals).toBe(1);
+  });
+
+  it('lives somewhere a second copy of this module would find it', () => {
+    governorFor('https://global.example');
+    const shared = (globalThis as Record<symbol, unknown>)[
+      Symbol.for('probatio.rpc-governors')
+    ] as Map<string, unknown>;
+
+    expect(shared).toBeInstanceOf(Map);
+    expect(shared.has('https://global.example')).toBe(true);
+  });
+
+  it('is still cleared between tests, wherever it lives', () => {
+    governorFor('https://reset.example').refused();
+    resetGovernors();
+    expect(governorFor('https://reset.example').stats().refusals).toBe(0);
+  });
+});

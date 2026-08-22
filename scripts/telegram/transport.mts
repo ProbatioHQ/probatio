@@ -14,7 +14,7 @@ import type {
  * asserted on. This one renders it, because a person reading a card is checking
  * something a test cannot: whether it is worth reading. Line breaks in the
  * wrong place, a number with fourteen decimals, a refusal that sounds like the
- * bot broke — all of it passes every assertion and is obvious the moment it is
+ * bot broke. All of it passes every assertion and is obvious the moment it is
  * laid out the way a chat would lay it out.
  *
  * It also keeps the buttons from the last message, so they can be pressed.

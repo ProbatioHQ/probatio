@@ -23,7 +23,7 @@ import { resolveLaunchImages } from './token-images';
  *
  * pump.fun publishes its own list of coins by creation time. It is the same
  * data, from the people who created it, on the same service this app already
- * reads for Explore, movers, search and chart history — and it costs nothing.
+ * reads for Explore, movers, search and chart history, and it costs nothing.
  * Polling it is not a downgrade from reading the chain; for this particular
  * question it is the more direct source.
  *

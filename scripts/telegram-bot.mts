@@ -14,7 +14,7 @@
  *
  * What it catches that the unit tests cannot: whether a card is worth reading.
  * A line break in the wrong place, a number with fourteen decimals, a refusal
- * phrased so it sounds like the bot broke — all of that passes every assertion
+ * phrased so it sounds like the bot broke. All of that passes every assertion
  * and is obvious the moment it is laid out the way a chat lays it out.
  *
  *   DATABASE_URL=file:./app/probatio.db npm run bot
@@ -22,7 +22,7 @@
  *
  * /verify reads the record through the site's public proof endpoint, the same
  * way anybody else would, so it needs to be able to reach it. Set PROBATIO_SITE
- * to point somewhere else — a local server, or the host directly when a router
+ * to point somewhere else: a local server, or the host directly when a router
  * is caching a bad answer for the domain.
  *
  * Meta-commands start with a colon so they cannot collide with the bot's own.
@@ -300,7 +300,7 @@ const readline = createInterface({ input: process.stdin, output: process.stdout 
  * waiting on a prompt nobody will answer or racing a close handler that fires
  * before the lines are consumed. Iterating drains what was sent and then stops,
  * which is what both a person and a script want. Scripting it is a fair way to
- * use this — it is how the replay of a bug report gets written down.
+ * use this, since it is how the replay of a bug report gets written down.
  */
 readline.setPrompt('\n> ');
 

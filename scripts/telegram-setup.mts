@@ -5,7 +5,7 @@
  *
  * Told: where to deliver updates, what secret it will send with them, and what
  * commands to offer in the menu. Asked: whether inline mode is on and whether
- * privacy mode is off — the two settings that live in BotFather rather than in
+ * privacy mode is off. Two settings that live in BotFather rather than in
  * the API, that half this bot depends on, and that fail silently when wrong.
  *
  * That last part is the reason this is a script and not a curl command in a
@@ -129,8 +129,8 @@ console.log(`${BOLD}@${me.username ?? '?'}${RESET} ${DIM}(${me.first_name ?? ''}
 /*
  * The two BotFather settings, checked rather than assumed.
  *
- * Neither can be set through the API — they are toggles in a chat with
- * BotFather — so the most this can do is say plainly which one is wrong and
+ * Neither can be set through the API, since they are toggles in a chat with
+ * BotFather, so the most this can do is say plainly which one is wrong and
  * what to type. Which is enough: the whole failure mode is not knowing.
  */
 let blocked = false;
@@ -164,7 +164,7 @@ if (check) {
   const hook = await call<Hook>('getWebhookInfo');
   console.log(
     `\n${BOLD}delivery${RESET}\n` +
-      `  url            ${hook.url || `${DIM}none — Telegram is delivering nowhere${RESET}`}\n` +
+      `  url            ${hook.url || `${DIM}none, Telegram is delivering nowhere${RESET}`}\n` +
       `  pending        ${hook.pending_update_count ?? 0}\n` +
       `  allowed        ${(hook.allowed_updates ?? []).join(', ') || 'all'}` +
       (hook.last_error_message

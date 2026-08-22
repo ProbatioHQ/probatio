@@ -264,11 +264,33 @@ export class RpcGovernor {
  * that a worker constructed in one file shares a budget with a worker
  * constructed in another that knows nothing about it. Keyed on the endpoint so
  * a fallback, or a future second provider, does not inherit the main one's
- * opinion of how fast it may go — or its bill.
+ * opinion of how fast it may go, or its bill.
+ *
+ * Hung off a global symbol rather than left as a plain module variable, and
+ * that is not decoration. A bundler compiles this module once per bundle that
+ * imports it, so the chart warmer, the curve watcher and the health route can
+ * each end up holding a private copy of what was meant to be one shared budget.
+ *
+ * It showed exactly as it would: the health endpoint reported an empty budget
+ * and nothing spent, while the provider's own meter showed thousands of credits
+ * an hour going out. Every worker was being governed and none of them were
+ * being governed together, which is the same failure this module was written to
+ * fix, one level down.
+ *
+ * The same trick app/lib/watched.ts already uses, for the same reason.
  */
-const governors = new Map<string, RpcGovernor>();
+const GOVERNORS_KEY = Symbol.for('probatio.rpc-governors');
+
+function registry(): Map<string, RpcGovernor> {
+  const global = globalThis as typeof globalThis & {
+    [GOVERNORS_KEY]?: Map<string, RpcGovernor>;
+  };
+  global[GOVERNORS_KEY] ??= new Map<string, RpcGovernor>();
+  return global[GOVERNORS_KEY];
+}
 
 export function governorFor(endpoint: string): RpcGovernor {
+  const governors = registry();
   let governor = governors.get(endpoint);
   if (!governor) {
     governor = new RpcGovernor();
@@ -280,7 +302,7 @@ export function governorFor(endpoint: string): RpcGovernor {
 /** What every endpoint is currently allowing, for the health endpoint. */
 export function governorStats(): Record<string, GovernorStats> {
   const stats: Record<string, GovernorStats> = {};
-  for (const [endpoint, governor] of governors) {
+  for (const [endpoint, governor] of registry()) {
     // Keyed by host, never by URL: the endpoint carries the API key.
     let host = 'rpc';
     try {
@@ -295,5 +317,5 @@ export function governorStats(): Record<string, GovernorStats> {
 
 /** Used by tests, which must not inherit another test's learned floor. */
 export function resetGovernors(): void {
-  governors.clear();
+  registry().clear();
 }
