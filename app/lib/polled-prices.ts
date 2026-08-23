@@ -1,5 +1,7 @@
 import 'server-only';
+import type { Observation } from '@probatio/candles';
 import { onLivePrice, publishPolledPrice } from './price-stream';
+import { ingestObservations } from './trade-candles';
 import { recentlyViewed } from './watched';
 
 /**
@@ -114,7 +116,31 @@ async function pass(): Promise<void> {
   await Promise.all(
     mints.map(async (mint) => {
       const price = await latestPrice(mint);
-      if (price !== null) publishPolledPrice(mint, price, now);
+      if (price === null) return;
+      publishPolledPrice(mint, price, now);
+
+      /*
+       * Record it as a candle too, for the same reason the chain path does.
+       *
+       * Pushing the price only to the stream fixed the live bar and nothing
+       * else. Every other number on a token page is read back out of the candle
+       * store — the header figure, the percent change, the mark a position is
+       * valued at — and for a graduated token with the subscription off, the
+       * only thing writing that store is an eight-minute history refresh. So
+       * the chart's last bar moved while the price above it sat still, and
+       * every candle poll stamped the stale close back over the live one. The
+       * hitch was those two disagreeing three times a second.
+       *
+       * No volume: this is a price observed, not a trade seen. The type allows
+       * that explicitly, and claiming volume nobody moved would put a number in
+       * the chart that no swap backs.
+       */
+      const observation: Observation = {
+        timestamp: Math.floor(now / 1_000),
+        price,
+        volumeLamports: 0n,
+      };
+      ingestObservations(mint, [observation]);
     }),
   );
 }

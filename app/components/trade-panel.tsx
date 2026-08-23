@@ -181,14 +181,19 @@ export function TradePanel({
     setLivePrice(null);
     if (typeof EventSource === 'undefined') return;
     const source = new EventSource(`/api/price-stream?mint=${encodeURIComponent(mint)}`);
-    source.onmessage = (event) => {
+    // `addEventListener`, not `onmessage`. The stream names its events, and
+    // `onmessage` only ever receives the unnamed kind, so this listened to a
+    // working connection and heard nothing: the holding's worth fell back to the
+    // positions poll for the life of the page and the live price it describes
+    // was permanently null.
+    source.addEventListener('price', (event) => {
       try {
-        const payload = JSON.parse(event.data as string) as { price?: string };
+        const payload = JSON.parse((event as MessageEvent).data as string) as { price?: string };
         if (payload.price) setLivePrice(payload.price);
       } catch {
         // A malformed frame is one tick missed, not a reason to drop the stream.
       }
-    };
+    });
     // Errors are left to the browser, which reconnects on its own.
     return () => source.close();
   }, [mint]);

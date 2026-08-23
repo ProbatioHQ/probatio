@@ -58,6 +58,15 @@ interface CandleResponse {
   candles: RawCandle[];
 }
 
+/**
+ * How long a pushed price outranks the candle store.
+ *
+ * Longer than the six seconds between polls and the twenty-five second
+ * heartbeat, so a working stream is never second-guessed, and short enough that
+ * a dead one hands the chart back to the store rather than freezing it.
+ */
+const PUSHED_TTL_MS = 45_000;
+
 export const TIMEFRAME_LABELS: Record<string, string> = {
   s1: '1s',
   s5: '5s',
@@ -319,6 +328,31 @@ export function PriceChart({
    */
   const lastBar = useRef<CandlestickData | null>(null);
   const liveRef = useRef({ unit, solUsd, decimals: 0, supply: '0' });
+
+  /*
+   * The newest pushed price, kept rather than spent.
+   *
+   * It used to be applied to the bar in progress and then forgotten, which made
+   * it worth less than it looks: the candle poll calls `setData` every three
+   * seconds, and `setData` replaces the whole series with what the store holds.
+   * On a token the store is behind on, that is a stale close landing on top of a
+   * live one three times a second, and back again on the next push. From the
+   * outside it reads as the price flickering between two values seconds apart.
+   *
+   * Held raw, in the units the stream sends, so the market-cap and price toggle
+   * and a newly arrived dollar rate all convert it the same way the candles are
+   * converted rather than leaving it on whichever axis it happened to arrive on.
+   * The ref is for the redraw, which must not re-run when a price ticks; the
+   * state is for the figures above the chart, which must.
+   *
+   * Given up after a while, which is what keeps preferring it safe. A pushed
+   * price outranks the store because it is newer, and the moment the stream
+   * drops that stops being true — kept indefinitely, a dead connection would pin
+   * the chart and the figure above it to whatever it last said and go on
+   * overriding perfectly good candles with it.
+   */
+  const liveRaw = useRef<string | null>(null);
+  const [livePrice, setLivePrice] = useState<string | null>(null);
   useEffect(() => {
     liveRef.current = {
       unit,
@@ -331,6 +365,10 @@ export function PriceChart({
   useEffect(() => {
     if (typeof EventSource === 'undefined') return;
     setLivePaused(false);
+    // A price belongs to the token it was pushed for. Carrying one across a
+    // navigation would price the new chart at the old token for a few seconds.
+    liveRaw.current = null;
+    setLivePrice(null);
     const source = new EventSource(`/api/price-stream?mint=${encodeURIComponent(mint)}`);
 
     // A dropped stream leaves the live bar frozen at its last value. The browser
@@ -358,6 +396,11 @@ export function PriceChart({
       const value = toDisplay(payload.price, u, decimals, supply, rate);
       if (!Number.isFinite(value) || value <= 0) return;
 
+      // Kept, so the next redraw can put it back, and so the figures above the
+      // chart read the same number the last bar is drawn at.
+      liveRaw.current = payload.price;
+      setLivePrice(payload.price);
+
       // The bar in progress moves; the ones behind it are history and do not.
       const updated: CandlestickData = {
         ...latest,
@@ -376,6 +419,24 @@ export function PriceChart({
 
     return () => source.close();
   }, [mint]);
+
+  /*
+   * Hand the chart back to the store when the stream stops speaking.
+   *
+   * Re-armed by every push, so a working stream never reaches it. A stream that
+   * drops silently — the connection stays open, nothing arrives — leaves a price
+   * that is preferred over the store's for as long as it is kept, which on a
+   * moving token means overriding fresh candles with a frozen number. Better to
+   * forget it and draw what is known.
+   */
+  useEffect(() => {
+    if (livePrice === null) return;
+    const forget = setTimeout(() => {
+      liveRaw.current = null;
+      setLivePrice(null);
+    }, PUSHED_TTL_MS);
+    return () => clearTimeout(forget);
+  }, [livePrice]);
 
   const points = useMemo<CandlestickData[]>(() => {
     if (!data) return [];
@@ -642,7 +703,43 @@ export function PriceChart({
     });
 
     series.current.setData(points);
-    lastBar.current = points[points.length - 1] ?? null;
+
+    /*
+     * Put the pushed price back on top of what the store just returned.
+     *
+     * `setData` replaces the series wholesale, so without this every poll undoes
+     * the live bar and the chart alternates between the two on the poll's beat.
+     * The store is authoritative about every bar behind the last one and the
+     * push is more current than any of them, so the two are merged rather than
+     * one winning: the store draws the history, the push closes the bar in
+     * progress.
+     */
+    const seeded = points[points.length - 1] ?? null;
+    const pushed = liveRaw.current;
+    if (seeded && pushed !== null) {
+      const { unit: u, solUsd: rate, decimals, supply } = liveRef.current;
+      const value = supply === '0' ? Number.NaN : toDisplay(pushed, u, decimals, supply, rate);
+      if (Number.isFinite(value) && value > 0) {
+        const merged: CandlestickData = {
+          ...seeded,
+          close: value,
+          high: Math.max(seeded.high, value),
+          low: Math.min(seeded.low, value),
+        };
+        lastBar.current = merged;
+        try {
+          series.current.update(merged);
+        } catch {
+          // Refused only if the bar is behind the series' last one, which the
+          // line above rules out. The next poll resynchronises regardless.
+        }
+      } else {
+        lastBar.current = seeded;
+      }
+    } else {
+      lastBar.current = seeded;
+    }
+
     volume.current?.setData(enabled.has('volume') ? volumes : []);
     applyIndicators();
 
@@ -707,8 +804,28 @@ export function PriceChart({
 
   const last = points.at(-1);
   const first = points.at(0);
+
+  /*
+   * The figure above the chart, from the same price the last bar is drawn at.
+   *
+   * It used to be `points.at(-1).close` and nothing else, which meant it could
+   * only ever be as current as the last write to the candle store. For a
+   * graduated token with the account subscription off, that store is refreshed
+   * on an eight-minute timer, so the number sat still for minutes at a time
+   * while the bar underneath it moved — the same price, from two sources,
+   * disagreeing on screen. The pushed price is preferred when there is one and
+   * the polled close is the fallback, so the two can no longer differ.
+   */
+  const pushed =
+    livePrice !== null && data
+      ? toDisplay(livePrice, unit, data.tokenDecimals, data.totalSupply, solUsd)
+      : Number.NaN;
+  const quoteValue =
+    Number.isFinite(pushed) && pushed > 0 ? pushed : (last?.close ?? null);
   const change =
-    last && first && first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
+    quoteValue !== null && first && first.open > 0
+      ? ((quoteValue - first.open) / first.open) * 100
+      : null;
 
   /*
    * Whether the phone is showing the timeframe row.
@@ -725,7 +842,6 @@ export function PriceChart({
 
   // Handed up whenever either number moves. onQuote has to be stable in the
   // parent or this runs every render.
-  const quoteValue = last?.close ?? null;
   useEffect(() => {
     onQuote?.({ value: quoteValue, change });
   }, [quoteValue, change, onQuote]);
