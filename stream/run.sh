@@ -238,14 +238,28 @@ while true; do
   fi
 
   say 'encoder starting'
+  #
+  # Every line ffmpeg writes goes through a filter that removes the key.
+  #
+  # Masking it in this script's own output was not enough: when the connection
+  # drops, ffmpeg reports the target it was writing to, and the target contains
+  # the key. It appeared in full in the deploy log the first time the stream was
+  # refused, which is exactly when somebody goes looking at logs. A stream key in
+  # a log is a broadcast anybody who reads it can take over.
+  #
+  # `thread_queue_size` because the capture warned it was blocking at the
+  # default of eight, and a blocked capture thread is dropped frames.
+  #
   ffmpeg -hide_banner -loglevel warning \
+    -thread_queue_size 512 \
     -f x11grab -draw_mouse 0 -framerate "$FPS" -video_size "${WIDTH}x${HEIGHT}" -i :99 \
+    -thread_queue_size 512 \
     -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
     -c:v libx264 -preset veryfast -tune zerolatency -pix_fmt yuv420p \
     -b:v "$BITRATE" -maxrate "$BITRATE" -bufsize "$BITRATE" \
     -g "$((FPS * 2))" -keyint_min "$((FPS * 2))" -sc_threshold 0 \
     -c:a aac -b:a 128k -ar 44100 \
-    -f flv "$TARGET" || true
+    -f flv "$TARGET" 2>&1 | sed -u "s|${STREAM_KEY}|****|g" || true
 
   # Wait rather than spin: hammering a service that is refusing you is how an
   # address gets blocked.
