@@ -34,7 +34,16 @@ export async function GET(): Promise<Response> {
    * is measured against and must keep using.
    */
   return Response.json(
-    { ...board, now: Math.floor(Date.now() / 1000) },
+    {
+      ...board,
+      now: Math.floor(Date.now() / 1000),
+      /*
+       * Which build answered. A broadcast holds this page open for weeks and
+       * would otherwise keep showing whatever the board said on the day it was
+       * opened, including anything since corrected.
+       */
+      build: process.env['RAILWAY_GIT_COMMIT_SHA']?.slice(0, 7) ?? 'local',
+    },
     {
       headers: {
         // Never cached anywhere. The assembler already dedupes the work behind

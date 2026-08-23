@@ -12,7 +12,7 @@ import type { StreamBoard } from '@/lib/livestream';
  * figures behind it were read. They differ by up to the cache's twelve seconds,
  * and conflating them is what made the wall clock lag and stutter.
  */
-type Payload = StreamBoard & { readonly now?: number };
+type Payload = StreamBoard & { readonly now?: number; readonly build?: string };
 
 /**
  * The board a camera points at, twenty four hours a day.
@@ -225,6 +225,8 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
   /** Server seconds minus local seconds, so the clock is right when drawn. */
   const [skew, setSkew] = useState<number | null>(null);
   const skewRef = useRef<number | null>(null);
+  /** The build this page was served by, so a newer one can be noticed. */
+  const builtRef = useRef<string | null>(null);
   const [clock, setClock] = useState(0);
   const [scale, setScale] = useState(1);
 
@@ -263,6 +265,25 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
          * never gets it back until the next poll.
          */
         setSkew((next.now ?? next.at) - Math.floor(Date.now() / 1000));
+
+        /*
+         * A deploy reaches the broadcast on its own.
+         *
+         * The container that streams this loaded the page once and holds it
+         * open for weeks. Every number on it refreshes, because those come from
+         * the polling; the page itself does not, so a correction to the words
+         * on the board would go out to nobody until somebody restarted the
+         * stream, and restarting the stream drops it off pump.fun.
+         *
+         * So the build the server is running travels with the payload, and a
+         * change to it means this page is out of date with the site it came
+         * from. Reloading costs a flicker. Broadcasting a sentence that was
+         * corrected a week ago costs more.
+         */
+        if (next.build) {
+          if (builtRef.current === null) builtRef.current = next.build;
+          else if (builtRef.current !== next.build) window.location.reload();
+        }
       } catch {
         /*
          * A failed poll keeps the last board rather than clearing it.
@@ -601,11 +622,22 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
                       </div>
                     ))}
                   </div>
+                  {/*
+                    What it does, rather than what was argued for.
+                    
+                    This said only what a compiler can verify is ever fixed
+                    automatically, which describes a design and not this
+                    program. Nothing here fixes anything. It was on air saying
+                    otherwise, on a board whose entire claim is that its numbers
+                    can be checked, which is the one place a comfortable
+                    overstatement costs the most.
+                  */}
                   <p className="sb-auto-foot">
-                    Results are committed to the repository, not stored in a database, so the
-                    history belongs to git and nobody can make a failing check look like it
-                    never failed. Only what a compiler can verify is ever fixed automatically,
-                    and never in the fill engine, a season, or a payout.
+                    Findings are recorded, never repaired. Results are committed to the
+                    repository rather than a database, so the history belongs to git and nobody
+                    can make a failing check look like it never failed. What to do about a
+                    finding is a decision, and a job that edits the fill engine at four in the
+                    morning because a check told it to is not one anybody should want.
                   </p>
                 </>
               ) : (
