@@ -17,8 +17,13 @@
 #                  is written and correct, and needs RTMP_URL and STREAM_KEY.
 #
 # Desktop mode wants:
-#   VNC_PASSWORD   required. Without it the screen is open to anyone with the
-#                  URL, and there is a wallet on that screen.
+#   VNC_PASSWORD   required. Eight characters and no more: VNC's scheme uses an
+#                  eight byte key and silently truncates the rest, so a long
+#                  passphrase here buys the confidence of a long password and
+#                  the strength of its first eight letters.
+#   WEB_PASSWORD   optional but wanted. A real password in front of the whole
+#                  thing, checked before the VNC handshake is ever reached, and
+#                  not subject to that truncation. Username is `probatio`.
 #   PORT           set by Railway.
 #
 set -Euo pipefail
@@ -104,7 +109,21 @@ if [ "$MODE" = 'desktop' ]; then
 
   # websockify serves noVNC's page and proxies it to x11vnc, so the screen is
   # reachable over the HTTPS URL Railway already gives this service.
-  exec websockify --web=/usr/share/novnc "0.0.0.0:${PORT:-8080}" localhost:5900
+  #
+  # A password in front of that, when one is set. This matters more than it
+  # looks: the VNC password behind it is capped at eight characters by the
+  # protocol, which is thin for something facing the internet with a wallet on
+  # the other side. This one is checked first, is not truncated, and turns a
+  # brute force from a script's afternoon into a waste of its time.
+  auth=()
+  if [ -n "${WEB_PASSWORD:-}" ]; then
+    auth=(--auth-plugin=BasicHTTPAuth --auth-source="probatio:${WEB_PASSWORD}")
+    say 'web password is set; the screen asks for it before anything else'
+  else
+    say 'WEB_PASSWORD is not set. The only lock is the eight character VNC one.' >&2
+  fi
+
+  exec websockify "${auth[@]}" --web=/usr/share/novnc "0.0.0.0:${PORT:-8080}" localhost:5900
 fi
 
 # ---- rtmp: kept for the day pump.fun offers an endpoint again ---------------

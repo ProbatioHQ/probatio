@@ -22,10 +22,18 @@ difference is which machine has to stay awake.
 3. **Settings** → **Networking** → **Generate Domain**. That URL is the screen.
 4. **Variables**:
 
-   | Variable       | Value                                                     |
-   | -------------- | --------------------------------------------------------- |
-   | `VNC_PASSWORD` | anything long. It is the only lock on the screen.          |
-   | `STREAM_URL`   | optional, defaults to `https://probatiotrade.com/livestream` |
+   | Variable       | Value                                                        |
+   | -------------- | ------------------------------------------------------------ |
+   | `VNC_PASSWORD` | exactly eight characters. See below.                          |
+   | `WEB_PASSWORD` | long. Asked for before anything else. Username is `probatio`. |
+   | `STREAM_URL`   | optional, defaults to `https://probatiotrade.com/livestream`  |
+
+   **On the eight characters.** VNC's password scheme uses an eight byte key and
+   silently truncates anything longer, so a long passphrase in `VNC_PASSWORD`
+   gives the confidence of a long password and the strength of its first eight
+   letters. That is thin for something facing the internet with a wallet behind
+   it, which is what `WEB_PASSWORD` is for: checked first, not truncated, and
+   the reason the eight character limit stops mattering.
 
 5. **Settings** → **Volumes** → add one mounted at `/profile`. Without it the
    wallet has to be set up again on every redeploy.
