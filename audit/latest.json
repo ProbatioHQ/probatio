@@ -1,7 +1,7 @@
 {
-  "at": 1787513664,
+  "at": 1787518945,
   "checks": 4,
-  "inspected": 2019,
+  "inspected": 2020,
   "errors": 0,
   "warnings": 75,
   "results": [
@@ -109,7 +109,7 @@
         {
           "severity": "warning",
           "file": "app/lib/rate-limit.ts",
-          "line": 74,
+          "line": 86,
           "detail": "resetLimiters is exported and no other file mentions it"
         },
         {
@@ -237,7 +237,7 @@
     {
       "id": "internal-links",
       "title": "Links to pages that exist",
-      "inspected": 50,
+      "inspected": 51,
       "findings": []
     },
     {
@@ -398,13 +398,13 @@
         {
           "severity": "warning",
           "file": "app/lib/strategy-runner.ts",
-          "line": 76,
+          "line": 77,
           "detail": "PROBATIO_DISABLE_STRATEGIES is read by the code and documented nowhere"
         },
         {
           "severity": "warning",
           "file": "app/lib/strategy-runner.ts",
-          "line": 86,
+          "line": 87,
           "detail": "PROBATIO_STRATEGY_INTERVAL_MS is read by the code and documented nowhere"
         },
         {
