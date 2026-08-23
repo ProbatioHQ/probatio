@@ -10,7 +10,20 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/test/**/*.test.ts', 'app/**/*.test.ts'],
+    /*
+     * `scripts` was missing, the same gap the typechecker had.
+     *
+     * The audit gates CI now, and a gate whose own tests are never collected is
+     * a gate that reports green because nothing ran. Between this and the
+     * typecheck, `scripts` was the one directory in the workspace that neither
+     * tool looked at, which is how two of the scripts in it had been unable to
+     * run at all without anybody hearing about it.
+     */
+    include: [
+      'packages/*/test/**/*.test.ts',
+      'app/**/*.test.ts',
+      'scripts/__tests__/**/*.test.ts',
+    ],
     environment: 'node',
     coverage: {
       provider: 'v8',

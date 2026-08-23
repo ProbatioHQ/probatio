@@ -146,11 +146,24 @@ for (let t = 0; t < traderCount; t += 1) {
       createdAt: START + slot * 1_000,
     };
 
+    const current = await db.execute({
+      sql: 'SELECT sol_balance FROM accounts WHERE id = ?',
+      args: [account.id],
+    });
+    const cashBefore = BigInt(String(current.rows[0]!['sol_balance']));
+    const position = await db.execute({
+      sql: `SELECT token_amount FROM positions
+            WHERE account_id = ? AND mint = ? AND closed_at IS NULL`,
+      args: [account.id, mint],
+    });
+    const heldBefore = position.rows[0] ? String(position.rows[0]['token_amount']) : null;
+
     await recordTrade(db, {
       snapshot: {
         mint,
         solReserve: solReserve.toString(),
         tokenReserve: tokenReserve.toString(),
+        deliverableTokens: tokenReserve.toString(),
         tokenDecimals: 6,
         feeBps: 125,
         source: 'pumpfun-curve',
@@ -181,9 +194,18 @@ for (let t = 0; t < traderCount; t += 1) {
         realizedPnl: nowRealized.toString(),
         closed,
       },
-      // One fill per account here, so the starting balance is what it sees.
-      expected: { solBalance: String(10_000_000_000n), tokenAmount: null },
-      newBalance: String(10_000_000_000n - basis),
+      /*
+       * Read, not assumed.
+       *
+       * This said "one fill per account here, so the starting balance is what
+       * it sees" and then hardcoded it, which was true only at TRADES_EACH=1.
+       * At anything higher the second fill presented a stale balance and
+       * `recordTrade` refused it as a concurrent trade, exactly as it should.
+       * So the seeder could not seed, which is a poor state for the script the
+       * restore drill depends on.
+       */
+      expected: { solBalance: String(cashBefore), tokenAmount: heldBefore },
+      newBalance: String(side === 'buy' ? cashBefore - solAmount : cashBefore + solAmount),
       leafHashFor: (sequence) => toHex(hashLeaf({ ...leafBase, sequence })),
       now: START + slot * 1_000,
     });

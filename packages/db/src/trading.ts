@@ -467,6 +467,41 @@ export async function tradeHistory(
   return result.rows.map((row) => toTradeRow(row as unknown as Record<string, unknown>));
 }
 
+/** A fill as the tape shows it: whose it was, and how it was produced. */
+export interface TapeRow extends TradeRow {
+  readonly pubkey: string;
+  readonly poolSource: string;
+}
+
+/**
+ * The newest fills across every account.
+ *
+ * Every other reader here is scoped to one account, because every other caller
+ * is showing somebody their own log. This one is for the broadcast, where the
+ * point is that fills are landing at all and that each carries the hash it was
+ * sealed with.
+ *
+ * The pubkey travels with the row and is truncated by whoever renders it. A
+ * wallet address is already public and already on the leaderboard, so this
+ * exposes nothing that reading the chain would not, but a full key across a
+ * stream is thirty-two characters of noise nobody can act on.
+ */
+export async function recentTrades(db: Client, limit = 40): Promise<TapeRow[]> {
+  const result = await db.execute({
+    sql: 'SELECT * FROM trades ORDER BY id DESC LIMIT ?',
+    args: [limit],
+  });
+
+  return result.rows.map((raw) => {
+    const row = raw as unknown as Record<string, unknown>;
+    return {
+      ...toTradeRow(row),
+      pubkey: String(row['user_pubkey']),
+      poolSource: String(row['pool_source']),
+    };
+  });
+}
+
 function toTradeRow(row: Record<string, unknown>): TradeRow {
   return {
     id: Number(row['id']),

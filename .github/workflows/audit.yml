@@ -1,0 +1,69 @@
+# The repository checking itself, on a clock.
+#
+# Runs the mechanical checks and commits the result back into the repository.
+# Committing rather than posting somewhere is the entire point: the history of
+# what this found belongs to git, so anyone can see when a check started failing
+# and nobody can make a failing one look like it never failed. A self-audit
+# stored where its author can quietly rewrite it is worth what a screenshot of a
+# green number is worth, which is nothing.
+#
+# It commits results and nothing else. `git add audit` is the whole write, so a
+# bug here can dirty a status file and cannot touch a line of the product. Fixes
+# are a separate, human-merged pull request, and never in the fill engine, a
+# season, or a payout.
+
+name: audit
+
+on:
+  schedule:
+    # Hourly, on the half hour, so a run does not collide with the top-of-hour
+    # crowd every other repository schedules into.
+    - cron: '30 * * * *'
+  workflow_dispatch:
+
+# One at a time. Two runs committing to the same file would race, and the
+# loser's result would be the one nobody sees.
+concurrency:
+  group: audit
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: run the checks and record what they found
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: audit
+        run: npx tsx scripts/audit.mts
+
+      - name: record the pass
+        run: |
+          # The author on the graph, matching every other commit here.
+          git config user.name  'ProbatioHQ'
+          git config user.email '316615726+ProbatioHQ@users.noreply.github.com'
+          git add audit
+          # `latest.json` carries a timestamp so it differs on every run, which
+          # makes it useless as a signal. The history file is the one that only
+          # moves when a pass says something new, or when half a day has passed
+          # without one, and that rule lives in the script where it is tested.
+          if git diff --cached --quiet -- audit/history.json; then
+            echo 'nothing changed since the last pass'
+            git reset
+            exit 0
+          fi
+          git commit -m "Audit: $(node -e "
+            const p = require('./audit/latest.json');
+            process.stdout.write(\`\${p.errors} errors, \${p.warnings} warnings across \${p.inspected} inspected\`);
+          ")"
+          git push

@@ -20,28 +20,38 @@
 import { readdirSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const projects = [
+/*
+ * Where a project's config lives, since one of them is not `<dir>/tsconfig.json`.
+ *
+ * `scripts` was missing from this list entirely, and it is the directory that
+ * drives the restore drill, loads the database and runs the audit. Two of those
+ * had been sitting with a required property missing from a call, unable to run
+ * at all, because the only place in the workspace that would have said so was
+ * never pointed at them.
+ */
+const projects: readonly { name: string; config: string }[] = [
   ...readdirSync('packages')
-    .map((name) => `packages/${name}`)
-    .filter((dir) => existsSync(`${dir}/tsconfig.json`)),
-  'app',
-].sort();
+    .map((name) => ({ name: `packages/${name}`, config: `packages/${name}/tsconfig.json` }))
+    .filter((p) => existsSync(p.config)),
+  { name: 'app', config: 'app/tsconfig.json' },
+  { name: 'scripts', config: 'tsconfig.scripts.json' },
+].sort((a, b) => a.name.localeCompare(b.name));
 
 let failed = 0;
 
 for (const project of projects) {
   const result = spawnSync(
     'npx',
-    ['tsc', '--noEmit', '-p', `${project}/tsconfig.json`],
+    ['tsc', '--noEmit', '-p', project.config],
     { encoding: 'utf8' },
   );
 
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
   if (result.status === 0 && output === '') {
-    console.log(`  ok    ${project}`);
+    console.log(`  ok    ${project.name}`);
   } else {
     failed += 1;
-    console.log(`  FAIL  ${project}`);
+    console.log(`  FAIL  ${project.name}`);
     for (const line of output.split('\n').slice(0, 12)) console.log(`        ${line}`);
   }
 }

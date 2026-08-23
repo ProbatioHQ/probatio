@@ -52,6 +52,15 @@ jobs:
       - name: Tests
         run: npx vitest run
 
+      # The same checks the hourly audit records, run as a gate.
+      #
+      # Recording a finding an hour after it merged is worth something; refusing
+      # it at the door is worth more, and the check already had the mode for it
+      # and no caller. Errors only, so the warnings the audit tracks over time do
+      # not block a change that did not cause them.
+      - name: Audit
+        run: npx tsx scripts/audit.mts --check
+
       # The build catches what the tests cannot: a page that throws only when
       # rendered, and the security headers, which are configuration rather than
       # code and have broken a page here before.

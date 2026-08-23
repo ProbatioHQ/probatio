@@ -1,0 +1,473 @@
+{
+  "at": 1787485518,
+  "checks": 4,
+  "inspected": 1942,
+  "errors": 0,
+  "warnings": 73,
+  "results": [
+    {
+      "id": "dead-exports",
+      "title": "Exports nothing calls",
+      "inspected": 805,
+      "findings": [
+        {
+          "severity": "warning",
+          "file": "app/components/leaderboard.tsx",
+          "line": 59,
+          "detail": "Leaderboard is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/components/price-chart.tsx",
+          "line": 61,
+          "detail": "TIMEFRAME_LABELS is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/components/status-banner.tsx",
+          "line": 29,
+          "detail": "isHealth is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/components/wallet.tsx",
+          "line": 44,
+          "detail": "shortenPubkey is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/chart-warm.ts",
+          "line": 168,
+          "detail": "chooseMint is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/continuous-candles.ts",
+          "line": 38,
+          "detail": "MAX_FILLED is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/curve-watch.ts",
+          "line": 322,
+          "detail": "stopCurveWatch is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/drift-watch.ts",
+          "line": 202,
+          "detail": "runDriftCycle is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/feed-filters.ts",
+          "line": 62,
+          "detail": "keywords is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/health.ts",
+          "line": 218,
+          "detail": "probeOnce is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/leaderboard.ts",
+          "line": 110,
+          "detail": "clearBoardCache is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/live-feed.ts",
+          "line": 136,
+          "detail": "stopLiveFeed is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/polled-feed.ts",
+          "line": 127,
+          "detail": "pollLaunches is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/polled-feed.ts",
+          "line": 216,
+          "detail": "resetPolledFeed is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/price-display.ts",
+          "line": 22,
+          "detail": "solPerToken is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/price-display.ts",
+          "line": 35,
+          "detail": "marketCapSol is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/rate-limit.ts",
+          "line": 74,
+          "detail": "resetLimiters is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/retention.ts",
+          "line": 91,
+          "detail": "stopRetention is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/rpc.ts",
+          "line": 40,
+          "detail": "sharedReader is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/season-lifecycle.ts",
+          "line": 31,
+          "detail": "startSeasonLifecycle is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/season-rollover.ts",
+          "line": 90,
+          "detail": "nextSchedule is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/season-rollover.ts",
+          "line": 167,
+          "detail": "stopSeasonRollover is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/format.ts",
+          "line": 40,
+          "detail": "escapeHtml is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/notify.ts",
+          "line": 71,
+          "detail": "deliverWatches is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/router.ts",
+          "line": 60,
+          "detail": "parseCommand is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/trade-cards.ts",
+          "line": 63,
+          "detail": "callbackData is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/trade.ts",
+          "line": 86,
+          "detail": "traderFor is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/transport.ts",
+          "line": 178,
+          "detail": "FakeTelegram is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram-links.ts",
+          "line": 24,
+          "detail": "TELEGRAM_BOT is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram-links.ts",
+          "line": 42,
+          "detail": "TELEGRAM_CHANNEL is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram-links.ts",
+          "line": 57,
+          "detail": "TELEGRAM_COMMUNITY is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/token-search.ts",
+          "line": 53,
+          "detail": "parseTokens is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/watched.ts",
+          "line": 70,
+          "detail": "watchedCount is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/pools/src/pumpfun.ts",
+          "line": 51,
+          "detail": "BONDING_CURVE_DISCRIMINATOR is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/sdk/src/read.ts",
+          "line": 32,
+          "detail": "resolveFetch is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/sybil/src/evidence.ts",
+          "line": 70,
+          "detail": "SHARED_FUNDER_SIGNATURES is mentioned only by tests, so nothing in the app runs it"
+        }
+      ]
+    },
+    {
+      "id": "css-vars",
+      "title": "Custom properties that resolve to nothing",
+      "inspected": 1051,
+      "findings": []
+    },
+    {
+      "id": "internal-links",
+      "title": "Links to pages that exist",
+      "inspected": 45,
+      "findings": []
+    },
+    {
+      "id": "env-docs",
+      "title": "Settings the notes explain",
+      "inspected": 41,
+      "findings": [
+        {
+          "severity": "warning",
+          "file": "app/app/api/admin/season/route.ts",
+          "line": 30,
+          "detail": "ADMIN_SECRET is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/app/api/health/route.ts",
+          "line": 46,
+          "detail": "RAILWAY_GIT_COMMIT_SHA is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/app/api/telegram/webhook/route.ts",
+          "line": 33,
+          "detail": "TELEGRAM_WEBHOOK_SECRET is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/app/layout.tsx",
+          "line": 37,
+          "detail": "APP_URI is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/instrumentation.ts",
+          "line": 27,
+          "detail": "NEXT_RUNTIME is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/instrumentation.ts",
+          "line": 41,
+          "detail": "PROBATIO_DISABLE_FEED is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/instrumentation.ts",
+          "line": 55,
+          "detail": "PROBATIO_FEED_SOURCE is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/instrumentation.ts",
+          "line": 73,
+          "detail": "PROBATIO_DISABLE_PRICE_STREAM is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/instrumentation.ts",
+          "line": 128,
+          "detail": "PROBATIO_DISABLE_DRIFT is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/chart-backfill.ts",
+          "line": 66,
+          "detail": "PROBATIO_BACKFILL_TRANSACTIONS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/chart-backfill.ts",
+          "line": 74,
+          "detail": "PROBATIO_POOL_BACKFILL_TRANSACTIONS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/chart-warm.ts",
+          "line": 77,
+          "detail": "PROBATIO_WARM_MINTS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/chart-warm.ts",
+          "line": 87,
+          "detail": "PROBATIO_WARM_INTERVAL_MS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/env.ts",
+          "line": 50,
+          "detail": "RPC_URL is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/env.ts",
+          "line": 77,
+          "detail": "RPC_FALLBACK_URL is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/env.ts",
+          "line": 110,
+          "detail": "COACH_MODEL is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/env.ts",
+          "line": 121,
+          "detail": "TREASURY_ADDRESS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/house-traders.ts",
+          "line": 90,
+          "detail": "PROBATIO_HOUSE_TRADERS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/house-traders.ts",
+          "line": 150,
+          "detail": "PROBATIO_HOUSE_INTERVAL_MS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/house-traders.ts",
+          "line": 347,
+          "detail": "PROBATIO_HOUSE_SEED is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/keeper.ts",
+          "line": 32,
+          "detail": "KEEPER_KEYPAIR is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/mark-prices.ts",
+          "line": 37,
+          "detail": "PROBATIO_DISABLE_MARKS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/mark-prices.ts",
+          "line": 40,
+          "detail": "PROBATIO_MARK_INTERVAL_MS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/mark-prices.ts",
+          "line": 49,
+          "detail": "PROBATIO_MARK_BUDGET is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/prize.ts",
+          "line": 25,
+          "detail": "PRIZE_KEYPAIR is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/cards.ts",
+          "line": 27,
+          "detail": "PROBATIO_SITE is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/telegram/transport.ts",
+          "line": 172,
+          "detail": "TELEGRAM_BOT_TOKEN is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/trader-warm.ts",
+          "line": 47,
+          "detail": "PROBATIO_TRADER_MINTS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/trader-warm.ts",
+          "line": 50,
+          "detail": "PROBATIO_TRADER_INTERVAL_MS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/trader-warm.ts",
+          "line": 65,
+          "detail": "PROBATIO_TRADER_DEPTH is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/trader-warm.ts",
+          "line": 78,
+          "detail": "PROBATIO_TRADER_WALLET_DEPTH is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/trader-warm.ts",
+          "line": 82,
+          "detail": "PROBATIO_TRADER_WALLETS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/trader-warm.ts",
+          "line": 294,
+          "detail": "PROBATIO_TRADER_LANES is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/db/src/client.ts",
+          "line": 46,
+          "detail": "DATABASE_AUTH_TOKEN is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/db/src/retention.ts",
+          "line": 219,
+          "detail": "PROBATIO_CANDLE_MINTS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/pools/src/governor.ts",
+          "line": 75,
+          "detail": "RPC_MONTHLY_CREDITS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/pools/src/governor.ts",
+          "line": 87,
+          "detail": "RPC_BACKGROUND_SHARE is read by the code and documented nowhere"
+        }
+      ]
+    }
+  ]
+}

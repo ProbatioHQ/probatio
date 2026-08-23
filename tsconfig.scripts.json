@@ -11,6 +11,18 @@
   // tsx, so a script can drive the real modules rather than a copy of them.
   "compilerOptions": {
     "target": "ES2022",
+    // Checking, not building: no emit, and the same strictness the rest of the
+    // workspace is held to. `skipLibCheck` because a script's types are the
+    // point and Next's shipped declarations are not.
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    // The harness imports sibling scripts by their real filename, which is how
+    // tsx resolves them and what tsc needs telling about.
+    "allowImportingTsExtensions": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
     "baseUrl": ".",
@@ -18,5 +30,14 @@
       "server-only": ["./test-support/server-only.ts"],
       "@/*": ["./app/*"]
     }
-  }
+    },
+
+  // Scoped so `tsc -p` can use this to check the scripts.
+  //
+  // Without an `include` this config claims the whole repository, so pointing a
+  // typechecker at it pulled in every page and failed on JSX it was never meant
+  // to compile. Which is why nothing ever pointed one at it, and why the
+  // restore-drill seeder sat with a missing required property: `scripts/` was
+  // the one directory in the workspace nobody was checking.
+  "include": ["scripts/**/*.ts", "scripts/**/*.mts", "test-support/**/*.ts"]
 }

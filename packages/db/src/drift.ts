@@ -167,6 +167,36 @@ export async function driftHistory(
 }
 
 /**
+ * The newest observations across every token, newest first.
+ *
+ * `driftHistory` answers "how has the engine done on this token", which is the
+ * question a token page asks. This answers "how is the engine doing", which is
+ * the one a status board asks, and there was no reader for it: finding out
+ * meant naming a mint first, so anything watching the engine as a whole had to
+ * already know where to look.
+ */
+export async function recentDrift(db: Client, limit = 50): Promise<DriftHistoryEntry[]> {
+  const result = await db.execute({
+    sql: 'SELECT * FROM drift_observations ORDER BY observed_at DESC LIMIT ?',
+    args: [limit],
+  });
+
+  return result.rows.map((row) => {
+    const record = row as unknown as Record<string, unknown>;
+    return {
+      mint: String(record['mint']),
+      engineVersion: Number(record['engine_version']),
+      samples: Number(record['samples']),
+      medianSignedBps: Number(record['median_signed_bps']),
+      medianAbsBps: Number(record['median_abs_bps']),
+      generousSamples: Number(record['generous_samples']),
+      severity: String(record['severity']) as DriftSeverity,
+      observedAt: Number(record['observed_at']),
+    };
+  });
+}
+
+/**
  * The mints worth checking the engine against.
  *
  * Ordered by how much they are being traded here, not by how much they trade on

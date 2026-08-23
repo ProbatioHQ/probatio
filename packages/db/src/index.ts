@@ -75,6 +75,7 @@ export type { RetentionResult } from './retention';
 
 export {
   driftHistory,
+  recentDrift,
   isSuspended,
   mostTradedMints,
   liftSuspension,
@@ -250,6 +251,7 @@ export {
   startOver,
   recordTrade,
   totalRealizedPnl,
+  recentTrades,
   tradeHistory,
 } from './trading';
 export type {
@@ -258,6 +260,7 @@ export type {
   PositionRow,
   PositionWrite,
   SeasonRow,
+  TapeRow,
   TradeRow,
   TradeWrite,
 } from './trading';

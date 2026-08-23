@@ -120,6 +120,7 @@ async function placeTrade(
         mint: MINT,
         solReserve: solReserve.toString(),
         tokenReserve: tokenReserve.toString(),
+        deliverableTokens: tokenReserve.toString(),
         tokenDecimals: 6,
         feeBps: 125,
         source: 'pumpfun-curve',
