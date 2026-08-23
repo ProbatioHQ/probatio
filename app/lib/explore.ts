@@ -423,8 +423,15 @@ export interface Board {
   readonly total: number;
 }
 
-/** The ranking, without sparklines. Cached, so readers share one round of calls. */
-async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
+/**
+ * The ranking, without sparklines. Cached, so readers share one round of calls.
+ *
+ * Exported because the strategy runner checks entry conditions against it every
+ * fifteen seconds. Sharing the cache is the whole point: a strategy that is
+ * waiting must not cost a request, and a hundred of them waiting must not cost a
+ * hundred.
+ */
+export async function ranking(): Promise<Omit<Mover, 'spark'>[]> {
   const cache = store<Omit<Mover, 'spark'>[]>(CACHE_KEY);
   const hit = cache.get('board');
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;

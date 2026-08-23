@@ -15,7 +15,9 @@ export type PolicyName =
   | 'money'
   | 'paid'
   | 'auth'
-  | 'write';
+  | 'write'
+  | 'api-order'
+  | 'api-read';
 
 export const POLICIES: Record<PolicyName, BucketRule> = {
   // Cached or database-only. Generous: these are what a page load costs, and a
@@ -46,4 +48,26 @@ export const POLICIES: Record<PolicyName, BucketRule> = {
 
   // Cheap writes: claiming a name, and similar.
   write: { capacity: 20, refillMs: 60_000 },
+
+  /*
+   * Orders from a program, in their own bucket.
+   *
+   * Tighter than `trade`, and separate from it, which matters more than the
+   * number. A person clicks a few times a minute; a loop can ask a thousand
+   * times in the same minute without meaning any harm at all. Sharing the
+   * website's bucket would mean one badly written program throttling the people
+   * trading by hand, which is exactly backwards.
+   *
+   * Twenty a minute is far above any strategy worth running and far below what a
+   * loop with no sleep in it produces, so it separates the two without ever being
+   * reached by the first.
+   */
+  'api-order': { capacity: 20, refillMs: 60_000 },
+
+  /*
+   * Reads from a program. Generous, because they are database-only and because
+   * the alternative is a bot polling blind: a program refused its own balance
+   * places orders it cannot size, which is worse for everybody than the read.
+   */
+  'api-read': { capacity: 120, refillMs: 60_000 },
 };

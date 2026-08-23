@@ -22,6 +22,26 @@ export default function SeasonPage() {
 
       <section className="term">
         <div className="term-bar">
+          <span className="prompt">~/strategies</span>
+          <span>trade it with an algorithm</span>
+          <span className="lights">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+        <div className="term-body prose">
+          <p>
+            You do not have to click. Write the rules and this site runs them for the whole season
+            on the same clock and the same fills, or take a key and run your own program. Either
+            way it trades the account you entered with and lands on the board above beside
+            everybody else. <a href="/strategies">Write one</a>.
+          </p>
+        </div>
+      </section>
+
+      <section className="term">
+        <div className="term-bar">
           <span className="prompt">~/rules</span>
           <span>how a season is decided</span>
           <span className="lights">

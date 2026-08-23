@@ -1,19 +1,19 @@
 {
-  "at": 1787506418,
+  "at": 1787513664,
   "checks": 4,
-  "inspected": 1945,
+  "inspected": 2019,
   "errors": 0,
-  "warnings": 73,
+  "warnings": 75,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 808,
+      "inspected": 841,
       "findings": [
         {
           "severity": "warning",
           "file": "app/components/leaderboard.tsx",
-          "line": 59,
+          "line": 70,
           "detail": "Leaderboard is exported and no other file mentions it"
         },
         {
@@ -73,7 +73,7 @@
         {
           "severity": "warning",
           "file": "app/lib/leaderboard.ts",
-          "line": 110,
+          "line": 111,
           "detail": "clearBoardCache is exported and no other file mentions it"
         },
         {
@@ -231,19 +231,19 @@
     {
       "id": "css-vars",
       "title": "Custom properties that resolve to nothing",
-      "inspected": 1051,
+      "inspected": 1085,
       "findings": []
     },
     {
       "id": "internal-links",
       "title": "Links to pages that exist",
-      "inspected": 45,
+      "inspected": 50,
       "findings": []
     },
     {
       "id": "env-docs",
       "title": "Settings the notes explain",
-      "inspected": 41,
+      "inspected": 43,
       "findings": [
         {
           "severity": "warning",
@@ -254,7 +254,7 @@
         {
           "severity": "warning",
           "file": "app/app/api/health/route.ts",
-          "line": 46,
+          "line": 47,
           "detail": "RAILWAY_GIT_COMMIT_SHA is read by the code and documented nowhere"
         },
         {
@@ -296,7 +296,7 @@
         {
           "severity": "warning",
           "file": "app/instrumentation.ts",
-          "line": 137,
+          "line": 149,
           "detail": "PROBATIO_DISABLE_DRIFT is read by the code and documented nowhere"
         },
         {
@@ -397,6 +397,18 @@
         },
         {
           "severity": "warning",
+          "file": "app/lib/strategy-runner.ts",
+          "line": 76,
+          "detail": "PROBATIO_DISABLE_STRATEGIES is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/strategy-runner.ts",
+          "line": 86,
+          "detail": "PROBATIO_STRATEGY_INTERVAL_MS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
           "file": "app/lib/telegram/cards.ts",
           "line": 27,
           "detail": "PROBATIO_SITE is read by the code and documented nowhere"
@@ -452,7 +464,7 @@
         {
           "severity": "warning",
           "file": "packages/db/src/retention.ts",
-          "line": 219,
+          "line": 221,
           "detail": "PROBATIO_CANDLE_MINTS is read by the code and documented nowhere"
         },
         {

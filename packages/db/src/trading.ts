@@ -167,7 +167,32 @@ export interface TradeWrite {
   readonly latencyMs: number;
   readonly engineVersion: number;
   readonly leafHash: string;
+  /**
+   * How the order arrived.
+   *
+   * Not part of the leaf, and that distinction is load bearing. The leaf is what
+   * a stranger recomputes to check a record, and its shape is fixed by the
+   * engine version a season committed to; adding a field to it now would
+   * invalidate every commit already on chain. So this is recorded beside the
+   * leaf rather than inside it: append-only and impossible to rewrite, but not
+   * something the chain vouches for. It belongs in the leaf at the next engine
+   * version bump, at a season boundary.
+   *
+   * Optional here only so that the several callers that predate it keep
+   * compiling as what they are, which is the website.
+   */
+  readonly source?: TradeSource;
 }
+
+/**
+ * The four ways an order can reach the engine.
+ *
+ * `form` is a strategy we run, `api` is a program the trader runs themselves.
+ * Both are automated and they are kept apart because "we did this on your
+ * behalf" and "you did this to us" are different claims about who is
+ * responsible for a fill.
+ */
+export type TradeSource = 'web' | 'telegram' | 'form' | 'api';
 
 export interface PoolSnapshotWrite {
   readonly mint: string;
@@ -293,8 +318,9 @@ export async function recordTrade(
       sql: `INSERT INTO trades (
               account_id, season_id, user_pubkey, mint, side, sol_amount, token_amount,
               fee, price_impact_bps, partial, pool_source, clicked_at_slot, filled_at_slot,
-              latency_ms, engine_version, pool_snapshot_id, leaf_hash, sequence, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              latency_ms, engine_version, pool_snapshot_id, leaf_hash, sequence, created_at,
+              source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id`,
       args: [
         input.trade.accountId,
@@ -316,6 +342,7 @@ export async function recordTrade(
         input.leafHashFor(sequence),
         sequence,
         input.now,
+        input.trade.source ?? 'web',
       ],
     });
 

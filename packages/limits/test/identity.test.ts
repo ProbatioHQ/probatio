@@ -130,3 +130,26 @@ describe('a deployment with no proxy in front of it', () => {
     expect(clientAddress(headers({ 'x-real-ip': '9.9.9.9' }), { trustedProxies: 1 })).toBe('9.9.9.9');
   });
 });
+
+/**
+ * A program identifies itself with a key, not with a cookie.
+ *
+ * The API routes authenticate first and then hand the wallet in here, because a
+ * request carrying an API key has no session and would otherwise be counted
+ * against its network address. Two bots behind one office connection, or in one
+ * cloud provider's range, would have shared a bucket and throttled each other
+ * while the header named each of them exactly.
+ */
+describe('a caller identified by a key rather than a session', () => {
+  it('is counted per wallet, whatever address it comes from', () => {
+    expect(callerKey('wallet-one', '203.0.113.7')).toBe('w:wallet-one');
+    expect(callerKey('wallet-two', '203.0.113.7')).toBe('w:wallet-two');
+    // Same wallet, two machines: still one caller.
+    expect(callerKey('wallet-one', '198.51.100.4')).toBe('w:wallet-one');
+  });
+
+  it('falls back to the address when there is no wallet to name', () => {
+    // Which is the unauthenticated case, and the reason a flood is still bounded.
+    expect(callerKey(null, '203.0.113.7')).toBe('a:203.0.113.7');
+  });
+});

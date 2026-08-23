@@ -1,4 +1,5 @@
 import type { Client } from '@libsql/client';
+import { pruneStrategyEvents } from './strategies';
 import { pruneUpdates } from './telegram';
 import { pruneObservedSwaps } from './observed';
 
@@ -156,6 +157,7 @@ export interface RetentionResult {
   readonly launchesDeleted: number;
   readonly observedSwapsDeleted: number;
   readonly telegramUpdatesDeleted: number;
+  readonly strategyEventsDeleted: number;
 }
 
 /**
@@ -375,6 +377,9 @@ export async function runRetention(db: Client, now: number): Promise<RetentionRe
     // The Telegram dedupe table grows with every update the bot is sent and is
     // only useful for as long as an update can still be retried.
     telegramUpdatesDeleted: await attempt('telegram updates', () => pruneUpdates(db, now)),
+    // A row every time a running strategy declines to do something, which is
+    // most ticks of most strategies. Unswept it is the next unbounded table.
+    strategyEventsDeleted: await attempt('strategy events', () => pruneStrategyEvents(db, now)),
   };
 }
 

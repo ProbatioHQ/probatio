@@ -81,7 +81,7 @@ export type {
   TransactionLogs,
 } from './rpc';
 
-export { PoolReader } from './reader';
+export { PoolReader, forgetPool } from './reader';
 export { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 export type { Resolution, Venue } from './reader';
 

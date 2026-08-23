@@ -263,6 +263,7 @@ export type {
   SeasonRow,
   TapeRow,
   TradeRow,
+  TradeSource,
   TradeWrite,
 } from './trading';
 
@@ -281,6 +282,30 @@ export {
   setSeasonStatus,
 } from './payout';
 export type { ClaimData, FinalizedEntry, SeasonLifecycle } from './payout';
+
+export {
+  StrategyError,
+  automatedTradesSince,
+  mintStrategyKey,
+  pruneStrategyEvents,
+  ownerOfKey,
+  recordStrategyEvent,
+  revokeStrategyKey,
+  runningStrategies,
+  saveStrategy,
+  staleRunningStrategies,
+  startStrategy,
+  stopStrategy,
+  strategyEvents,
+  strategyFor,
+  strategyKeys,
+} from './strategies';
+export type {
+  StrategyEvent,
+  StrategyKeyRow,
+  StrategyRow,
+  StrategyStatus,
+} from './strategies';
 
 export { createTestDatabase } from './testing';
 export type { TestDatabase } from './testing';

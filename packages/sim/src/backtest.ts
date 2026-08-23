@@ -1,5 +1,6 @@
 import { QuoteError, quoteBuy, quoteSell } from './engine';
 import { DEFAULT_RULES } from './execution';
+import { exitDecision } from './strategy';
 import type { FeeSchedule, PoolState } from './types';
 
 /**
@@ -360,18 +361,25 @@ export function backtestRule(
     if (bestBps === null || moved > bestBps) bestBps = moved;
 
     /*
-     * Order matters, and this order is the pessimistic one.
+     * The same decision the live runner makes, from the same function.
      *
-     * A single swap can carry the price through a stop and a take profit at
-     * once, and only one of them can be true. Checking the stop first is the
-     * assumption that the move went against you before it went for you, which
-     * is the assumption a backtest should make about a moment it cannot see
-     * inside of.
+     * Two implementations of "has the rule fired" would agree for a while and
+     * then quietly stop, and the failure would look like a strategy that
+     * backtested well and traded badly — indistinguishable from an unlucky
+     * strategy, and the most damaging bug this could ship with. So the ordering,
+     * the comparisons and the pessimism all live in `exitDecision`, and both
+     * callers get them or neither does.
      */
-    if (stopLoss !== null && moved <= -stopLoss) reason = 'stop_loss';
-    else if (takeProfit !== null && moved >= takeProfit) reason = 'take_profit';
-    else if (deadline !== null && point.at >= deadline) reason = 'timeout';
-    else continue;
+    const fired = exitDecision(
+      {
+        ...(takeProfit === null ? {} : { takeProfitBps: takeProfit }),
+        ...(stopLoss === null ? {} : { stopLossBps: stopLoss }),
+        ...(deadline === null ? {} : { timeoutSeconds: deadline - entry.at }),
+      },
+      { movedBps: moved, heldSeconds: point.at - entry.at },
+    );
+    if (fired === null) continue;
+    reason = fired;
 
     exit = {
       at: point.at,

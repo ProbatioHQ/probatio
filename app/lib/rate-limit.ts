@@ -43,12 +43,24 @@ export async function rateLimit(
   request: Request,
   policy: PolicyName,
   cost = 1,
+  /**
+   * Who this is, when the caller already knows better than a cookie can say.
+   *
+   * The session is how a browser identifies itself and a program has no session,
+   * so a request carrying an API key fell through to being counted by network
+   * address. Two people running bots from one office, or from one cloud
+   * provider's range, would then have shared a bucket and throttled each other,
+   * while the key in the header named the wallet exactly. Passed in rather than
+   * looked up here, because only the route knows whether it has authenticated
+   * the request yet.
+   */
+  identity?: string,
 ): Promise<LimitResult> {
   // Identifying the caller by wallet where possible: two traders behind one
   // connection are two callers, and one wallet moving networks is still one.
-  const user = await currentUser().catch(() => null);
+  const user = identity ? null : await currentUser().catch(() => null);
   const address = clientAddress(request.headers, { trustedProxies: trustedProxies() });
-  const key = callerKey(user?.pubkey ?? null, address);
+  const key = callerKey(identity ?? user?.pubkey ?? null, address);
 
   const decision = limiterFor(policy).check(key, Date.now(), cost);
   if (decision.allowed) return { response: null, key };

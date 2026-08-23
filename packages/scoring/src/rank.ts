@@ -20,6 +20,24 @@ export interface Standing {
   /** Cash plus the marked value of anything still held. */
   readonly finalEquity: bigint;
   readonly tradeCount: number;
+  /**
+   * How many of those were placed by a program rather than by a person.
+   *
+   * Deliberately absent from `compareStandings` below. How a record was made
+   * changes nothing about where it places: an automated entrant is ranked
+   * against everybody else on return and on nothing else. This exists to be
+   * shown, not weighed.
+   *
+   * Optional, and that is not laziness. A verifier rebuilds standings out of a
+   * published finalization in order to recompute the split, and a finalization
+   * does not carry this — it cannot, because the fields in a result leaf are
+   * fixed by the hash every already-published season committed to, and adding
+   * one would break the verification of all of them. So a standing reconstructed
+   * for verification legitimately does not know, and must not be required to.
+   * Absent means unrecorded, which is different from zero, and only the board
+   * reads it.
+   */
+  readonly automatedTrades?: number;
 }
 
 export interface RankedStanding extends Standing {

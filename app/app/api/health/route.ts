@@ -8,6 +8,7 @@ import { driftStatus } from '@/lib/drift-watch';
 import { warmStats } from '@/lib/chart-warm';
 import { traderWarmStats } from '@/lib/trader-warm';
 import { houseTraderStats } from '@/lib/house-traders';
+import { strategyRunnerStatus } from '@/lib/strategy-runner';
 import { markStats } from '@/lib/mark-prices';
 import { priceStreamStatus } from '@/lib/price-stream';
 import { seasonProbe, storageStats, writeProbe } from '@/lib/db-reclaim';
@@ -97,6 +98,8 @@ export async function GET(request: Request): Promise<Response> {
       traders: traderWarmStats(),
       /* The accounts trading free play through the engine. */
       house: houseTraderStats(),
+      /* Strategies people wrote in the form, running on our clock. */
+      strategies: strategyRunnerStatus(),
       /*
        * Prices kept on what people hold.
        *

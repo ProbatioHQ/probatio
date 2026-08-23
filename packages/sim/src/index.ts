@@ -42,6 +42,30 @@ export type {
   ReplayPoint,
   Rule,
 } from './backtest';
+export {
+  DAILY_TRADE_CAP,
+  MAX_OPEN_POSITIONS,
+  MAX_STAKE_LAMPORTS,
+  MIN_STAKE_LAMPORTS,
+  RULES_VERSION,
+  StrategyRulesError,
+  exitDecision,
+  matchesEntry,
+  parseStrategyRules,
+  readStoredRules,
+  serializeStrategyRules,
+} from './strategy';
+export type {
+  Candidate,
+  EntryRules,
+  EntryVerdict,
+  ExitRules,
+  ExitTrigger,
+  SizeRules,
+  StrategyRules,
+  Venue,
+} from './strategy';
+
 export { DEFAULT_RULES, simulateFill } from './execution';
 export type {
   ExecutionRules,

@@ -189,6 +189,16 @@ export interface LeaderboardRow {
   readonly solBalance: string;
   readonly realizedPnl: string;
   readonly tradeCount: number;
+  /**
+   * How many of those orders were placed by a program rather than by a person.
+   *
+   * Counted so the board can say how a record was made without segregating it.
+   * A row where this equals `tradeCount` was traded entirely automatically; a
+   * row where it is zero was traded entirely by hand; anything between is a
+   * trader who used both, which is allowed and ordinary. There is no separate
+   * bot division and no scoring difference. The tag says how, not where.
+   */
+  readonly automatedTrades: number;
   readonly enteredAt: number;
   readonly positions: readonly LeaderboardPosition[];
 }
@@ -227,7 +237,11 @@ export async function leaderboardRows(
   });
 
   const counts = await db.execute({
-    sql: `SELECT account_id, COUNT(*) AS n FROM trades
+    // Both counts in the one pass. A second query to learn how a row was made
+    // would double the cost of a board to add a label to it.
+    sql: `SELECT account_id, COUNT(*) AS n,
+                 SUM(CASE WHEN source IN ('form', 'api') THEN 1 ELSE 0 END) AS automated
+          FROM trades
           WHERE season_id = ? GROUP BY account_id`,
     args: [seasonId],
   });
@@ -251,8 +265,10 @@ export async function leaderboardRows(
   }
 
   const tradeCounts = new Map<number, number>();
+  const automatedCounts = new Map<number, number>();
   for (const row of counts.rows) {
     tradeCounts.set(Number(row['account_id']), Number(row['n']));
+    automatedCounts.set(Number(row['account_id']), Number(row['automated'] ?? 0));
   }
 
   return accounts.rows.map((row) => {
@@ -264,6 +280,7 @@ export async function leaderboardRows(
       solBalance: String(row['sol_balance']),
       realizedPnl: (realized.get(accountId) ?? 0n).toString(),
       tradeCount: tradeCounts.get(accountId) ?? 0,
+      automatedTrades: automatedCounts.get(accountId) ?? 0,
       enteredAt: Number(row['entered_at']),
       positions: held.get(accountId) ?? [],
     };
@@ -314,7 +331,11 @@ export async function allTimeRows(db: Client): Promise<AllTimeRow[]> {
      FROM positions p`,
   );
 
-  const counts = await db.execute('SELECT account_id, COUNT(*) AS n FROM trades GROUP BY account_id');
+  const counts = await db.execute(
+    `SELECT account_id, COUNT(*) AS n,
+            SUM(CASE WHEN source IN ('form', 'api') THEN 1 ELSE 0 END) AS automated
+     FROM trades GROUP BY account_id`,
+  );
 
   // What each trader paid for practice SOL, per season, still as lamports of
   // real SOL. The caller converts it to a credit, because the tier table lives
@@ -341,7 +362,11 @@ export async function allTimeRows(db: Client): Promise<AllTimeRow[]> {
   }
 
   const tradeCounts = new Map<number, number>();
-  for (const row of counts.rows) tradeCounts.set(Number(row['account_id']), Number(row['n']));
+  const automatedCounts = new Map<number, number>();
+  for (const row of counts.rows) {
+    tradeCounts.set(Number(row['account_id']), Number(row['n']));
+    automatedCounts.set(Number(row['account_id']), Number(row['automated'] ?? 0));
+  }
 
   const paid = new Map<string, bigint>();
   for (const row of purchases.rows) {
@@ -364,6 +389,7 @@ export async function allTimeRows(db: Client): Promise<AllTimeRow[]> {
         solBalance: String(row['sol_balance']),
         realizedPnl: (realized.get(accountId) ?? 0n).toString(),
         tradeCount: tradeCounts.get(accountId) ?? 0,
+        automatedTrades: automatedCounts.get(accountId) ?? 0,
         enteredAt: Number(row['entered_at']),
         positions: held.get(accountId) ?? [],
         purchasedBalance: (paid.get(`${pubkey}:${seasonId}`) ?? 0n).toString(),

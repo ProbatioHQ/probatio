@@ -7,6 +7,7 @@ import {
   recordTrade,
   type AccountRow,
   type Client,
+  type TradeSource,
 } from '@probatio/db';
 import { PUMPFUN_TOKEN_DECIMALS, type Resolution } from '@probatio/pools';
 import { DEFAULT_RULES, simulateFill, totalFeeBps } from '@probatio/sim';
@@ -59,6 +60,14 @@ export interface TradeRequest {
   readonly size: bigint;
   readonly slippageBps?: number;
   readonly market: MarketReader;
+  /**
+   * How this order arrived, recorded on the trade.
+   *
+   * Defaults to the website, which is what every caller that predates automated
+   * entrants is. Recorded beside the leaf rather than inside it: see the note on
+   * `TradeWrite.source` for why that distinction is not a shortcut.
+   */
+  readonly source?: TradeSource;
   /** Waits out the season's latency. Injected so a test does not sit there. */
   readonly wait?: (ms: number) => Promise<void>;
   readonly now?: number;
@@ -288,6 +297,7 @@ export async function executeTrade(request: TradeRequest): Promise<TradeOutcome>
         filledAtSlot: pool.slot,
         latencyMs: account.latencyMs,
         engineVersion: outcome.quote.engineVersion,
+        source: request.source ?? 'web',
       },
       position: {
         accountId: account.id,

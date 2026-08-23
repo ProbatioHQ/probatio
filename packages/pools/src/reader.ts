@@ -35,6 +35,91 @@ import { decodeMintDecimals, decodeTokenAccount } from './token';
 /** A pool with no creator to pay. Anchor writes an unset Pubkey as all zeros. */
 const UNSET_CREATOR = '11111111111111111111111111111111';
 
+/**
+ * Which pool is a graduated mint's market, remembered between reads.
+ *
+ * WHAT IS CACHED, AND WHAT IS EMPHATICALLY NOT
+ *
+ * Only the *identity* of the pool: its address and its layout. The reserves are
+ * read fresh on every single resolve and are never stored here, because a quote
+ * against a remembered balance is a fabricated quote and the entire engine rests
+ * on that not happening. This changes which account is read, never how recently.
+ *
+ * WHY IT EXISTS
+ *
+ * Finding the pool means scanning every account the PumpSwap program owns,
+ * filtered by mint. There is no address to derive: a pool's key comes from its
+ * creator, so the mint has to be matched inside the data. That scan is twenty
+ * credits against a plain read's one, and it ran twice per fill, on both sides
+ * of the latency wait. Measured: a graduated round trip cost about ninety-six
+ * credits, of which eighty were the same scan answering the same question four
+ * times. With the answer remembered it is about sixteen.
+ *
+ * WHY A SHORT LIFE
+ *
+ * Which pool is deepest is a live fact and a security-relevant one. `deepestPool`
+ * exists because a trader who controls the pool the simulator quotes from
+ * controls the price of their own fills, and the defence is that being quoted
+ * costs real SOL. Remembering the winner for too long turns that into a stale
+ * answer, so it is minutes rather than hours, and any read that finds the
+ * remembered pool empty throws it away and searches again.
+ */
+const POOL_TTL_MS = 5 * 60 * 1_000;
+
+/** Bounded: a busy feed touches thousands of mints and this is only a shortcut. */
+const POOL_CACHE_MAX = 2_000;
+
+interface CachedPool {
+  readonly address: string;
+  readonly pool: PumpSwapPool;
+  readonly at: number;
+}
+
+/*
+ * Shared across readers rather than held per instance.
+ *
+ * There are several readers in a running process — the request path, the house
+ * accounts, the price marker — and each one pays this cost separately. They are
+ * all asking the same question about the same mint, so per-instance caches would
+ * answer it once each instead of once.
+ */
+const POOL_CACHE_KEY = Symbol.for('probatio.pumpswap-pools');
+
+function poolCache(): Map<string, CachedPool> {
+  const store = globalThis as unknown as Record<symbol, Map<string, CachedPool> | undefined>;
+  const existing = store[POOL_CACHE_KEY];
+  if (existing) return existing;
+  const fresh = new Map<string, CachedPool>();
+  store[POOL_CACHE_KEY] = fresh;
+  return fresh;
+}
+
+function rememberPool(mint: string, address: string, pool: PumpSwapPool, at: number): void {
+  const cache = poolCache();
+  cache.delete(mint);
+  cache.set(mint, { address, pool, at });
+  while (cache.size > POOL_CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
+
+function rememberedPool(mint: string, now: number): CachedPool | null {
+  const held = poolCache().get(mint);
+  if (!held) return null;
+  if (now - held.at >= POOL_TTL_MS) {
+    poolCache().delete(mint);
+    return null;
+  }
+  return held;
+}
+
+/** Forget a mint's pool, so the next read searches again. Exported for tests. */
+export function forgetPool(mint: string): void {
+  poolCache().delete(mint);
+}
+
 export type Venue =
   | { readonly kind: 'pumpfun-curve'; readonly curveAddress: string }
   | { readonly kind: 'pumpswap'; readonly poolAddress: string; readonly graduated: true }
@@ -186,6 +271,42 @@ export class PoolReader {
 
     // Graduated. Quoting the curve's final reserves would price a market that
     // has stopped trading, so the successor pool has to be found instead.
+    const now = Date.now();
+    const remembered = rememberedPool(mint, now);
+
+    if (remembered) {
+      /*
+       * The shortcut, and the check that keeps it honest.
+       *
+       * Reserves are read fresh here exactly as they are on the slow path; the
+       * only thing skipped is the program scan that decides *which* pool. If the
+       * remembered one has since been emptied, or has become unreadable, the
+       * answer is thrown away and the full search runs. Quoting a drained pool
+       * would refuse every trade on a token that is trading perfectly well
+       * somewhere else, which is a worse failure than the cost this avoids.
+       */
+      try {
+        const [poolAccount] = await this.#rpc.getAccounts([remembered.address]);
+        const state = await this.readPumpSwapReserves(
+          remembered.address,
+          remembered.pool,
+          tokenDecimals,
+          poolAccount ? pumpSwapReserveOffset(poolAccount.data) : 0n,
+        );
+        if (state.solReserve > 0n && state.tokenReserve > 0n) {
+          return {
+            mint,
+            venue: { kind: 'pumpswap', poolAddress: remembered.address, graduated: true },
+            pool: state,
+            slot: state.slot,
+          };
+        }
+      } catch {
+        // Fall through to the search below.
+      }
+      forgetPool(mint);
+    }
+
     const pools = await this.findPumpSwapPools(mint);
     const pool = await this.deepestPool(pools);
     if (!pool) {
@@ -199,6 +320,7 @@ export class PoolReader {
       tokenDecimals,
       poolAccount ? pumpSwapReserveOffset(poolAccount.data) : 0n,
     );
+    rememberPool(mint, pool.address, pool.pool, now);
     return {
       mint,
       venue: { kind: 'pumpswap', poolAddress: pool.address, graduated: true },

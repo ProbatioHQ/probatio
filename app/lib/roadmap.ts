@@ -45,7 +45,7 @@ export const PHASES: readonly Phase[] = [
       {
         title: 'Automated strategies that get ranked',
         detail:
-          'Write an algorithm, connect it to the simulator, and let it trade a season under the same fills and the same clock as everyone else. A bot that can prove itself is a trader too.',
+          'Built. Write the rules in a form and this site runs them for the whole season, or take a key and run your own program. Both go through the same fill engine on the same clock and land on the same leaderboard. No separate bot division.',
       },
       {
         title: 'Backtesting on real history',

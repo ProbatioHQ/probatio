@@ -10007,3 +10007,234 @@ body:has(#livestream) {
   flex-direction: column;
   justify-content: center;
 }
+
+/* ------------------------------------------------------------- strategies */
+/* The form somebody writes a strategy in, and the log of what it did.
+   Laid out on a grid rather than with margins between fields, so a row of
+   conditions stays a row when the labels wrap. */
+
+.strategies {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.strategy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.strategy-section {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+.strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+}
+
+.strategy-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.strategy-actions .field {
+  flex: 0 1 220px;
+}
+
+.strategy-error {
+  color: var(--loss);
+  font-size: 13.5px;
+}
+
+/* The key, the one time it is ever shown. Deliberately hard to miss and
+   deliberately selectable in one go. */
+.strategy-minted {
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.strategy-minted code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  word-break: break-all;
+  user-select: all;
+  color: var(--text);
+}
+
+.strategy-keys {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.strategy-keys li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.strategy-keys code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--text-dim);
+}
+
+.strategy-log {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.strategy-log li {
+  display: grid;
+  grid-template-columns: 74px 68px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+
+.strategy-log-at {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.strategy-log-kind {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Colour carries the same meaning it does everywhere else on the site: green
+   is money in, red is money out, and everything else is neutral. A refusal is
+   not a failure and is not painted as one. */
+.strategy-log-kind.k-entered { color: var(--accent); }
+.strategy-log-kind.k-exited { color: var(--accent); }
+.strategy-log-kind.k-failed { color: var(--loss); }
+.strategy-log-kind.k-capped { color: var(--warn, #f0b429); }
+
+.strategy-log-detail {
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.strategy-limits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.strategy-limits strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .strategy-log li {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
+
+/* A row traded entirely by a program. A label, not a division: it sits beside
+   the name rather than in a column of its own, and nothing about the ranking
+   or the payout changes because of it. */
+.auto-tag {
+  margin-left: 7px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--line-bright);
+  border-radius: 4px;
+  padding: 1px 4px;
+  vertical-align: middle;
+}
+
+/* --------------------------------------------------------------- api docs */
+
+.docs {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.docs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Code that has to be copied whole, so it scrolls inside its own box rather
+   than widening the page. */
+.docs-code {
+  background: var(--ink-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+
+.docs-code code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  white-space: pre;
+}
+
+.docs-endpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.docs-endpoints dt code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.docs-endpoints dd {
+  margin-top: 5px;
+  font-size: 14px;
+  color: var(--text-dim);
+  max-width: 68ch;
+}
+
+.docs-endpoints dd code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+}

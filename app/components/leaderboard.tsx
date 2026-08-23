@@ -15,6 +15,8 @@ interface Row {
   trader: string;
   returnBps: number;
   tradeCount: number;
+  /** Every order on this row came from a program rather than from a person. */
+  automated?: boolean;
   payoutLamports: string;
 }
 
@@ -46,7 +48,16 @@ function Standing({ row, you = false }: { row: Row; you?: boolean }) {
   return (
     <tr aria-current={you ? 'true' : undefined}>
       <td>{row.rank}</td>
-      <td className="mono">{you ? 'You' : short(row.trader)}</td>
+      <td className="mono">
+        {you ? 'You' : short(row.trader)}
+        {/* How the row was traded, not where it belongs. Same board, same
+            ranking; a tag rather than a division. */}
+        {row.automated && (
+          <span className="auto-tag" title="Every order on this row was placed by a program, through the same engine and the same clock as a click.">
+            auto
+          </span>
+        )}
+      </td>
       <td className={row.returnBps > 0 ? 'gain' : row.returnBps < 0 ? 'loss' : 'dim'}>
         {percent(row.returnBps)}
       </td>

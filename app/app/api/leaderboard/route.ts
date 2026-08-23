@@ -75,6 +75,15 @@ export async function GET(request: Request): Promise<Response> {
     finalEquity: standing.finalEquity.toString(),
     startingBalance: standing.startingBalance.toString(),
     tradeCount: standing.tradeCount,
+    /*
+     * How this row was traded, not where it belongs.
+     *
+     * True only when every order came from a program. A trader who ran a
+     * strategy and also clicked is not "a bot", and labelling them one would be
+     * the sort of tidy that is simply untrue. Same board, same ranking either
+     * way: this changes a label and nothing else.
+     */
+    automated: standing.tradeCount > 0 && (standing.automatedTrades ?? 0) === standing.tradeCount,
     payoutLamports: (payoutByPlace.get(standing.rank) ?? 0n).toString(),
   }));
 
@@ -91,6 +100,7 @@ export async function GET(request: Request): Promise<Response> {
           finalEquity: mine.finalEquity.toString(),
           startingBalance: mine.startingBalance.toString(),
           tradeCount: mine.tradeCount,
+          automated: mine.tradeCount > 0 && (mine.automatedTrades ?? 0) === mine.tradeCount,
           payoutLamports: (payoutByPlace.get(mine.rank) ?? 0n).toString(),
         }
       : null;

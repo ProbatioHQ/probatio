@@ -84,6 +84,18 @@ export async function register(): Promise<void> {
     safely('price stream', startPriceStream);
   }
 
+  /*
+   * Runs the strategies people wrote in the form, so a season does not require
+   * them to keep a machine awake for a fortnight.
+   *
+   * Started after the price sources on purpose. It screens its exits against the
+   * last known price and only pays for a chain read when that screen says a level
+   * is near, so a runner started before anything is pricing would spend a read on
+   * every open position on its first pass.
+   */
+  const { startStrategyRunner } = await import('./lib/strategy-runner');
+  safely('strategies', startStrategyRunner);
+
   // Commits records to the chain. Does nothing without a key, and says so.
   const { startKeeper } = await import('./lib/keeper');
   safely('keeper', startKeeper);

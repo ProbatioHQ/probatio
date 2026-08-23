@@ -103,6 +103,7 @@ function toStanding(row: LeaderboardRow, prices: ReadonlyMap<string, bigint>) {
     startingBalance: BigInt(row.startingBalance),
     finalEquity: BigInt(row.solBalance) + positionValue,
     tradeCount: row.tradeCount,
+    automatedTrades: row.automatedTrades,
   };
 }
 
@@ -137,6 +138,7 @@ export interface AllTimeStanding {
   readonly equity: string;
   readonly returnBps: number;
   readonly tradeCount: number;
+  readonly automatedTrades: number;
 }
 
 export interface AllTimeBoard {
@@ -204,6 +206,7 @@ function toAllTime(row: AllTimeRow, prices: ReadonlyMap<string, bigint>): AllTim
     equity: equity.toString(),
     returnBps,
     tradeCount: row.tradeCount,
+    automatedTrades: row.automatedTrades,
   };
 }
 

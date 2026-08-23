@@ -430,6 +430,7 @@ export function WalletButton() {
           <a href="/me">Your account</a>
           <a href={`/p/${pubkey}`}>Public record</a>
           <a href="/season">This season</a>
+          <a href="/strategies">Strategies</a>
           <button type="button" onClick={() => void signOut()}>
             Disconnect
           </button>
