@@ -144,6 +144,16 @@ http {
   server {
     listen ${PORT:-8080};
 
+    # The root served a directory listing, because that is what websockify does
+    # with a web root: it indexes the folder rather than opening the client in
+    # it. Anybody arriving got a page of links and no way to know which one was
+    # the screen.
+    location = / {
+      auth_basic           "probatio";
+      auth_basic_user_file /tmp/htpasswd;
+      return 302 /vnc.html?autoconnect=true&resize=remote;
+    }
+
     location / {
       auth_basic           "probatio";
       auth_basic_user_file /tmp/htpasswd;
