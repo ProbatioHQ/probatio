@@ -1,57 +1,66 @@
 # The broadcaster
 
-Opens `/livestream` in a browser on a server, encodes what it draws, and pushes
-it to pump.fun over RTMP. It exists so the stream does not depend on a laptop
-being awake.
+A browser running on a server, with a screen you can reach from anywhere. You
+connect once, start the stream, and close the tab. It keeps going with your
+machine off.
+
+## Why it works this way
+
+pump.fun streams from the browser. Accepting the moderation terms puts you live
+immediately; there is no RTMP endpoint on the coin page to push video at. The
+only way to get a page onto the stream is a real browser session that has a
+wallet connected, has pressed Start livestream, and has shared a window.
+
+None of that can be done by an encoder pointed at a URL, so the browser runs
+here instead. The clicking is the same clicking you would do on a laptop. The
+difference is which machine has to stay awake.
 
 ## Setting it up on Railway
 
-1. In the same Railway project, **New Service** → **GitHub Repo** → this repo.
-2. In that service's **Settings**:
-   - **Root Directory**: `stream`
-   - **Builder**: Dockerfile (Railway detects it from the root directory)
-3. In **Variables**, add:
+1. **New Service** → **GitHub Repo** → this repo.
+2. **Settings** → **Root Directory**: `stream`. Railway finds the Dockerfile.
+3. **Settings** → **Networking** → **Generate Domain**. That URL is the screen.
+4. **Variables**:
 
-   | Variable     | Where it comes from                                        |
-   | ------------ | ---------------------------------------------------------- |
-   | `RTMP_URL`   | pump.fun coin page → Start livestream → RTMP → Stream URL   |
-   | `STREAM_KEY` | the key shown next to that URL                              |
+   | Variable       | Value                                                     |
+   | -------------- | --------------------------------------------------------- |
+   | `VNC_PASSWORD` | anything long. It is the only lock on the screen.          |
+   | `STREAM_URL`   | optional, defaults to `https://probatiotrade.com/livestream` |
 
-   Optional: `STREAM_URL` (defaults to `https://probatiotrade.com/livestream`),
-   `STREAM_FPS` (30), `STREAM_BITRATE` (4500k), `STREAM_WIDTH`, `STREAM_HEIGHT`.
+5. **Settings** → **Volumes** → add one mounted at `/profile`. Without it the
+   wallet has to be set up again on every redeploy.
+6. Deploy.
 
-4. Deploy. It starts pushing within about fifteen seconds.
+## Then, once
 
-There is no port and no healthcheck: this is a worker, not a web service.
+Open the service's URL, enter the password, and you are looking at a desktop
+with Chromium on it, already showing the board and pump.fun.
 
-## What it does when things go wrong
+1. Install a wallet extension and connect the creator wallet.
+2. Open the coin page, **Start livestream**, accept the terms.
+3. Click the share button, pick the window showing the board.
+4. Close your tab.
 
-Nothing here is fatal, because everything here happens at four in the morning
-with nobody watching.
+The container holds the session. Nothing on your machine is involved after this.
 
-- **The encoder stops**, because the endpoint dropped the connection or the
-  network went: waits ten seconds and reconnects. Waits rather than spins, since
-  a tight loop against a service refusing you is how an address gets blocked.
-- **The browser dies**: noticed on the next pass and restarted. Checked rather
-  than assumed, because a dead browser is a black rectangle being encoded and
-  pushed at four megabits, which from the outside looks exactly like a working
-  stream.
-- **The board is slow to answer**: it draws its own placeholder state, which is
-  honest about not having read anything yet. Ten seconds are allowed before the
-  encoder starts so the stream does not open on it.
+## The part worth thinking about before you do it
 
-## The stream key
+The creator wallet ends up inside a browser on a server, and the only thing in
+front of it is `VNC_PASSWORD`. Anyone who has that password, or who gets into
+the container, has the wallet.
 
-Set it in Railway, never in the repository. The script prints the endpoint with
-the key masked, because Railway keeps deploy logs and a key in one is a stream
-anybody can take over.
+Use a long password, and keep nothing in that wallet beyond what it needs to be
+the coin's creator. This is a real tradeoff rather than a formality, and it is
+the price of the stream not depending on a laptop.
 
-## Cost
+## If the stream drops
 
-A 1080p30 encode keeps a CPU busy continuously. That is the whole bill, and it
-is why this is a separate service rather than a thread inside the app: the site
-should not be competing for CPU with a video encoder, and neither should be
-scaled because of the other.
+It has to be restarted by hand, through the same screen. That is the cost of
+pump.fun having no RTMP endpoint: an encoder can reconnect on its own, a browser
+session that was ended cannot.
 
-Dropping `STREAM_FPS` to 24 or `STREAM_BITRATE` to `3000k` costs little on a
-board that is mostly still text, and saves a noticeable amount.
+## RTMP, if it ever comes back
+
+`MODE=rtmp` with `RTMP_URL` and `STREAM_KEY` skips all of the above and pushes
+the board straight at an endpoint, reconnecting on its own, with nothing to log
+into. The code is there and correct. There is currently nowhere to point it.
