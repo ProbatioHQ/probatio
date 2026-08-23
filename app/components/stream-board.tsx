@@ -206,8 +206,8 @@ function Art({ src, alt }: { src: string | null; alt: string }) {
   const [broken, setBroken] = useState(false);
   const resolved = imageSrc(src);
   if (!resolved || broken) return <span className="sb-art sb-art-none" />;
-  // eslint-disable-next-line @next/next/no-img-element
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={resolved}
       alt={alt}
@@ -222,8 +222,15 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
   const [board, setBoard] = useState<StreamBoard | null>(null);
   const [card, setCard] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  /** Server seconds minus local seconds, so the clock is right when drawn. */
-  const [skew, setSkew] = useState<number | null>(null);
+  /**
+   * Server seconds minus local seconds, so the clock is right when drawn.
+   *
+   * A ref and not state, because nothing renders it: the tick reads it to
+   * compute the clock and that is all it is for. It was both, mirrored into the
+   * ref during render, which React refuses for good reason. Under concurrent
+   * rendering a render can be thrown away and run again, so a ref written there
+   * records something that never happened.
+   */
   const skewRef = useRef<number | null>(null);
   /** The build this page was served by, so a newer one can be noticed. */
   const builtRef = useRef<string | null>(null);
@@ -264,7 +271,7 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
          * ticks instead loses a second for every tick that did not fire and
          * never gets it back until the next poll.
          */
-        setSkew((next.now ?? next.at) - Math.floor(Date.now() / 1000));
+        skewRef.current = (next.now ?? next.at) - Math.floor(Date.now() / 1000);
 
         /*
          * A deploy reaches the broadcast on its own.
@@ -360,10 +367,6 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, []);
-
-  // Kept in a ref as well, so the one-second tick can read the newest value
-  // without the interval being torn down and rebuilt on every poll.
-  skewRef.current = skew;
 
   const which = CARDS[card] ?? 'what';
   /*
