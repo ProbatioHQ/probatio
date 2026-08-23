@@ -17,8 +17,10 @@ FROM debian:bookworm-slim
 # Xvfb is the screen nobody is looking at, openbox lets windows be moved and
 # focused on it, x11vnc serves that screen, and websockify puts noVNC in front
 # so it is reachable from a browser over Railway's HTTPS rather than a VNC
-# client. ffmpeg stays for the RTMP path, which is written and works if pump.fun
-# ever offers an endpoint again.
+# client. nginx sits in front of all of it holding the password, because
+# websockify's own auth plugin served the client page to anybody who asked.
+# ffmpeg stays for the RTMP path, which is written and works if pump.fun ever
+# offers an endpoint again.
 #
 # The fonts matter more than they look. Without them every glyph on the board
 # renders as a box, and the first anybody would know is a screenshot.
@@ -29,6 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       openbox \
       novnc \
       websockify \
+      nginx-light \
+      apache2-utils \
       ffmpeg \
       dbus-x11 \
       procps \

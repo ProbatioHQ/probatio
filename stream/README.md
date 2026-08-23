@@ -24,9 +24,18 @@ difference is which machine has to stay awake.
 
    | Variable       | Value                                                        |
    | -------------- | ------------------------------------------------------------ |
-   | `VNC_PASSWORD` | exactly eight characters. See below.                          |
-   | `WEB_PASSWORD` | long. Asked for before anything else. Username is `probatio`. |
+   | `VNC_PASSWORD` | exactly eight characters. See below. Required.                |
+   | `WEB_PASSWORD` | long. Asked for before anything else. Required.               |
    | `STREAM_URL`   | optional, defaults to `https://probatiotrade.com/livestream`  |
+
+   Both are required and the container refuses to start without them. That is
+   not caution: the first version treated `WEB_PASSWORD` as optional and used
+   websockify's own auth plugin, which starts cleanly, logs nothing wrong, and
+   serves the noVNC client to anyone who asks. Checked from outside once it was
+   deployed, the page returned 200 with no `WWW-Authenticate` header at all. The
+   screen was on the internet with only the eight character VNC password behind
+   it. nginx holds the password now, on every path, and websockify no longer
+   listens in public.
 
    **On the eight characters.** VNC's password scheme uses an eight byte key and
    silently truncates anything longer, so a long passphrase in `VNC_PASSWORD`

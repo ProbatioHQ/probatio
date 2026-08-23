@@ -82,10 +82,12 @@ start_chrome() {
 # ---- desktop: the browser, and a way in ------------------------------------
 
 if [ "$MODE" = 'desktop' ]; then
-  if [ -z "${VNC_PASSWORD:-}" ]; then
-    say 'VNC_PASSWORD must be set.' >&2
-    say 'This screen has a wallet on it. Without a password the URL is the' >&2
-    say 'only thing between anyone on the internet and that wallet.' >&2
+  if [ -z "${VNC_PASSWORD:-}" ] || [ -z "${WEB_PASSWORD:-}" ]; then
+    say 'VNC_PASSWORD and WEB_PASSWORD must both be set.' >&2
+    say 'This screen has a wallet on it, and WEB_PASSWORD is the only lock on' >&2
+    say 'it that the VNC protocol does not truncate to eight characters.' >&2
+    say 'It used to be optional. It was optional for one deploy, and that' >&2
+    say 'deploy served the screen to the internet without asking for anything.' >&2
     exit 1
   fi
 
@@ -107,23 +109,64 @@ if [ "$MODE" = 'desktop' ]; then
   say "screen ready on the service's public URL"
   say 'connect, connect the wallet, start the stream, share the board window'
 
-  # websockify serves noVNC's page and proxies it to x11vnc, so the screen is
-  # reachable over the HTTPS URL Railway already gives this service.
   #
-  # A password in front of that, when one is set. This matters more than it
-  # looks: the VNC password behind it is capped at eight characters by the
-  # protocol, which is thin for something facing the internet with a wallet on
-  # the other side. This one is checked first, is not truncated, and turns a
-  # brute force from a script's afternoon into a waste of its time.
-  auth=()
-  if [ -n "${WEB_PASSWORD:-}" ]; then
-    auth=(--auth-plugin=BasicHTTPAuth --auth-source="probatio:${WEB_PASSWORD}")
-    say 'web password is set; the screen asks for it before anything else'
-  else
-    say 'WEB_PASSWORD is not set. The only lock is the eight character VNC one.' >&2
-  fi
+  # A real proxy holding the password, rather than websockify's own.
+  #
+  # This was `websockify --auth-plugin=BasicHTTPAuth`, which starts without
+  # complaint, logs nothing wrong, and serves the noVNC client to anybody who
+  # asks. Checked from outside once it was up: the page returned 200 with no
+  # WWW-Authenticate header anywhere. The screen was open to the internet with
+  # only the eight character VNC password behind it, which is the exact thing
+  # the outer password exists to avoid.
+  #
+  # So websockify no longer listens in public at all. It binds to loopback and
+  # nginx takes the port, asks for the password on every path including the
+  # websocket upgrade, and passes nothing through until it has one.
+  #
+  websockify --web=/usr/share/novnc 127.0.0.1:6080 localhost:5900 &
+  sleep 1
 
-  exec websockify "${auth[@]}" --web=/usr/share/novnc "0.0.0.0:${PORT:-8080}" localhost:5900
+  htpasswd -bc /tmp/htpasswd probatio "$WEB_PASSWORD" >/dev/null 2>&1
+
+  cat >/tmp/nginx.conf <<NGINX
+daemon off;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+events { worker_connections 256; }
+http {
+  access_log off;
+  client_body_temp_path /tmp/nginx-body;
+  proxy_temp_path /tmp/nginx-proxy;
+  fastcgi_temp_path /tmp/nginx-fastcgi;
+  uwsgi_temp_path /tmp/nginx-uwsgi;
+  scgi_temp_path /tmp/nginx-scgi;
+
+  server {
+    listen ${PORT:-8080};
+
+    location / {
+      auth_basic           "probatio";
+      auth_basic_user_file /tmp/htpasswd;
+
+      proxy_pass http://127.0.0.1:6080;
+      proxy_http_version 1.1;
+
+      # The screen is a websocket. Without these it authenticates and then
+      # hangs, which looks like a broken build rather than a missing header.
+      proxy_set_header Upgrade    \$http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host       \$host;
+
+      # A desktop session is idle for long stretches and must not be cut for it.
+      proxy_read_timeout 3600s;
+      proxy_send_timeout 3600s;
+    }
+  }
+}
+NGINX
+
+  say 'password wall up; nothing is served without it'
+  exec nginx -c /tmp/nginx.conf
 fi
 
 # ---- rtmp: kept for the day pump.fun offers an endpoint again ---------------
