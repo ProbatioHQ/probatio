@@ -74,9 +74,25 @@ chrome_flags=(
 )
 
 start_chrome() {
+  # The profile lives on a volume that outlives the container, and Chromium
+  # leaves a lock in it. After a restart that lock is still there, describing a
+  # process that no longer exists, and Chromium refuses to open against it. The
+  # screen comes up black and the log still says it started, because what
+  # started was the shell's background job rather than a browser.
+  rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" "$PROFILE/SingletonSocket"
+
   chromium "${chrome_flags[@]}" "$@" >/tmp/chromium.log 2>&1 &
   CHROME_PID=$!
-  say "chromium started (pid $CHROME_PID)"
+
+  # Proof rather than a PID. If it died on the way up, say so and say why,
+  # instead of leaving a black rectangle and a reassuring log line.
+  sleep 3
+  if kill -0 "$CHROME_PID" 2>/dev/null; then
+    say "chromium up (pid $CHROME_PID)"
+  else
+    say 'chromium exited on startup. Its last words:' >&2
+    tail -n 5 /tmp/chromium.log >&2 || true
+  fi
 }
 
 # ---- desktop: the browser, and a way in ------------------------------------
@@ -97,8 +113,25 @@ if [ "$MODE" = 'desktop' ]; then
   openbox &
   sleep 1
 
+  # A colour rather than the void, so a screen with no windows on it can be
+  # told apart from a screen that is not being drawn at all.
+  xsetroot -solid '#101418' 2>/dev/null || true
+
   # Kiosk is deliberately not used here: this session is driven by a person.
   start_chrome "$URL" 'https://pump.fun'
+
+  # Kept alive for the length of the broadcast. Chromium dying at three in the
+  # morning would otherwise end the stream and leave the container looking
+  # perfectly healthy.
+  (
+    while true; do
+      sleep 20
+      if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+        say 'chromium went away, bringing it back'
+        start_chrome "$URL" 'https://pump.fun'
+      fi
+    done
+  ) &
 
   mkdir -p /tmp/vnc
   x11vnc -storepasswd "$VNC_PASSWORD" /tmp/vnc/passwd >/dev/null 2>&1

@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       dbus-x11 \
       procps \
       xdg-utils \
+      x11-xserver-utils \
       ca-certificates \
       fonts-liberation \
       fonts-dejavu-core \
