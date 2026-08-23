@@ -511,15 +511,30 @@ export function StreamBoardView({ phase }: { phase: Phase | null }) {
                         `finished · ${known.season.entrants} entered`}
                     </span>
                   </div>
-                  {known.season.top.map((s) => (
-                    <div className="sb-rank" key={s.rank}>
-                      <span className="sb-rank-n">{s.rank}</span>
-                      <span className="mono">{s.trader}</span>
-                      <span className={`sb-rank-r ${s.returnBps >= 0 ? 'up' : 'dn'}`}>
-                        {pct(s.returnBps)}
-                      </span>
+                  {/*
+                    The standings as one block, rather than as the card's only
+                    other child.
+
+                    Spread across the card, two entrants ended up at opposite
+                    ends of the screen with a field of black between them, which
+                    reads as a rendering fault rather than as a short season.
+                    Wrapped, the rows stay a list and the list is centred in
+                    whatever the card has left, so it looks composed at two
+                    names and at five.
+                  */}
+                  {known.season.top.length > 0 && (
+                    <div className="sb-ranks">
+                      {known.season.top.map((s) => (
+                        <div className="sb-rank" key={s.rank}>
+                          <span className="sb-rank-n">{s.rank}</span>
+                          <span className="mono">{s.trader}</span>
+                          <span className={`sb-rank-r ${s.returnBps >= 0 ? 'up' : 'dn'}`}>
+                            {pct(s.returnBps)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                   {/*
                     A season with nobody on the board is the same empty card as
                     no season at all, and it will look like that for the whole

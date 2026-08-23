@@ -9990,3 +9990,20 @@ body:has(#livestream) {
 .sb-engine-chart {
   margin-top: 0;
 }
+
+/*
+ * The standings, held together and centred in what the card leaves.
+ *
+ * The season card is spread top to bottom, which is right when its body is a
+ * statement and a strip and wrong when it is a heading and a list: a season
+ * with two entrants put one at the top of the screen and one at the bottom with
+ * a field of black between them. Wrapping the rows makes them one block again,
+ * and centring that block keeps it composed whether there are two names or five.
+ */
+.sb-ranks {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
