@@ -1,14 +1,14 @@
 {
-  "at": 1787484845,
+  "at": 1787506418,
   "checks": 4,
-  "inspected": 1942,
+  "inspected": 1945,
   "errors": 0,
   "warnings": 73,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 805,
+      "inspected": 808,
       "findings": [
         {
           "severity": "warning",
@@ -19,7 +19,7 @@
         {
           "severity": "warning",
           "file": "app/components/price-chart.tsx",
-          "line": 61,
+          "line": 70,
           "detail": "TIMEFRAME_LABELS is exported and no other file mentions it"
         },
         {
@@ -290,13 +290,13 @@
         {
           "severity": "warning",
           "file": "app/instrumentation.ts",
-          "line": 73,
+          "line": 82,
           "detail": "PROBATIO_DISABLE_PRICE_STREAM is read by the code and documented nowhere"
         },
         {
           "severity": "warning",
           "file": "app/instrumentation.ts",
-          "line": 128,
+          "line": 137,
           "detail": "PROBATIO_DISABLE_DRIFT is read by the code and documented nowhere"
         },
         {
