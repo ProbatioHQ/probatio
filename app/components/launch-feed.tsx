@@ -730,8 +730,7 @@ export function LaunchFeedList({ variant = 'preview' }: { variant?: 'preview' | 
       // Each lane is filtered by its own set. The rule itself lives in
       // lib/feed-filters, so it can be tested without a browser.
       const filters = laneFilters[lane];
-      const nowSeconds = Math.floor(now / 1000);
-      return rows.filter((token) => matchesFilters(token, filters, { solUsd, nowSeconds }));
+      return rows.filter((token) => matchesFilters(token, filters, { solUsd, nowMs: now }));
     },
     [lanes, terminal, laneFilters, solUsd, now],
   );

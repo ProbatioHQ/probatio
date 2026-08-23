@@ -102,6 +102,7 @@ export {
   creatorLaunchCounts,
   launchByMint,
   launchesByCreator,
+  launchedAtMs,
   recentLaunches,
   recordLaunches,
   searchLaunches,

@@ -45,10 +45,26 @@ export interface LivePrice {
   readonly mint: string;
   /** Lamports per token base unit, scaled by 1e18 — the same unit as a candle. */
   readonly price: bigint;
-  readonly solReserve: bigint;
-  readonly tokenReserve: bigint;
+  /**
+   * The reserves the price was computed from, when they are known.
+   *
+   * Null from a polled source. pump.fun publishes a price and not a pool, and
+   * inventing reserves to fill the field would put a number nobody measured
+   * next to numbers that were. Nothing outside this file reads them: the stream
+   * sends the price, the slot and the time.
+   */
+  readonly solReserve: bigint | null;
+  readonly tokenReserve: bigint | null;
   readonly slot: number | null;
   readonly at: number;
+  /**
+   * Where it came from, so the poller can defer to the subscription.
+   *
+   * `chain` is a pool account update, which is exact and immediate. `pumpfun`
+   * is a one-minute candle close, which is neither, and is what a viewer gets
+   * when the subscription is switched off.
+   */
+  readonly source: 'chain' | 'pumpfun';
 }
 
 type Listener = (price: LivePrice) => void;
@@ -152,6 +168,31 @@ function publish(price: LivePrice): void {
   }
 }
 
+/**
+ * A price from somewhere that is not the chain.
+ *
+ * Kept beside `publish` rather than exported directly so a caller cannot
+ * fabricate reserves or a slot: those are the fields only a pool read can
+ * honestly fill, and a polled price has none of them.
+ */
+export function publishPolledPrice(mint: string, price: bigint, at: number): void {
+  const current = state();
+  const held = current.latest.get(mint);
+  // The subscription is better whenever it is working. If it has spoken more
+  // recently than this poll, its answer stands.
+  if (held && held.source === 'chain' && held.at >= at) return;
+
+  publish({
+    source: 'pumpfun',
+    mint,
+    price,
+    solReserve: null,
+    tokenReserve: null,
+    slot: null,
+    at,
+  });
+}
+
 /** Recompute and publish once both sides of a market are known. */
 function priceFrom(mint: string, slot: number | null): void {
   const current = state();
@@ -170,6 +211,7 @@ function priceFrom(mint: string, slot: number | null): void {
   const now = Date.now();
 
   publish({
+    source: 'chain',
     mint,
     // The same function the candles and the fill engine use. A price that
     // reached a chart by another route would be a second opinion.

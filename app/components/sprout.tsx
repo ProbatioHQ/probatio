@@ -36,7 +36,14 @@ export function Sprout({ size = 11 }: { size?: number }) {
  */
 export function age(launchedAt: number, now: number): string {
   if (launchedAt <= 0) return '';
-  const seconds = Math.max(0, Math.floor(now / 1000) - launchedAt);
+  /*
+   * Both in milliseconds, then divided once.
+   *
+   * This subtracted a millisecond launch time from a seconds clock, which is
+   * always a large negative and clamps to zero, so every token in the feed read
+   * as nought seconds old however long it had existed.
+   */
+  const seconds = Math.max(0, Math.floor((now - launchedAt) / 1000));
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3_600)}h`;
@@ -46,5 +53,7 @@ export function age(launchedAt: number, now: number): string {
 /** Under an hour reads green, older reads grey. */
 export function freshAge(launchedAt: number, now: number): boolean {
   if (launchedAt <= 0) return false;
-  return Math.floor(now / 1000) - launchedAt < 3_600;
+  // The same mixed units made this negative for everything, so every token in
+  // the feed was painted as launched within the hour.
+  return now - launchedAt < 3_600_000;
 }

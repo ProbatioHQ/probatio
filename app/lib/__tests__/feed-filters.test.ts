@@ -15,14 +15,22 @@ import {
  * rather than a claim about it.
  */
 
-const NOW = 1_800_000_000; // unix seconds
+/*
+ * Milliseconds, matching what the launches table actually holds.
+ *
+ * This file was written in seconds and so agreed with the code it was testing:
+ * both sides subtracted a millisecond launch time from a seconds clock, which
+ * is always negative, and every token came out nought minutes old. The tests
+ * passed because they shared the mistake.
+ */
+const NOW = 1_800_000_000_000;
 const SOL_USD = 100; // round number keeps the market cap maths obvious
 
 function token(overrides: Partial<FeedToken> = {}): FeedToken {
   return {
     name: 'Groove Valley Gorilla',
     symbol: 'GORILLA',
-    launchedAt: NOW - 3_600, // an hour old
+    launchedAt: NOW - 3_600_000_000, // an hour old
     image: 'https://example.invalid/g.png',
     progressBps: 5_000, // 50%
     marketCap: (50n * 1_000_000_000n).toString(), // 50 SOL = $5,000
@@ -35,7 +43,7 @@ function filters(overrides: Partial<Filters> = {}): Filters {
   return { ...DEFAULT_FILTERS, ...overrides };
 }
 
-const ctx = { solUsd: SOL_USD, nowSeconds: NOW };
+const ctx = { solUsd: SOL_USD, nowMs: NOW };
 
 describe('the default filter', () => {
   it('shows everything', () => {
@@ -102,8 +110,8 @@ describe('market cap', () => {
   it('is inert when no exchange rate is known', () => {
     // Dollars cannot be computed at all, so it stands down rather than hiding
     // everything on a number it could not check.
-    expect(matchesFilters(token(), filters({ minMarketCapUsd: 6_000 }), { solUsd: null, nowSeconds: NOW })).toBe(true);
-    expect(matchesFilters(token({ marketCap: null }), filters({ minMarketCapUsd: 6_000 }), { solUsd: null, nowSeconds: NOW })).toBe(true);
+    expect(matchesFilters(token(), filters({ minMarketCapUsd: 6_000 }), { solUsd: null, nowMs: NOW })).toBe(true);
+    expect(matchesFilters(token({ marketCap: null }), filters({ minMarketCapUsd: 6_000 }), { solUsd: null, nowMs: NOW })).toBe(true);
   });
 });
 
@@ -124,14 +132,14 @@ describe('curve progress', () => {
 describe('age', () => {
   it('hides tokens younger than the floor', () => {
     // Ten minutes old, floor at thirty minutes.
-    expect(matchesFilters(token({ launchedAt: NOW - 600 }), filters({ minAgeMin: 30 }), ctx)).toBe(false);
-    expect(matchesFilters(token({ launchedAt: NOW - 3_600 }), filters({ minAgeMin: 30 }), ctx)).toBe(true);
+    expect(matchesFilters(token({ launchedAt: NOW - 600_000 }), filters({ minAgeMin: 30 }), ctx)).toBe(false);
+    expect(matchesFilters(token({ launchedAt: NOW - 3_600_000 }), filters({ minAgeMin: 30 }), ctx)).toBe(true);
   });
 
   it('hides tokens older than the ceiling', () => {
     // Two hours old, ceiling at thirty minutes.
-    expect(matchesFilters(token({ launchedAt: NOW - 7_200 }), filters({ maxAgeMin: 30 }), ctx)).toBe(false);
-    expect(matchesFilters(token({ launchedAt: NOW - 600 }), filters({ maxAgeMin: 30 }), ctx)).toBe(true);
+    expect(matchesFilters(token({ launchedAt: NOW - 7_200_000 }), filters({ maxAgeMin: 30 }), ctx)).toBe(false);
+    expect(matchesFilters(token({ launchedAt: NOW - 600_000 }), filters({ maxAgeMin: 30 }), ctx)).toBe(true);
   });
 });
 

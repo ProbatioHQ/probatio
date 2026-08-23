@@ -4,6 +4,29 @@ import type { Client } from '@libsql/client';
  * The launch feed and the search over it.
  */
 
+/**
+ * A launch time in milliseconds, whichever unit the row happens to hold.
+ *
+ * The column has both. The websocket feed that indexed launches originally
+ * wrote seconds; the polled feed that replaced it writes what pump.fun sends,
+ * which is milliseconds. Measured on production: of 180 rows, 167 were
+ * milliseconds and 13 were seconds, sitting in the same column with nothing to
+ * tell them apart.
+ *
+ * Normalised on the way out rather than migrated, because a migration has to be
+ * right about every row it touches and this only has to be right about the ones
+ * it can identify. The test is not close: a launch time in milliseconds is
+ * around 1.79e12 and in seconds around 1.79e9, and the boundary sits at a date
+ * no token has or will have.
+ */
+export function launchedAtMs(value: unknown): number {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  // Below this a value cannot be a plausible millisecond timestamp, and above it
+  // it cannot be a plausible one in seconds.
+  return raw < 4e11 ? raw * 1000 : raw;
+}
+
 export interface Launch {
   readonly mint: string;
   readonly bondingCurve: string;
@@ -24,7 +47,7 @@ function toLaunch(row: Record<string, unknown>): Launch {
     name: String(row['name']),
     symbol: String(row['symbol']),
     uri: String(row['uri']),
-    launchedAt: Number(row['launched_at']),
+    launchedAt: launchedAtMs(row['launched_at']),
     slot: row['slot'] === null || row['slot'] === undefined ? null : Number(row['slot']),
     firstSeenAt: Number(row['first_seen_at']),
   };

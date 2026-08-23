@@ -461,7 +461,7 @@ export function TokenView({
             {head.launchedAt !== null && (
               <>
                 <span className="sep" aria-hidden="true" />
-                <span>launched {new Date(head.launchedAt * 1_000).toLocaleDateString()}</span>
+                <span>launched {new Date(head.launchedAt).toLocaleDateString()}</span>
               </>
             )}
             <span className="sep" aria-hidden="true" />

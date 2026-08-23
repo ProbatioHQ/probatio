@@ -70,6 +70,15 @@ export async function register(): Promise<void> {
   // Pushes a price the moment a watched token's market moves. Independent of
   // the launch feed: somebody can be looking at a chart on a server that is not
   // watching for launches at all.
+  /*
+   * Prices from pump.fun, always. It costs no RPC credits and it defers to the
+   * subscription below whenever that is running, so it is the floor rather than
+   * a replacement: with the subscription off, a chart moves; with it on, this
+   * says nothing.
+   */
+  const { startPolledPrices } = await import('./lib/polled-prices');
+  safely('polled prices', startPolledPrices);
+
   if (process.env['PROBATIO_DISABLE_PRICE_STREAM'] !== '1') {
     const { startPriceStream } = await import('./lib/price-stream');
     safely('price stream', startPriceStream);

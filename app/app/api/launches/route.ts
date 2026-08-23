@@ -329,7 +329,7 @@ export async function GET(request: Request): Promise<Response> {
     });
 
   const rate = await solUsd();
-  const nowSeconds = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
 
   /*
    * The same rule the browser runs, on the same shape, from the same module.
@@ -343,7 +343,7 @@ export async function GET(request: Request): Promise<Response> {
     const filters = laneFilters[lane];
     if (!isFiltered(filters)) return rows.slice(0, limit);
     return rows
-      .filter((token) => matchesFilters(token, filters, { solUsd: rate, nowSeconds }))
+      .filter((token) => matchesFilters(token, filters, { solUsd: rate, nowMs }))
       .slice(0, limit);
   };
 

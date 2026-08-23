@@ -1,4 +1,5 @@
 import type { Client } from '@libsql/client';
+import { launchedAtMs } from './launches';
 import type { Launch } from './launches';
 
 /**
@@ -163,7 +164,7 @@ function joined(rows: readonly Record<string, unknown>[]): LaunchWithCurve[] {
     name: String(row['name']),
     symbol: String(row['symbol']),
     uri: String(row['uri']),
-    launchedAt: Number(row['launched_at']),
+    launchedAt: launchedAtMs(row['launched_at']),
     slot: row['slot'] === null || row['slot'] === undefined ? null : Number(row['slot']),
     firstSeenAt: Number(row['first_seen_at']),
     curve:

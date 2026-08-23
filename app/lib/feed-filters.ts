@@ -87,7 +87,7 @@ export interface FilterContext {
   /** SOL in dollars, or null when no rate is known. */
   readonly solUsd: number | null;
   /** Current time in unix seconds, so the caller controls the clock. */
-  readonly nowSeconds: number;
+  readonly nowMs: number;
 }
 
 /**
@@ -125,8 +125,14 @@ export function matchesFilters(token: FeedToken, filters: Filters, ctx: FilterCo
     return false;
   }
 
-  // Age is always known.
-  const ageMin = Math.max(0, ctx.nowSeconds - token.launchedAt) / 60;
+  /*
+   * Age is always known, and both sides are milliseconds.
+   *
+   * A seconds clock against a millisecond launch time is always negative, so
+   * this was nought minutes for every token: a minimum age rejected everything
+   * and a maximum age accepted everything.
+   */
+  const ageMin = Math.max(0, ctx.nowMs - token.launchedAt) / 60_000;
   if (filters.minAgeMin > 0 && ageMin < filters.minAgeMin) return false;
   if (filters.maxAgeMin > 0 && ageMin > filters.maxAgeMin) return false;
 
