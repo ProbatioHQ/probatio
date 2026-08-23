@@ -47,4 +47,58 @@ export function guardTheProcess(): void {
      */
     setTimeout(() => process.exit(1), 100);
   });
+
+  /*
+   * Being asked to stop is not crashing.
+   *
+   * Every deploy replaces this container, and the platform replaces it by
+   * sending SIGTERM. Node's default action for a signal it has no handler for
+   * is to die *by* that signal, which the supervisor reads as exit code 143 and
+   * reports as a crash. So every single deploy produced a crash notice for a
+   * shutdown that went exactly as intended, and the notice that would mean
+   * something — a real one — looked identical to the eleven before it that did
+   * not. An alarm that fires on every deploy is an alarm nobody reads.
+   *
+   * Handling it makes the exit code honest: asked to stop, stopped, code zero.
+   * This cannot hide a genuine failure, because the only sender of SIGTERM here
+   * is the supervisor doing the replacing. A crash still leaves by the path
+   * above with code 1, and an out-of-memory kill is SIGKILL, which no handler
+   * can intercept.
+   *
+   * THIS ONLY WORKS WITH `NEXT_MANUAL_SIG_HANDLE=1`, WHICH railway.json SETS.
+   *
+   * Next installs its own SIGTERM handler that ends with `process.exit(143)` on
+   * purpose, so that a signal termination stays a signal termination. That
+   * handler is registered before this one and reaches its exit first, so adding
+   * this alone changed nothing: measured through the real start command, the
+   * process still left with 143 while this very line printed to the log. The
+   * environment variable is Next's own documented way to take the signals back,
+   * and without it this code is decoration.
+   */
+  let stopping = false;
+  const stop = (signal: NodeJS.Signals): void => {
+    if (stopping) return;
+    stopping = true;
+    console.log(`[process] ${signal} received, shutting down`);
+
+    /*
+     * A moment, not a graceful drain.
+     *
+     * There is no handle on the HTTP server from here — this runs inside
+     * Next's instrumentation hook, which is handed no listener to close. What
+     * this can do is stop immediately rather than hang: the platform's own
+     * timeout kills anything still here after its grace period, and being
+     * killed at the end of a shutdown is the crash notice all over again.
+     *
+     * Long-lived readers (a price stream, a chart) reconnect on their own,
+     * which they already do across every deploy.
+     */
+    // Not unref'd, for the same reason the crash path above is not: the exit
+    // code is the whole point, and a timer that does not hold the loop can be
+    // beaten to it by the loop emptying.
+    setTimeout(() => process.exit(0), 250);
+  };
+
+  process.on('SIGTERM', stop);
+  process.on('SIGINT', stop);
 }
