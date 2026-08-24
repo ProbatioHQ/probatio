@@ -81,6 +81,79 @@ export interface EntryRules {
   readonly maxChangeBps?: number;
   readonly changeWindowSeconds?: number;
   readonly venue?: Venue;
+
+  /*
+   * Who launched it, and whether it looks like anybody stood behind it.
+   *
+   * The conditions above describe a price. These describe the token and the
+   * person who made it, which is what somebody actually screens on: nobody
+   * decides what to buy from a market cap alone. Both are read from what this
+   * site already indexes, so a strategy that uses them still costs nothing to
+   * leave running.
+   */
+
+  /** The token's metadata names an X account. */
+  readonly requireTwitter?: boolean;
+  /** The token's metadata names a website. */
+  readonly requireWebsite?: boolean;
+  /**
+   * The most tokens this creator may have launched, counting this one.
+   *
+   * The serial-launcher filter. One is "only ever launched this"; three allows
+   * somebody with a couple of previous coins. Counted over everything this site
+   * has indexed, which is not the whole chain, so it is a floor on how many
+   * they have launched rather than a complete history.
+   */
+  readonly maxCreatorLaunches?: number;
+
+  /**
+   * The most of the supply the launcher may still be holding, in basis points.
+   *
+   * The one condition here that is not free. Everything above is answered from
+   * what this site already indexes; this is a read of the creator's token
+   * accounts, so it is only asked about tokens that have already passed every
+   * other condition. See the runner: paying for it per candidate would make an
+   * idle strategy expensive, which is the one thing it must never be.
+   */
+  readonly maxCreatorHoldingBps?: number;
+
+  /**
+   * The most of the supply that may have been taken in the launch slot.
+   *
+   * The bundle filter. A creator who lands the create and a set of buys in one
+   * bundle is filled before anybody watching can react, so what looks like
+   * instant volume is a supply that already belongs to whoever paid for it.
+   *
+   * Also a chain read, and also only asked of candidates that passed everything
+   * free. Unlike the holding, its answer never changes, so it is read once per
+   * token and remembered.
+   */
+  readonly maxBundleBps?: number;
+
+  /**
+   * The fewest wallets that must actually hold it.
+   *
+   * The most expensive condition here: there is no index of holders, so the
+   * only way to know is to scan every token account for the mint. Asked last,
+   * of the few candidates that passed everything else, and held only briefly —
+   * unlike a launch slot, this changes every few seconds on anything worth
+   * buying.
+   */
+  readonly minHolders?: number;
+
+  /**
+   * The most tokens that may share this one's X account.
+   *
+   * The honest half of "has this account promoted a pile of coins and deleted
+   * the evidence". Seeing what an account posted and then removed needs an
+   * archive this does not keep. Seeing that the same account is attached to
+   * eleven other launches in this site's own index needs only the index, and
+   * catches the same behaviour from the other side.
+   *
+   * Counts the token itself, so one means an account seen once. Free: it is a
+   * count over rows already here.
+   */
+  readonly maxSocialReuse?: number;
 }
 
 export interface SizeRules {
@@ -127,6 +200,49 @@ export interface Candidate {
   /** Null when there is not enough history to say, which is not the same as zero. */
   readonly changeBps: number | null;
   readonly graduated: boolean;
+
+  /**
+   * Whether the token's metadata names an X account or a website.
+   *
+   * Null where the metadata has not been read yet, which is common in a token's
+   * first seconds and is not the same as "it has none". A condition that cannot
+   * be answered is not a condition that has been met.
+   */
+  readonly hasTwitter: boolean | null;
+  readonly hasWebsite: boolean | null;
+  /** How many launches this site has indexed from this creator. Null if unknown. */
+  readonly creatorLaunches: number | null;
+  /**
+   * What share of the supply the creator still holds, in basis points.
+   *
+   * Null until somebody pays to find out, which is most of the time: this is
+   * the only field here that costs a chain read, so it is filled in for the few
+   * candidates that survive everything else rather than for the whole list.
+   */
+  readonly creatorHoldingBps: number | null;
+  /**
+   * Share of supply taken in the launch slot, in basis points.
+   *
+   * Null both before anybody has looked and when a look could not tell. A rule
+   * treats either as unmet: nothing bought in the launch slot and nothing known
+   * about the launch slot are opposite facts, and only one of them is clean.
+   */
+  readonly bundledBps: number | null;
+  /**
+   * Wallets holding a non-zero balance. Null until somebody pays to find out.
+   *
+   * Counted by balance rather than by account, because a wallet that sold out
+   * usually leaves its token account behind. Counting accounts would report a
+   * token everybody abandoned as one with hundreds of holders.
+   */
+  readonly holders: number | null;
+  /**
+   * How many tokens in this index name the same X account, this one included.
+   *
+   * Null where the token names no account at all, which is a different fact
+   * from an account used once and is left to the socials condition to judge.
+   */
+  readonly socialReuse: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,7 +381,101 @@ export function matchesEntry(entry: EntryRules, candidate: Candidate): EntryVerd
     }
   }
 
+  if (entry.requireTwitter === true) {
+    if (candidate.hasTwitter === null) {
+      return { ok: false, why: 'its metadata has not been read yet' };
+    }
+    if (!candidate.hasTwitter) return { ok: false, why: 'it names no X account' };
+  }
+
+  if (entry.requireWebsite === true) {
+    if (candidate.hasWebsite === null) {
+      return { ok: false, why: 'its metadata has not been read yet' };
+    }
+    if (!candidate.hasWebsite) return { ok: false, why: 'it names no website' };
+  }
+
+  if (entry.maxCreatorLaunches !== undefined) {
+    if (candidate.creatorLaunches === null) {
+      return { ok: false, why: 'how many tokens its creator has launched is not known here' };
+    }
+    if (candidate.creatorLaunches > entry.maxCreatorLaunches) {
+      return {
+        ok: false,
+        why: `its creator has launched ${candidate.creatorLaunches} tokens, over the ${entry.maxCreatorLaunches} allowed`,
+      };
+    }
+  }
+
+  if (entry.maxCreatorHoldingBps !== undefined) {
+    if (candidate.creatorHoldingBps === null) {
+      return { ok: false, why: 'how much its creator holds has not been read yet' };
+    }
+    if (candidate.creatorHoldingBps > entry.maxCreatorHoldingBps) {
+      return {
+        ok: false,
+        why: `its creator holds ${(candidate.creatorHoldingBps / 100).toFixed(1)}% of the supply, over the ${(entry.maxCreatorHoldingBps / 100).toFixed(1)}% allowed`,
+      };
+    }
+  }
+
+  if (entry.maxBundleBps !== undefined) {
+    if (candidate.bundledBps === null) {
+      return { ok: false, why: 'what was taken in its launch slot has not been read yet' };
+    }
+    if (candidate.bundledBps > entry.maxBundleBps) {
+      return {
+        ok: false,
+        why: `${(candidate.bundledBps / 100).toFixed(1)}% of the supply went in the launch slot, over the ${(entry.maxBundleBps / 100).toFixed(1)}% allowed`,
+      };
+    }
+  }
+
+  if (entry.maxSocialReuse !== undefined) {
+    if (candidate.socialReuse === null) {
+      return { ok: false, why: 'it names no X account to check' };
+    }
+    if (candidate.socialReuse > entry.maxSocialReuse) {
+      return {
+        ok: false,
+        why: `its X account is on ${candidate.socialReuse} tokens here, over the ${entry.maxSocialReuse} allowed`,
+      };
+    }
+  }
+
+  if (entry.minHolders !== undefined) {
+    if (candidate.holders === null) {
+      return { ok: false, why: 'how many wallets hold it has not been read yet' };
+    }
+    if (candidate.holders < entry.minHolders) {
+      return {
+        ok: false,
+        why: `${candidate.holders} wallets hold it, under the ${entry.minHolders} required`,
+      };
+    }
+  }
+
   return OK;
+}
+
+/**
+ * Whether a rule needs a condition that costs a chain read.
+ *
+ * The runner asks this so it can check everything free first and only pay for
+ * the survivors. Without it, a strategy screening on the launcher's holdings
+ * would read the chain for every candidate on every pass, which is the cost
+ * this whole loop is arranged to avoid.
+ */
+export function needsCreatorHolding(entry: EntryRules): boolean {
+  return entry.maxCreatorHoldingBps !== undefined;
+}
+
+export function needsBundle(entry: EntryRules): boolean {
+  return entry.maxBundleBps !== undefined;
+}
+
+export function needsHolders(entry: EntryRules): boolean {
+  return entry.minHolders !== undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +606,32 @@ export function parseStrategyRules(input: unknown): StrategyRules {
     entry.changeWindowSeconds === undefined
   ) {
     throw new StrategyRulesError('a move condition needs a window to measure it over');
+  }
+
+  if (entrySource['requireTwitter'] === true) entry.requireTwitter = true;
+  if (entrySource['requireWebsite'] === true) entry.requireWebsite = true;
+  if (present(entrySource, 'maxCreatorLaunches')) {
+    entry.maxCreatorLaunches = integer(
+      entrySource['maxCreatorLaunches'], 'the creator launch limit', 1, 1_000,
+    );
+  }
+
+  if (present(entrySource, 'maxCreatorHoldingBps')) {
+    entry.maxCreatorHoldingBps = integer(
+      entrySource['maxCreatorHoldingBps'], 'the creator holding limit', 0, 10_000,
+    );
+  }
+
+  if (present(entrySource, 'maxBundleBps')) {
+    entry.maxBundleBps = integer(entrySource['maxBundleBps'], 'the bundle limit', 0, 10_000);
+  }
+
+  if (present(entrySource, 'maxSocialReuse')) {
+    entry.maxSocialReuse = integer(entrySource['maxSocialReuse'], 'the account reuse limit', 1, 10_000);
+  }
+
+  if (present(entrySource, 'minHolders')) {
+    entry.minHolders = integer(entrySource['minHolders'], 'the holder floor', 1, 1_000_000);
   }
 
   if (present(entrySource, 'venue')) {

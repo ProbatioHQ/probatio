@@ -1,5 +1,10 @@
 import { marketCapLamports, priceFromReserves } from '@probatio/candles';
-import { launchedAtMs, newLaunches } from '@probatio/db';
+import {
+  creatorLaunchCounts,
+  getManyTokenMetadata,
+  launchedAtMs,
+  newLaunches,
+} from '@probatio/db';
 import { PUMPFUN_TOKEN_TOTAL_SUPPLY } from '@probatio/pools';
 import { db } from '@/lib/db';
 import { ranking } from '@/lib/explore';
@@ -57,7 +62,14 @@ export async function GET(request: Request): Promise<Response> {
   const tokens: Record<string, unknown>[] = [];
   const seen = new Set<string>();
 
-  for (const launch of await newLaunches(client, limit)) {
+  const fresh = await newLaunches(client, limit);
+  /* Batched for the whole page, so this stays a request a program may poll. */
+  const [socials, launchCounts] = await Promise.all([
+    getManyTokenMetadata(client, fresh.map((launch) => launch.mint)),
+    creatorLaunchCounts(client, fresh.map((launch) => launch.creator)),
+  ]);
+
+  for (const launch of fresh) {
     const curve = launch.curve;
     if (!curve || curve.virtualSolReserves === null || curve.virtualTokenReserves === null) continue;
     seen.add(launch.mint);
@@ -82,6 +94,22 @@ export async function GET(request: Request): Promise<Response> {
       ).toString(),
       progressBps: curve.progressBps,
       changeBps: null,
+      creator: launch.creator,
+      /*
+       * Null where the metadata has not been read yet, which is common in a
+       * token's first seconds and is not the same as "it named none". A program
+       * treating null as false would buy exactly the launches it was trying to
+       * avoid.
+       */
+      hasTwitter: socials.has(launch.mint)
+        ? (socials.get(launch.mint)?.twitterUrl ?? '').trim().length > 0
+        : null,
+      hasWebsite: socials.has(launch.mint)
+        ? (socials.get(launch.mint)?.websiteUrl ?? '').trim().length > 0
+        : null,
+      // How many launches this site has indexed from them: a floor on their
+      // history rather than the whole of it.
+      creatorLaunches: launchCounts.get(launch.creator) ?? 1,
     });
   }
 
@@ -102,6 +130,10 @@ export async function GET(request: Request): Promise<Response> {
         marketCapLamports: null,
         marketCapUsd: row.marketCapUsd,
         changeBps: row.changeH1 === null ? null : Math.round(row.changeH1 * 100),
+        creator: row.creator || null,
+        hasTwitter: null,
+        hasWebsite: null,
+        creatorLaunches: null,
       });
     }
   } catch {

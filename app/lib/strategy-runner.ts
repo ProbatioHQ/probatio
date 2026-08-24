@@ -2,7 +2,9 @@ import 'server-only';
 import { marketCapLamports, priceFromReserves } from '@probatio/candles';
 import {
   automatedTradesSince,
+  creatorLaunchCounts,
   ensureAccount,
+  getManyTokenMetadata,
   isSuspended,
   lastPrices,
   launchedAtMs,
@@ -11,6 +13,9 @@ import {
   recordStrategyEvent,
   currentRankedSeason,
   hasEntered,
+  launchBundlesFor,
+  recordLaunchBundle,
+  socialReuseFor,
   runningStrategies,
   staleRunningStrategies,
   stopStrategy,
@@ -19,12 +24,23 @@ import {
   type PositionRow,
   type StrategyRow,
 } from '@probatio/db';
-import { PUMPFUN_TOKEN_TOTAL_SUPPLY, PoolReader, RpcClient } from '@probatio/pools';
+import {
+  PUMPFUN_TOKEN_TOTAL_SUPPLY,
+  PoolReader,
+  RpcClient,
+  bondingCurveAddress,
+  decodeTokenAccount,
+  holderCount,
+  launchBundle,
+} from '@probatio/pools';
 import {
   DAILY_TRADE_CAP,
   QuoteError,
   exitDecision,
   matchesEntry,
+  needsBundle,
+  needsCreatorHolding,
+  needsHolders,
   quoteSell,
   readStoredRules,
   type Candidate,
@@ -34,6 +50,7 @@ import { db } from './db';
 import { rpcEndpoint, hasDedicatedRpc } from './env';
 import { executeTrade } from './execute-trade';
 import { ranking } from './explore';
+import { seasonTradingOpen, whyNotOpen } from './season-open';
 import { noteViewed } from './watched';
 
 /**
@@ -117,6 +134,16 @@ const PRICE_MAX_AGE_SECONDS = 300;
  */
 const BLIND_QUOTE_MS = 90_000;
 
+/**
+ * How long a holder count is worth keeping.
+ *
+ * Half a minute. Unlike a launch slot, whose answer is fixed for ever, this
+ * changes every few seconds on anything worth buying. Held only long enough
+ * that several strategies screening the same token in the same pass share one
+ * scan rather than each paying for their own.
+ */
+const HOLDERS_TTL_MS = 30_000;
+
 const DAY_MS = 24 * 60 * 60 * 1_000;
 const BPS = 10_000n;
 
@@ -128,6 +155,9 @@ const BPS = 10_000n;
  * positions, so it cannot outgrow the set of things being held.
  */
 const blindQuotes = new Map<string, number>();
+
+/** Holder counts, briefly. See HOLDERS_TTL_MS. */
+const holderCounts = new Map<string, { holders: number | null; at: number }>();
 
 function mayQuoteBlind(accountId: number, mint: string, now: number): boolean {
   const key = `${accountId}:${mint}`;
@@ -185,6 +215,12 @@ export function strategyRunnerStatus(): Omit<RunnerState, 'timer'> {
 let runnerRpc: RpcClient | null = null;
 let runnerReader: PoolReader | null = null;
 
+/** The same patient client the reader is built on, for the calls it does not make. */
+function rpc(): RpcClient {
+  reader();
+  return runnerRpc!;
+}
+
 function reader(): PoolReader {
   runnerRpc ??= new RpcClient({
     endpoint: rpcEndpoint(),
@@ -213,10 +249,27 @@ function market(mint: string): ReturnType<PoolReader['resolve']> {
  * carries what has moved, which is where a graduated token's numbers come from.
  * Neither costs a credit, which is what makes a waiting strategy free.
  */
-async function candidates(client: Client, now: number): Promise<Candidate[]> {
-  const out = new Map<string, Candidate>();
+/** A candidate, plus the creator this side needs to go and ask about them. */
+type Scanned = Candidate & { readonly creator: string | null };
+
+async function candidates(client: Client, now: number): Promise<Scanned[]> {
+  const out = new Map<string, Scanned>();
 
   const fresh = await newLaunches(client, CANDIDATES);
+
+  /*
+   * Socials and creator history, in two batched reads for the whole list.
+   *
+   * Per-token lookups here would turn a free pass into forty queries a tick per
+   * strategy, which is the shape of thing that makes an idle strategy expensive
+   * and is exactly what this loop is built to avoid.
+   */
+  const [socials, launchCounts, reuse] = await Promise.all([
+    getManyTokenMetadata(client, fresh.map((launch) => launch.mint)),
+    creatorLaunchCounts(client, fresh.map((launch) => launch.creator)),
+    socialReuseFor(client, fresh.map((launch) => launch.mint)),
+  ]);
+
   for (const launch of fresh) {
     const curve = launch.curve;
     if (!curve || curve.virtualSolReserves === null || curve.virtualTokenReserves === null) continue;
@@ -241,6 +294,18 @@ async function candidates(client: Client, now: number): Promise<Candidate[]> {
       ),
       changeBps: null,
       graduated: false,
+      ...socialsOf(socials.get(launch.mint)),
+      // Absent means this site has not indexed any launch from them, which
+      // cannot be true while looking at one of theirs, so it counts as one.
+      creatorLaunches: launchCounts.get(launch.creator) ?? 1,
+      // Filled in later, and only for what survives everything free.
+      creatorHoldingBps: null,
+      bundledBps: null,
+      holders: null,
+      // Absent means the token names no account, which is a different fact from
+      // an account nobody else has used.
+      socialReuse: reuse.get(launch.mint) ?? null,
+      creator: launch.creator,
     });
   }
 
@@ -259,6 +324,21 @@ async function candidates(client: Client, now: number): Promise<Candidate[]> {
         marketCapLamports: null,
         changeBps: row.changeH1 === null ? null : Math.round(row.changeH1 * 100),
         graduated: true,
+        /*
+         * The board carries a token's socials and creator, but not in a form
+         * this reads, and a second batched lookup per tick for the whole board
+         * is a cost this loop exists to avoid. Unknown rather than assumed, so
+         * a strategy asking for an X account simply does not match a board
+         * token instead of matching one on a guess.
+         */
+        hasTwitter: null,
+        hasWebsite: null,
+        creatorLaunches: null,
+        creatorHoldingBps: null,
+        bundledBps: null,
+        holders: null,
+        socialReuse: null,
+        creator: null,
       });
     }
   } catch {
@@ -271,6 +351,112 @@ async function candidates(client: Client, now: number): Promise<Candidate[]> {
 // ---------------------------------------------------------------------------
 // leaving a position
 // ---------------------------------------------------------------------------
+
+/**
+ * Whether a token's metadata names an X account or a site.
+ *
+ * A blank string is not a link. Launchers write empty fields as often as they
+ * omit them, and treating one as a social would pass every token that filled
+ * the form in badly.
+ */
+function socialsOf(
+  token: { twitterUrl: string | null; websiteUrl: string | null } | undefined,
+): { hasTwitter: boolean | null; hasWebsite: boolean | null } {
+  if (!token) return { hasTwitter: null, hasWebsite: null };
+  return {
+    hasTwitter: (token.twitterUrl ?? '').trim().length > 0,
+    hasWebsite: (token.websiteUrl ?? '').trim().length > 0,
+  };
+}
+
+/**
+ * What share of the supply a launcher still holds, in basis points.
+ *
+ * Every token account they hold for the mint, not just the associated one.
+ * Checked against mainnet: of two live holders of the same token, one used the
+ * derived associated address and the other held it in a plain account that
+ * derivation never names. Reading only the associated account would report zero
+ * for the second, and zero is the answer that lets a token through a "dev holds
+ * under five percent" rule. A condition that fails open is worse than none.
+ *
+ * Null when it cannot be read, which the rule then treats as unmet rather than
+ * as clean.
+ */
+async function creatorHoldingBps(creator: string, mint: string): Promise<number | null> {
+  try {
+    const accounts = await rpc().getTokenAccountsByOwner(creator, mint);
+    let held = 0n;
+    for (const entry of accounts) {
+      try {
+        held += decodeTokenAccount(entry.account.data).amount;
+      } catch {
+        // Another account type under the same owner. Not evidence of anything.
+      }
+    }
+    return Number((held * 10_000n) / PUMPFUN_TOKEN_TOTAL_SUPPLY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What went in a token's launch slot, from the store or from the chain.
+ *
+ * Read once per mint, ever. A token's launch slot is over, so the answer cannot
+ * change, and a row here — including a row recording that the walk gave up — is
+ * the difference between paying for that answer once and paying for it on every
+ * pass of every strategy that asks.
+ */
+async function bundledBpsFor(
+  client: Client,
+  mint: string,
+  known: Map<string, { bundledBps: number | null }>,
+  now: number,
+): Promise<number | null> {
+  const stored = known.get(mint);
+  if (stored) return stored.bundledBps;
+
+  let found: Awaited<ReturnType<typeof launchBundle>> = null;
+  try {
+    found = await launchBundle(rpc(), bondingCurveAddress(mint));
+  } catch {
+    // Recorded as unreadable below rather than retried on the next pass.
+  }
+
+  await recordLaunchBundle(client, {
+    mint,
+    slot: found?.slot ?? null,
+    bought: found?.boughtTokens.toString() ?? null,
+    bundledBps: found?.bundledBps ?? null,
+    buys: found?.buys ?? null,
+    now,
+  });
+  known.set(mint, { bundledBps: found?.bundledBps ?? null });
+  return found?.bundledBps ?? null;
+}
+
+/**
+ * How many wallets hold a token, from the last half minute or from the chain.
+ *
+ * The most expensive question a strategy can ask, so it is asked last and its
+ * answer is shared. Null on a failed scan, which the rule treats as unmet: a
+ * scan that did not finish is not a token nobody holds.
+ */
+async function holdersFor(mint: string, now: number): Promise<number | null> {
+  const held = holderCounts.get(mint);
+  if (held && now - held.at < HOLDERS_TTL_MS) return held.holders;
+
+  const found = await holderCount(rpc(), mint);
+  holderCounts.set(mint, { holders: found?.holders ?? null, at: now });
+
+  // Bounded, so a long uptime cannot accumulate every mint ever screened.
+  if (holderCounts.size > 2_000) {
+    for (const [key, entry] of holderCounts) {
+      if (now - entry.at > HOLDERS_TTL_MS * 4) holderCounts.delete(key);
+    }
+  }
+  return found?.holders ?? null;
+}
 
 function bpsAgainst(value: bigint, cost: bigint): number {
   if (cost <= 0n) return 0;
@@ -534,11 +720,61 @@ async function runOne(client: Client, strategy: StrategyRow, now: number): Promi
   const room = Math.min(rules.size.maxOpenPositions - openNow.length, budget);
   let opened = 0;
 
-  for (const candidate of await candidates(client, now)) {
+  const wantsHolding = needsCreatorHolding(rules.entry);
+  const wantsBundle = needsBundle(rules.entry);
+  const wantsHolders = needsHolders(rules.entry);
+
+  const scanned = await candidates(client, now);
+  /* Whatever is already known, in one read for the whole list. */
+  const bundles = wantsBundle
+    ? new Map(
+        [...(await launchBundlesFor(client, scanned.map((entry) => entry.mint)))].map(
+          ([mint, row]) => [mint, { bundledBps: row.bundledBps }],
+        ),
+      )
+    : new Map<string, { bundledBps: number | null }>();
+
+  for (const candidate of scanned) {
     if (opened >= room) break;
     if (held.has(candidate.mint)) continue;
 
-    const verdict = matchesEntry(rules.entry, candidate);
+    /*
+     * Everything free first, then pay for what is left.
+     *
+     * Checking the launcher's holdings needs a chain read, and doing it for
+     * every candidate on every pass is exactly the cost this loop is arranged
+     * to avoid. The conditions above usually cut a list of forty to one or two,
+     * and paying for those is nothing.
+     */
+    const free = matchesEntry(
+      {
+        ...rules.entry,
+        maxCreatorHoldingBps: undefined,
+        maxBundleBps: undefined,
+        minHolders: undefined,
+      },
+      candidate,
+    );
+    if (!free.ok) continue;
+
+    let checked = candidate;
+    if (wantsBundle) {
+      checked = { ...checked, bundledBps: await bundledBpsFor(client, candidate.mint, bundles, now) };
+    }
+    if (wantsHolding) {
+      if (candidate.creator === null) continue;
+      const bps = await creatorHoldingBps(candidate.creator, candidate.mint);
+      checked = { ...checked, creatorHoldingBps: bps };
+    }
+    /*
+     * Last, because it is the dearest. A token that already failed on its
+     * bundle or its launcher never costs a program scan at all.
+     */
+    if (wantsHolders) {
+      checked = { ...checked, holders: await holdersFor(candidate.mint, now) };
+    }
+
+    const verdict = matchesEntry(rules.entry, checked);
     if (!verdict.ok) continue;
 
     // Checked before the chain is read, so a refusal costs nothing.
@@ -593,16 +829,26 @@ async function tick(): Promise<void> {
     const now = Date.now();
     const season = await currentRankedSeason(client, now);
 
-    if (!season || season.status !== 'running') {
+    /*
+     * Open for trading, which is not the same as `status === 'running'`.
+     *
+     * The first two days of a season are `entry_open`, and trades placed in
+     * them count: `tradingOpen` says so, and every human path in the site asks
+     * it rather than the column. This asked the column, so a strategy started
+     * on the opening day was stopped within seconds and told the season was no
+     * longer running, about a season that had just begun.
+     */
+    if (!season || !seasonTradingOpen(season, now)) {
       /*
        * No season to trade. Every running strategy is stopped and told why,
        * rather than left marked running against a season that has ended.
        */
       const orphans = season ? await runningStrategies(client, season.id) : [];
+      const detail = whyNotOpen(season, now);
       for (const strategy of orphans) {
-        await stopStrategy(client, strategy.id, 'the season is no longer running', now);
+        await stopStrategy(client, strategy.id, detail, now);
         await recordStrategyEvent(client, strategy.id, {
-          at: now, kind: 'stopped', mint: null, detail: 'the season is no longer running',
+          at: now, kind: 'stopped', mint: null, detail,
         });
       }
       return;

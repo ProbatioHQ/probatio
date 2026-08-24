@@ -3,6 +3,9 @@ import {
   StrategyRulesError,
   exitDecision,
   matchesEntry,
+  needsBundle,
+  needsHolders,
+  needsCreatorHolding,
   parseStrategyRules,
   readStoredRules,
   serializeStrategyRules,
@@ -37,6 +40,13 @@ function candidate(over: Partial<Candidate> = {}): Candidate {
     marketCapLamports: 500_000_000_000n,
     changeBps: 2_500,
     graduated: false,
+    hasTwitter: true,
+    hasWebsite: true,
+    creatorLaunches: 1,
+    creatorHoldingBps: 0,
+    bundledBps: 0,
+    holders: 200,
+    socialReuse: 1,
     ...over,
   };
 }
@@ -120,6 +130,125 @@ describe('whether a token qualifies', () => {
     const wantsMove = { minChangeBps: 1_000, changeWindowSeconds: 300 };
     expect(matchesEntry(wantsMove, candidate({ changeBps: 2_500 })).ok).toBe(true);
     expect(matchesEntry(wantsMove, candidate({ changeBps: 400 })).ok).toBe(false);
+  });
+
+  /*
+   * The conditions that describe the launcher rather than the price. Nobody
+   * decides what to buy from a market cap alone, and these are the two this
+   * site can already answer without buying data from anybody.
+   */
+  it('can require an X account and a website', () => {
+    expect(matchesEntry({ requireTwitter: true }, candidate({ hasTwitter: true })).ok).toBe(true);
+    const none = matchesEntry({ requireTwitter: true }, candidate({ hasTwitter: false }));
+    expect(none.ok).toBe(false);
+    if (!none.ok) expect(none.why).toContain('no X account');
+
+    expect(matchesEntry({ requireWebsite: true }, candidate({ hasWebsite: false })).ok).toBe(false);
+  });
+
+  it('does not read unread metadata as an absent account', () => {
+    // A token seconds old has no metadata yet, which is not the same as a token
+    // that named nothing. Passing it would enter exactly the launches this
+    // condition exists to avoid.
+    const verdict = matchesEntry({ requireTwitter: true }, candidate({ hasTwitter: null }));
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.why).toContain('not been read');
+  });
+
+  it('skips serial launchers', () => {
+    const rule = { maxCreatorLaunches: 3 };
+    expect(matchesEntry(rule, candidate({ creatorLaunches: 1 })).ok).toBe(true);
+    expect(matchesEntry(rule, candidate({ creatorLaunches: 3 })).ok).toBe(true);
+
+    const busy = matchesEntry(rule, candidate({ creatorLaunches: 14 }));
+    expect(busy.ok).toBe(false);
+    if (!busy.ok) expect(busy.why).toContain('14 tokens');
+  });
+
+  it('does not guess at a creator it knows nothing about', () => {
+    expect(matchesEntry({ maxCreatorLaunches: 3 }, candidate({ creatorLaunches: null })).ok).toBe(false);
+  });
+
+  it('ignores the launcher conditions nobody asked for', () => {
+    // A token with no socials still matches a strategy that never mentioned them.
+    expect(
+      matchesEntry({ maxAgeSeconds: 90 }, candidate({ hasTwitter: false, hasWebsite: false })).ok,
+    ).toBe(true);
+  });
+
+  /*
+   * The one condition that costs a chain read, so the runner only asks it of
+   * candidates that already passed everything free.
+   */
+  it('caps what the launcher is still holding', () => {
+    const rule = { maxCreatorHoldingBps: 500 };
+    expect(matchesEntry(rule, candidate({ creatorHoldingBps: 120 })).ok).toBe(true);
+
+    const heavy = matchesEntry(rule, candidate({ creatorHoldingBps: 3_400 }));
+    expect(heavy.ok).toBe(false);
+    if (!heavy.ok) expect(heavy.why).toContain('34.0%');
+  });
+
+  it('treats an unread holding as unmet rather than as clean', () => {
+    // Zero is the answer that lets a token through, so an unknown must never
+    // read as one. A condition that fails open is worse than no condition.
+    expect(matchesEntry({ maxCreatorHoldingBps: 500 }, candidate({ creatorHoldingBps: null })).ok)
+      .toBe(false);
+  });
+
+  it('knows when a rule needs the read at all', () => {
+    expect(needsCreatorHolding({ maxAgeSeconds: 90 })).toBe(false);
+    expect(needsCreatorHolding({ maxCreatorHoldingBps: 500 })).toBe(true);
+  });
+
+  it('caps what went in the launch slot', () => {
+    const rule = { maxBundleBps: 2_000 };
+    expect(matchesEntry(rule, candidate({ bundledBps: 400 })).ok).toBe(true);
+
+    const bundled = matchesEntry(rule, candidate({ bundledBps: 6_100 }));
+    expect(bundled.ok).toBe(false);
+    if (!bundled.ok) expect(bundled.why).toContain('61.0%');
+  });
+
+  it('treats an unread launch slot as unmet rather than as clean', () => {
+    // Nothing bought in the launch slot and nothing known about it are opposite
+    // facts. Only one of them is a token worth entering.
+    expect(matchesEntry({ maxBundleBps: 2_000 }, candidate({ bundledBps: null })).ok).toBe(false);
+    expect(needsBundle({ maxAgeSeconds: 90 })).toBe(false);
+    expect(needsBundle({ maxBundleBps: 2_000 })).toBe(true);
+  });
+
+  it('requires a floor of real holders', () => {
+    const rule = { minHolders: 50 };
+    expect(matchesEntry(rule, candidate({ holders: 220 })).ok).toBe(true);
+
+    const thin = matchesEntry(rule, candidate({ holders: 4 }));
+    expect(thin.ok).toBe(false);
+    if (!thin.ok) expect(thin.why).toContain('4 wallets');
+  });
+
+  it('treats an unread holder count as unmet', () => {
+    expect(matchesEntry({ minHolders: 50 }, candidate({ holders: null })).ok).toBe(false);
+    expect(needsHolders({ maxAgeSeconds: 90 })).toBe(false);
+    expect(needsHolders({ minHolders: 50 })).toBe(true);
+  });
+
+  /*
+   * The buildable half of "this account has shilled a pile of coins". Not what
+   * it posted and deleted, which needs an archive nobody here keeps, but how
+   * many launches in this site's own index name the same account.
+   */
+  it('catches an X account attached to a pile of tokens', () => {
+    const rule = { maxSocialReuse: 3 };
+    expect(matchesEntry(rule, candidate({ socialReuse: 1 })).ok).toBe(true);
+
+    const serial = matchesEntry(rule, candidate({ socialReuse: 19 }));
+    expect(serial.ok).toBe(false);
+    if (!serial.ok) expect(serial.why).toContain('19 tokens');
+  });
+
+  it('has nothing to check when a token names no account', () => {
+    expect(matchesEntry({ maxSocialReuse: 3 }, candidate({ socialReuse: null })).ok).toBe(false);
   });
 
   it('takes no conditions to mean anything qualifies', () => {
@@ -226,6 +355,24 @@ describe('reading a set of rules', () => {
     expect(() => parseStrategyRules(rules({ entry: { venue: 'raydium' } }))).toThrow(
       /any, curve or graduated/,
     );
+  });
+
+  it('reads the launcher conditions', () => {
+    const parsed = parseStrategyRules(
+      rules({ entry: { requireTwitter: true, requireWebsite: true, maxCreatorLaunches: 3 } }),
+    );
+    expect(parsed.entry.requireTwitter).toBe(true);
+    expect(parsed.entry.maxCreatorLaunches).toBe(3);
+  });
+
+  it('treats an unticked box as a condition nobody set', () => {
+    // False is not a condition. "I did not ask for an X account" must not become
+    // "only tokens with no X account".
+    const parsed = parseStrategyRules(
+      rules({ entry: { maxAgeSeconds: 90, requireTwitter: false, requireWebsite: false } }),
+    );
+    expect(parsed.entry.requireTwitter).toBeUndefined();
+    expect(parsed.entry.requireWebsite).toBeUndefined();
   });
 
   it('treats a blank box as a condition nobody set', () => {

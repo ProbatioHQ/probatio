@@ -7,10 +7,10 @@ import {
   hasEntered,
   type AccountRow,
 } from '@probatio/db';
-import { tradingOpen } from '@probatio/seasons';
 import type { Client } from '@libsql/client';
 import { accountChoice } from './account-choice';
 import { noteActivity } from './activity';
+import { seasonTradingOpen } from './season-open';
 
 /**
  * Which season a trader's actions count toward.
@@ -119,15 +119,7 @@ async function resolveSeason(
 
   if (ranked && ranked.startsAt !== null && ranked.endsAt !== null) {
     const entered = await hasEntered(client, ranked.id, pubkey);
-    const open = tradingOpen(
-      {
-        startsAt: ranked.startsAt,
-        endsAt: ranked.endsAt,
-        entryClosesAt: ranked.entryClosesAt ?? ranked.endsAt,
-        finalizedAt: ranked.status === 'finalized' ? ranked.endsAt : null,
-      },
-      now,
-    );
+    const open = seasonTradingOpen(ranked, now);
 
     if (entered && open) {
       /*
@@ -220,19 +212,7 @@ export async function balances(client: Client, pubkey: string, now: number): Pro
   // Live means trades land here, which is the season being open and this
   // browser not having chosen otherwise, not merely the season running.
   const chosenFree = (await accountChoice()) === 'free';
-  const live =
-    !chosenFree &&
-    season.startsAt !== null &&
-    season.endsAt !== null &&
-    tradingOpen(
-      {
-        startsAt: season.startsAt,
-        endsAt: season.endsAt,
-        entryClosesAt: season.entryClosesAt ?? season.endsAt,
-        finalizedAt: season.status === 'finalized' ? season.endsAt : null,
-      },
-      now,
-    );
+  const live = !chosenFree && seasonTradingOpen(season, now);
 
   return {
     free,

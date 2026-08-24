@@ -307,5 +307,10 @@ export type {
   StrategyStatus,
 } from './strategies';
 
+export { backfillTwitterHandles, socialReuseFor, twitterHandle } from './handles';
+
+export { launchBundlesFor, recordLaunchBundle } from './bundles';
+export type { LaunchBundleRow } from './bundles';
+
 export { createTestDatabase } from './testing';
 export type { TestDatabase } from './testing';

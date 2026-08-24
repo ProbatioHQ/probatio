@@ -40,6 +40,13 @@ export default function StrategiesPage() {
         </div>
         <ul className="strategy-limits">
           <li>
+            <strong>The dear conditions are asked last.</strong> Everything that needs the chain
+            read — what the creator still holds, what went in the launch slot, how many wallets
+            hold it — is only checked for tokens that have already passed everything else, and a
+            read that fails counts as unmet rather than as clean. A condition that fails open
+            would be worse than no condition, because it would look like it worked.
+          </li>
+          <li>
             <strong>It gets no faster lane.</strong> The same latency, the same slippage, the same
             price impact ceiling and the same suspension checks as a person clicking buy.
           </li>

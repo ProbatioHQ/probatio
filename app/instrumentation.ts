@@ -109,6 +109,17 @@ export async function register(): Promise<void> {
   const { startSeasonRollover } = await import('./lib/season-rollover');
   safely('season rollover', startSeasonRollover);
 
+  /*
+   * Reads the X link on every stored token down to the account behind it.
+   *
+   * A one-off that converges and then stops. It was a script, and a script is
+   * an instruction to a person: every deploy that ran the migration and forgot
+   * the script would leave the account-reuse condition counting a serial
+   * promoter as a first-timer, with nothing anywhere saying so.
+   */
+  const { startHandleBackfill } = await import('./lib/handle-backfill');
+  safely('handle backfill', startHandleBackfill);
+
   // Drops chart candles too old to draw and reclaims the space, so the one
   // table that grows on a timer cannot fill the disk and take the database down.
   const { startRetention } = await import('./lib/retention');

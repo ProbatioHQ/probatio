@@ -1,4 +1,5 @@
 import type { Client } from '@libsql/client';
+import { twitterHandle } from './handles';
 
 /**
  * The token metadata cache.
@@ -153,7 +154,7 @@ export async function recordOffchainMetadata(
   await db.execute({
     sql: `UPDATE token_metadata SET
             offchain_name = ?, offchain_symbol = ?, description = ?, image_url = ?,
-            twitter_url = ?, website_url = ?, telegram_url = ?,
+            twitter_url = ?, website_url = ?, telegram_url = ?, twitter_handle = ?,
             offchain_fetched_at = ?, offchain_error = NULL, offchain_attempts = 0
           WHERE mint = ?`,
     args: [
@@ -164,6 +165,14 @@ export async function recordOffchainMetadata(
       entry.twitterUrl ?? null,
       entry.websiteUrl ?? null,
       entry.telegramUrl ?? null,
+      /*
+       * Reduced to the account as it is written, not later by a sweep. A
+       * backfill exists for the rows already here, but a link arriving now and
+       * only being normalised on some future pass would leave the newest
+       * tokens — the ones a strategy is screening — as the ones it knows least
+       * about.
+       */
+      twitterHandle(entry.twitterUrl),
       now,
       mint,
     ],

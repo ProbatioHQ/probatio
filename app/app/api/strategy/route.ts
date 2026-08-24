@@ -21,6 +21,7 @@ import {
 } from '@probatio/sim';
 import { db } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
+import { seasonTradingOpen, whyNotOpen } from '@/lib/season-open';
 import { currentUser } from '@/lib/session';
 
 /**
@@ -182,11 +183,15 @@ export async function PATCH(request: Request): Promise<Response> {
     return Response.json({ status: 'stopped' });
   }
 
-  if (season.status !== 'running') {
-    return Response.json(
-      { error: `the season is ${season.status}, so there is nothing to trade yet` },
-      { status: 409 },
-    );
+  /*
+   * Open for trading, not `status === 'running'`. The entry window is the first
+   * two days of a season and trades placed in it count, so refusing to start a
+   * strategy then refused it on the days the board is actually being made.
+   */
+  if (!seasonTradingOpen(season, now)) {
+    return Response.json({ error: `${whyNotOpen(season, now)}, so there is nothing to trade yet` }, {
+      status: 409,
+    });
   }
 
   /*

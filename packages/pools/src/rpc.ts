@@ -382,6 +382,17 @@ export class RpcClient {
   async getProgramAccounts(
     programId: string,
     filters: readonly ProgramAccountFilter[],
+    /**
+     * Ask for a window of each account rather than all of it.
+     *
+     * A scan that matches thousands of accounts returns thousands of accounts,
+     * and most callers want one field out of each. Counting the holders of a
+     * token means matching every token account for that mint, which is a
+     * hundred and sixty-five bytes apiece for a number that lives in eight of
+     * them. The slice is applied by the node, so what is saved is the response
+     * itself rather than only the parsing of it.
+     */
+    dataSlice?: { readonly offset: number; readonly length: number },
   ): Promise<{ address: string; account: AccountData }[]> {
     const result = await this.call<{ pubkey: string; account: AccountValue }[]>(
       'getProgramAccounts',
@@ -391,6 +402,7 @@ export class RpcClient {
           encoding: 'base64',
           commitment: this.commitment,
           filters: filters.map(toRpcFilter),
+          ...(dataSlice ? { dataSlice } : {}),
         },
       ],
     );
@@ -400,6 +412,36 @@ export class RpcClient {
     return result.map((entry) => ({
       address: entry.pubkey,
       account: toAccountData(entry.account, 0),
+    }));
+  }
+
+  /**
+   * Every token account one owner holds for one mint.
+   *
+   * Deliberately this rather than deriving the associated token address and
+   * reading it. Both are a single call, and the derivation was verified against
+   * mainnet — but it is only complete for owners who use an associated account,
+   * and plenty do not: checked against two live USDC holders, one matched the
+   * derived address exactly and the other held the same mint in a plain token
+   * account the derivation never names.
+   *
+   * That difference decides a filter. "How much does the launcher still hold"
+   * read from the associated account alone reports zero for anybody holding it
+   * elsewhere, and zero is the answer that lets a token through. A condition
+   * that fails open is worse than no condition, because it looks like it worked.
+   */
+  async getTokenAccountsByOwner(
+    owner: string,
+    mint: string,
+  ): Promise<{ address: string; account: AccountData }[]> {
+    const result = await this.call<WithContext<{ pubkey: string; account: AccountValue }[]>>(
+      'getTokenAccountsByOwner',
+      [owner, { mint }, { encoding: 'base64', commitment: this.commitment }],
+    );
+
+    return result.value.map((entry) => ({
+      address: entry.pubkey,
+      account: toAccountData(entry.account, result.context.slot),
     }));
   }
 

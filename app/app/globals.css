@@ -10434,3 +10434,28 @@ body:has(#livestream) {
 @media (prefers-reduced-motion: reduce) {
   .pnl-overlay { backdrop-filter: none; }
 }
+
+/* A ticked condition, laid out along the row rather than down it like the
+   fields beside it: a checkbox has no separate label to stack above. */
+.field.tickbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  align-self: end;
+}
+
+.field.tickbox input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.field.tickbox span {
+  font-size: 14.5px;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: inherit;
+}

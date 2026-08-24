@@ -116,8 +116,11 @@ export default function ApiDocsPage() {
             <code>GET /api/v1/tokens</code>
           </dt>
           <dd>
-            What there is to trade, with age, depth and market cap where they are known. Nothing
-            here reads the chain, so it can be polled freely.
+            What there is to trade, with age, depth and market cap where they are known, plus
+            whether the token names an X account or a website and how many launches this site has
+            indexed from its creator. Nothing here reads the chain, so it can be polled freely.
+            Those last three are <code>null</code> where they are not known, which is not the same
+            as false: a token seconds old has no metadata read yet.
           </dd>
         </dl>
       </section>

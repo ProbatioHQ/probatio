@@ -28,6 +28,13 @@ interface Rules {
     maxChangeBps?: number | string;
     changeWindowSeconds?: number | string;
     venue?: string;
+    requireTwitter?: boolean;
+    requireWebsite?: boolean;
+    maxCreatorLaunches?: number | string;
+    maxCreatorHoldingBps?: number | string;
+    maxBundleBps?: number | string;
+    minHolders?: number | string;
+    maxSocialReuse?: number | string;
   };
   size: { stakeLamports: string; maxOpenPositions: number | string };
   exit: {
@@ -120,6 +127,10 @@ function when(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+/* Ticked or not, rather than a value. Kept apart from the text fields because
+   an unticked box is a condition nobody set, not a condition set to false. */
+const BLANK_TICKS = { twitter: false, website: false };
+
 const BLANK = {
   minAge: '',
   maxAge: '90',
@@ -130,6 +141,11 @@ const BLANK = {
   maxChange: '',
   window: '300',
   venue: 'any',
+  maxLaunches: '',
+  maxDevHold: '',
+  maxBundle: '',
+  minHolders: '',
+  maxReuse: '',
   stake: '0.25',
   maxOpen: '3',
   takeProfit: '120',
@@ -139,6 +155,7 @@ const BLANK = {
 
 export function StrategyBuilder() {
   const [form, setForm] = useState({ ...BLANK });
+  const [ticks, setTicks] = useState({ ...BLANK_TICKS });
   const [name, setName] = useState('my strategy');
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [keys, setKeys] = useState<KeyRow[]>([]);
@@ -183,11 +200,20 @@ export function StrategyBuilder() {
         maxChange: toPercent(rules.entry.maxChangeBps),
         window: String(rules.entry.changeWindowSeconds ?? '300'),
         venue: String(rules.entry.venue ?? 'any'),
+        maxLaunches: String(rules.entry.maxCreatorLaunches ?? ''),
+        maxDevHold: toPercent(rules.entry.maxCreatorHoldingBps),
+        maxBundle: toPercent(rules.entry.maxBundleBps),
+        minHolders: String(rules.entry.minHolders ?? ''),
+        maxReuse: String(rules.entry.maxSocialReuse ?? ''),
         stake: toSol(rules.size.stakeLamports),
         maxOpen: String(rules.size.maxOpenPositions),
         takeProfit: toPercent(rules.exit.takeProfitBps),
         stopLoss: toPercent(rules.exit.stopLossBps),
         timeout: String(rules.exit.timeoutSeconds ?? ''),
+      });
+      setTicks({
+        twitter: rules.entry.requireTwitter === true,
+        website: rules.entry.requireWebsite === true,
       });
     }
   }, []);
@@ -218,6 +244,14 @@ export function StrategyBuilder() {
     if (form.maxChange) entry.maxChangeBps = Number(toBps(form.maxChange));
     if (form.minChange || form.maxChange) entry.changeWindowSeconds = Number(form.window);
     if (form.venue !== 'any') entry.venue = form.venue;
+    // Only when ticked. False would read as "only tokens with no X account".
+    if (ticks.twitter) entry.requireTwitter = true;
+    if (ticks.website) entry.requireWebsite = true;
+    if (form.maxLaunches) entry.maxCreatorLaunches = Number(form.maxLaunches);
+    if (form.maxDevHold) entry.maxCreatorHoldingBps = Number(toBps(form.maxDevHold));
+    if (form.maxBundle) entry.maxBundleBps = Number(toBps(form.maxBundle));
+    if (form.minHolders) entry.minHolders = Number(form.minHolders);
+    if (form.maxReuse) entry.maxSocialReuse = Number(form.maxReuse);
 
     const exit: Rules['exit'] = {};
     if (form.takeProfit) exit.takeProfitBps = Number(toBps(form.takeProfit));
@@ -398,6 +432,85 @@ export function StrategyBuilder() {
             <input inputMode="numeric" value={form.window} onChange={(e) => set('window', e.target.value)} />
           </label>
         </div>
+
+        <h3 className="strategy-section">Who launched it</h3>
+        <div className="strategy-grid">
+          <label className="field tickbox">
+            <input
+              type="checkbox"
+              checked={ticks.twitter}
+              onChange={(event) => setTicks((now) => ({ ...now, twitter: event.target.checked }))}
+            />
+            <span>Names an X account</span>
+          </label>
+          <label className="field tickbox">
+            <input
+              type="checkbox"
+              checked={ticks.website}
+              onChange={(event) => setTicks((now) => ({ ...now, website: event.target.checked }))}
+            />
+            <span>Names a website</span>
+          </label>
+          <label className="field">
+            <span>Creator has launched, at most</span>
+            <input
+              inputMode="numeric"
+              value={form.maxLaunches}
+              onChange={(e) => set('maxLaunches', e.target.value)}
+              placeholder="any"
+            />
+          </label>
+          <label className="field">
+            <span>Creator still holds, at most (%)</span>
+            <input
+              inputMode="decimal"
+              value={form.maxDevHold}
+              onChange={(e) => set('maxDevHold', e.target.value)}
+              placeholder="any"
+            />
+          </label>
+          <label className="field">
+            <span>Bundled in the launch slot, at most (%)</span>
+            <input
+              inputMode="decimal"
+              value={form.maxBundle}
+              onChange={(e) => set('maxBundle', e.target.value)}
+              placeholder="any"
+            />
+          </label>
+          <label className="field">
+            <span>Holders, at least</span>
+            <input
+              inputMode="numeric"
+              value={form.minHolders}
+              onChange={(e) => set('minHolders', e.target.value)}
+              placeholder="any"
+            />
+          </label>
+          <label className="field">
+            <span>Its X account is on, at most</span>
+            <input
+              inputMode="numeric"
+              value={form.maxReuse}
+              onChange={(e) => set('maxReuse', e.target.value)}
+              placeholder="any"
+            />
+          </label>
+        </div>
+        <p className="dim panel-note">
+          Launches are counted across what this site has indexed, so it is a floor on how many they
+          have made rather than their whole history. A token whose metadata has not been read yet
+          matches neither of the boxes above, rather than being let through on a guess.
+          The last three are read from the chain, so they are only checked for tokens that have
+          already passed everything else, and a read that fails counts as unmet rather than as
+          clean. The bundle figure is what was bought in the same slot the token was created in,
+          which is what a creator gets when they land the launch and their own buys together; it
+          never changes, so it is read once per token and remembered. Holders counts wallets with
+          a balance rather than token accounts, since a wallet that sold out usually leaves its
+          account behind. The last box counts how many tokens here name the same X account,
+          including this one: it cannot see what an account posted and deleted, but it can see the
+          same account attached to a dozen other launches.
+        </p>
 
         <h3 className="strategy-section">Size</h3>
         <div className="strategy-grid">

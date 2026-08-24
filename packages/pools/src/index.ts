@@ -81,6 +81,10 @@ export type {
   TransactionLogs,
 } from './rpc';
 
+export { holderCount } from './holders';
+export type { HolderCount } from './holders';
+export { launchBundle } from './bundle';
+export type { LaunchBundle } from './bundle';
 export { PoolReader, forgetPool } from './reader';
 export { PUMPFUN_CURVE_FEES, PUMPSWAP_DEFAULT_FEES } from './fees';
 export type { Resolution, Venue } from './reader';

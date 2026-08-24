@@ -1,5 +1,6 @@
 import { LayoutError, readPubkey, readU64, readU8 } from './layout';
 
+import { findProgramAddress, pubkeySeed } from './pda';
 /**
  * SPL token account layout — fixed at 165 bytes.
  *
@@ -86,4 +87,27 @@ export function decodeMintDecimals(data: Uint8Array): number {
     throw new LayoutError(`implausible decimals ${decimals} — the layout is probably wrong`);
   }
   return decimals;
+}
+
+/**
+ * The SPL token program, and the program that derives an owner's account for a
+ * mint. Both are fixed addresses rather than anything this reads.
+ */
+export const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+export const ASSOCIATED_TOKEN_PROGRAM_ID = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
+
+/**
+ * Where an owner's tokens for a mint live, without asking anybody.
+ *
+ * The associated token account is a program address derived from the owner, the
+ * token program and the mint, so it can be worked out locally and then read in
+ * the same batch as everything else. That is the whole reason a "how much does
+ * the launcher still hold" condition is affordable: no search, no scan of the
+ * token program's accounts, one address computed here and one account read.
+ */
+export function associatedTokenAddress(owner: string, mint: string): string {
+  return findProgramAddress(
+    [pubkeySeed(owner), pubkeySeed(TOKEN_PROGRAM_ID), pubkeySeed(mint)],
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  ).address;
 }
