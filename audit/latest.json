@@ -1,14 +1,14 @@
 {
-  "at": 1787562709,
+  "at": 1787569498,
   "checks": 4,
-  "inspected": 2031,
+  "inspected": 2044,
   "errors": 0,
   "warnings": 76,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 846,
+      "inspected": 847,
       "findings": [
         {
           "severity": "warning",
@@ -237,7 +237,7 @@
     {
       "id": "css-vars",
       "title": "Custom properties that resolve to nothing",
-      "inspected": 1091,
+      "inspected": 1103,
       "findings": []
     },
     {

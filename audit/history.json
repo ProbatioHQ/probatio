@@ -1,5 +1,12 @@
 [
   {
+    "at": 1787569498,
+    "checks": 4,
+    "inspected": 2044,
+    "errors": 0,
+    "warnings": 76
+  },
+  {
     "at": 1787562709,
     "checks": 4,
     "inspected": 2031,
