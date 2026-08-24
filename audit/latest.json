@@ -1,14 +1,14 @@
 {
-  "at": 1787562619,
+  "at": 1787562709,
   "checks": 4,
-  "inspected": 2020,
+  "inspected": 2031,
   "errors": 0,
-  "warnings": 75,
+  "warnings": 76,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 841,
+      "inspected": 846,
       "findings": [
         {
           "severity": "warning",
@@ -105,6 +105,12 @@
           "file": "app/lib/price-display.ts",
           "line": 35,
           "detail": "marketCapSol is mentioned only by tests, so nothing in the app runs it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/public-fetch.ts",
+          "line": 47,
+          "detail": "isPrivateAddress is mentioned only by tests, so nothing in the app runs it"
         },
         {
           "severity": "warning",
@@ -231,7 +237,7 @@
     {
       "id": "css-vars",
       "title": "Custom properties that resolve to nothing",
-      "inspected": 1085,
+      "inspected": 1091,
       "findings": []
     },
     {
