@@ -1,14 +1,14 @@
 {
-  "at": 1787569498,
+  "at": 1787600633,
   "checks": 4,
-  "inspected": 2044,
+  "inspected": 2063,
   "errors": 0,
-  "warnings": 76,
+  "warnings": 79,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 847,
+      "inspected": 864,
       "findings": [
         {
           "severity": "warning",
@@ -63,6 +63,12 @@
           "file": "app/lib/feed-filters.ts",
           "line": 62,
           "detail": "keywords is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/handle-backfill.ts",
+          "line": 55,
+          "detail": "handleBackfillStatus is exported and no other file mentions it"
         },
         {
           "severity": "warning",
@@ -222,6 +228,18 @@
         },
         {
           "severity": "warning",
+          "file": "packages/pools/src/token.ts",
+          "line": 97,
+          "detail": "ASSOCIATED_TOKEN_PROGRAM_ID is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
+          "file": "packages/pools/src/token.ts",
+          "line": 108,
+          "detail": "associatedTokenAddress is exported and no other file mentions it"
+        },
+        {
+          "severity": "warning",
           "file": "packages/sdk/src/read.ts",
           "line": 32,
           "detail": "resolveFetch is exported and no other file mentions it"
@@ -237,7 +255,7 @@
     {
       "id": "css-vars",
       "title": "Custom properties that resolve to nothing",
-      "inspected": 1103,
+      "inspected": 1105,
       "findings": []
     },
     {
@@ -302,7 +320,7 @@
         {
           "severity": "warning",
           "file": "app/instrumentation.ts",
-          "line": 149,
+          "line": 160,
           "detail": "PROBATIO_DISABLE_DRIFT is read by the code and documented nowhere"
         },
         {
@@ -404,13 +422,13 @@
         {
           "severity": "warning",
           "file": "app/lib/strategy-runner.ts",
-          "line": 77,
+          "line": 94,
           "detail": "PROBATIO_DISABLE_STRATEGIES is read by the code and documented nowhere"
         },
         {
           "severity": "warning",
           "file": "app/lib/strategy-runner.ts",
-          "line": 87,
+          "line": 104,
           "detail": "PROBATIO_STRATEGY_INTERVAL_MS is read by the code and documented nowhere"
         },
         {
