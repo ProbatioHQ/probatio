@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ShareCard, type TradeCardData } from './share-card';
 import { useWallet } from './wallet';
 
 /**
@@ -162,6 +163,13 @@ export function TradePanel({
   const [showSlippage, setShowSlippage] = useState(false);
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<TradeResult | null>(null);
+  /*
+   * The receipt for the round trip that just closed, once it has been asked
+   * for. Not fetched with the fill: most fills do not close anything, and a
+   * request nobody asked for on every trade is a request for nothing.
+   */
+  const [receipt, setReceipt] = useState<TradeCardData | null>(null);
+  const [fetchingReceipt, setFetchingReceipt] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
   const [held, setHeld] = useState<string>('0');
   /** What the holding cost and what it is worth now, for the live position. */
@@ -273,6 +281,7 @@ export function TradePanel({
         }
 
         setResult(body);
+        setReceipt(null);
         if (body.status === 'filled') {
           setBalance(body.balance);
           setHeld(body.position.tokenAmount);
@@ -910,6 +919,47 @@ export function TradePanel({
               <dt>Impact</dt>
               <dd className="mono">{result.filled.priceImpactBps}bp</dd>
             </dl>
+
+            {/*
+              A round trip has just ended, which is the one moment somebody
+              wants to post about it.
+              
+              Only on a sell that left nothing behind. A buy is half a story and
+              a partial sell is a story still going, and offering a receipt for
+              either would produce a card describing a trade that has not
+              finished happening.
+            */}
+            {result.side === 'sell' && result.position.tokenAmount === '0' && (
+              <p className="fill-receipt">
+                {receipt ? null : (
+                  <button
+                    type="button"
+                    className="linklike"
+                    disabled={fetchingReceipt}
+                    onClick={() => {
+                      setFetchingReceipt(true);
+                      void fetch('/api/card')
+                        .then(async (response) => {
+                          if (!response.ok) return;
+                          const body = (await response.json()) as { trades: TradeCardData[] };
+                          /*
+                           * The newest closed trip, which is the one that just
+                           * closed. Read back rather than assembled from the
+                           * fill, so the figures on the card come from the same
+                           * replay the profile does and cannot drift from it.
+                           */
+                          setReceipt(body.trades[0] ?? null);
+                        })
+                        .finally(() => setFetchingReceipt(false));
+                    }}
+                  >
+                    {fetchingReceipt ? 'getting the receipt' : 'get the receipt'}
+                  </button>
+                )}
+              </p>
+            )}
+
+            {receipt && <ShareCard trade={receipt} onClose={() => setReceipt(null)} />}
 
             {/* The number the whole product turns on. */}
             <p

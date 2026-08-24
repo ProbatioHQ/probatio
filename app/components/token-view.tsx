@@ -6,6 +6,7 @@ import { PriceChart } from '@/components/price-chart';
 import { useWallet } from '@/components/wallet';
 import { Positions } from '@/components/positions';
 import { RuleBacktest } from '@/components/rule-backtest';
+import { PnlCardPanel } from './pnl-card-panel';
 import { TradePanel } from '@/components/trade-panel';
 import type { PriceUnit } from '@/lib/price-display';
 import { Sprout, age, freshAge } from '@/components/sprout';
@@ -580,7 +581,20 @@ export function TokenView({
         </div>
       </section>
 
-      <TradePanel mint={mint} onTraded={() => setTradeCount((n) => n + 1)} />
+      {/*
+        One column, wrapped, rather than two siblings in a grid.
+        
+        The trade panel never claimed a column: it sat beside the chart only
+        because it happened to be the second child of a two-column grid. Adding
+        anything before it took that slot and dropped the panel onto the next
+        row, under the chart, which is how a card meant to sit above the buy
+        buttons ended up swapping places with them. Wrapping the two means their
+        order is their order and nothing between them can move either.
+      */}
+      <div className="trade-side">
+        <PnlCardPanel refreshKey={tradeCount} mint={mint} />
+        <TradePanel mint={mint} onTraded={() => setTradeCount((n) => n + 1)} />
+      </div>
 
       {/* Under the trade panel rather than under the chart. Somebody asks what a
           rule would have done after they have looked at the price and thought

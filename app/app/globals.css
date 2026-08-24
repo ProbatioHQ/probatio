@@ -3313,6 +3313,25 @@ button:hover:not(:where(:disabled)),
 }
 
 /*
+ * The right-hand column, as one thing.
+ *
+ * Its contents used to be loose children of the grid, which meant their column
+ * was decided by how many siblings came before them. Anything inserted above
+ * the trade panel pushed it onto the next row and under the chart. Held
+ * together here so the order inside is the only thing that decides the order.
+ */
+.trade-side {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .trade-side { grid-column: 1; }
+}
+
+/*
  * The record sits under the chart, not under the whole layout.
  *
  * `1 / -1` spanned the chart column and the 320px trade panel beside it, so a
@@ -10237,4 +10256,181 @@ body:has(#livestream) {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 12.5px;
   color: var(--text);
+}
+
+/* ------------------------------------------------------------- share card */
+/* The card a trader turns a closed trade into. Composed on a canvas in the
+   browser, so the picture they pick never leaves their machine. */
+
+.sharecard {
+  margin: 18px 0 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sharecard-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--ink-sunken);
+  max-width: 900px;
+}
+
+/* The canvas is drawn at 2x for a crisp download and shown at its CSS size. */
+.sharecard-frame canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sharecard-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 900px;
+}
+
+.sharecard-gap { flex: 1; }
+
+/* A file input is unstyleable, so the real one is hidden behind a label that
+   is not. Clicking the label still opens the picker, and keyboard focus still
+   reaches the input, which is why it is hidden with opacity rather than
+   display:none. */
+.btn-file {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  border: 1px solid var(--line-bright);
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.btn-file input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.btn-file:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sharecard-note {
+  font-size: 13.5px;
+  max-width: 900px;
+}
+
+/* The receipt offer, in the fill panel at the moment a round trip ends. */
+.fill-receipt {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+/* The background swatches on a receipt. Colour is the whole control, so the
+   swatch is the button rather than a label beside one. */
+.sharecard-backs {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.sharecard-back {
+  width: 42px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sharecard-back.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* -------------------------------------------------------- the PNL card way in */
+/* One line above the trade panel. The smallest thing in that column on
+   purpose: the card is the payoff, this is only the door to it. */
+
+.pnl-strip {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ink-raised);
+  cursor: pointer;
+  text-align: left;
+}
+
+.pnl-strip:hover {
+  border-color: var(--line-bright);
+}
+
+.pnl-strip-label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.pnl-strip:hover .pnl-strip-label { color: var(--accent); }
+
+.pnl-strip-ret {
+  margin-left: auto;
+  font-size: 14.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* How many other closed trips there are in this token, when there are any. */
+.pnl-strip-more {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  border: 1px solid var(--line-bright);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* The card opens over the page. A 16:9 card meant to be looked at before it is
+   posted cannot be judged inside a 320px strip. */
+.pnl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 6, 8, 0.82);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.pnl-overlay-inner {
+  width: min(940px, 100%);
+}
+
+.pnl-overlay .sharecard { margin: 0; }
+.pnl-overlay .sharecard-frame,
+.pnl-overlay .sharecard-actions,
+.pnl-overlay .sharecard-note { max-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pnl-overlay { backdrop-filter: none; }
 }

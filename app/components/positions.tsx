@@ -126,6 +126,7 @@ export function Positions({ refreshKey = 0 }: { refreshKey?: number }) {
 
       const tradesBody = (await tradesResponse.json()) as { trades: TradeEntry[] } | { error: string };
       if (!('error' in tradesBody)) setTrades(tradesBody.trades);
+
     } catch {
       setError('Could not load your positions.');
     }
