@@ -37,6 +37,7 @@ const LINKS: readonly { href: string; label: string; narrow?: string }[] = [
   { href: '/watching', label: 'Watching' },
   { href: '/traders', label: 'Traders' },
   { href: '/season', label: 'Season' },
+  { href: '/duels', label: 'Duels' },
   { href: '/store', label: 'Store' },
   { href: '/telegram', label: 'Telegram' },
   { href: '/roadmap', label: 'Roadmap' },

@@ -170,6 +170,7 @@ export {
   nameHistory,
   nameRecord,
   namesFor,
+  pubkeyForName,
 } from './names';
 export type { ClaimOutcome, DisplayName } from './names';
 
@@ -241,6 +242,7 @@ export type {
 export { ConcurrentTradeError } from './trading';
 export {
   allTrades,
+  accountFor,
   ensureAccount,
   ensureFreePlaySeason,
   isRankedSeason,
@@ -306,6 +308,27 @@ export type {
   StrategyRow,
   StrategyStatus,
 } from './strategies';
+
+export {
+  DUEL_WINDOWS,
+  DuelError,
+  MAX_OPEN_OFFERS,
+  OFFER_TTL_MS,
+  acceptDuel,
+  closeOffer,
+  duelById,
+  duelRecord,
+  duelSeal,
+  duelsFor,
+  dueDuels,
+  expireOffers,
+  liveDuelFor,
+  offerDuel,
+  recentDuels,
+  returnBps,
+  settleDuel,
+} from './duels';
+export type { DuelRecord, DuelRow, DuelStatus } from './duels';
 
 export { backfillTwitterHandles, socialReuseFor, twitterHandle } from './handles';
 

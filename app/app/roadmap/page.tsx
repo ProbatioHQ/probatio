@@ -22,11 +22,12 @@ export default function RoadmapPage() {
       <div className="page-head">
         <h1>Roadmap</h1>
         <p className="dim">
-          The honest simulator, records committed to Solana, ranked seasons and the coach are
-          here at launch. This page is not about them. It is everything after: what the record
-          lets us build next, and where being good enough eventually pays. Each phase is marked
-          with how real it is, because a wish painted as a promise is the one thing this site
-          exists not to do.
+          The honest simulator, records committed to Solana, ranked seasons and the coach were
+          here at launch. This page is everything after: what the record lets us build next, and
+          where being good enough eventually pays. Phase one is finished, and a phase is only
+          marked shipped when every item in it is live and you can go and use it. Each of the
+          rest is marked with how real it is, because a wish painted as a promise is the one
+          thing this site exists not to do.
         </p>
       </div>
 
@@ -56,8 +57,8 @@ export default function RoadmapPage() {
       </ol>
 
       <p className="dim roadmap-foot">
-        Written to be honest about what is real. A phase marked <em>exploring</em> is a direction,
-        not a promise. See <a href="/trust">what you have to trust</a> for the rest of that
+        Written to be honest about what is real. <em>Shipped</em> means every item in that phase
+        is live on this site today; <em>exploring</em> is a direction, not a promise. See <a href="/trust">what you have to trust</a> for the rest of that
         argument.
       </p>
     </main>

@@ -96,6 +96,16 @@ export async function register(): Promise<void> {
   const { startStrategyRunner } = await import('./lib/strategy-runner');
   safely('strategies', startStrategyRunner);
 
+  /*
+   * Scores duels whose window has closed.
+   *
+   * A duel ends at a time, and a time is not an event anything watches. Settling
+   * on page view instead would mean a duel nobody opens is never scored, and the
+   * loser choosing the moment they are measured by staying away.
+   */
+  const { startDuelSettler } = await import('./lib/duel-settle');
+  safely('duels', startDuelSettler);
+
   // Commits records to the chain. Does nothing without a key, and says so.
   const { startKeeper } = await import('./lib/keeper');
   safely('keeper', startKeeper);

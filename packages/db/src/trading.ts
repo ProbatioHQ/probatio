@@ -64,6 +64,49 @@ export async function ensureFreePlaySeason(db: Client, now: number): Promise<num
   return Number(existing.rows[0]!['id']);
 }
 
+/**
+ * The trader's account for a season, or null. Never creates one.
+ *
+ * `ensureAccount` is right on a request path, where a wallet's first visit has
+ * to end with an account existing. It is wrong everywhere else, and the reason
+ * is not tidiness: it builds an account at the season's starting balance for
+ * any season it is handed, so a background job reaching for it is a background
+ * job that can hand somebody a fresh ten SOL in a season they never entered.
+ * That exact hole was found once already, in the strategy runner.
+ *
+ * So readers read. A caller that finds nothing here has learnt something true
+ * and should say so, rather than being handed an account that did not exist a
+ * moment ago.
+ */
+export async function accountFor(
+  db: Client,
+  seasonId: number,
+  userPubkey: string,
+): Promise<AccountRow | null> {
+  const result = await db.execute({
+    sql: `SELECT a.*, s.ordinal AS season_ordinal, s.latency_ms, s.max_price_impact_bps,
+                 s.engine_version, s.starting_balance
+          FROM accounts a JOIN seasons s ON s.id = a.season_id
+          WHERE a.season_id = ? AND a.user_pubkey = ?
+          ORDER BY a.generation DESC LIMIT 1`,
+    args: [seasonId, userPubkey],
+  });
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: Number(row['id']),
+    seasonId: Number(row['season_id']),
+    seasonOrdinal: Number(row['season_ordinal']),
+    userPubkey: String(row['user_pubkey']),
+    generation: Number(row['generation']),
+    solBalance: String(row['sol_balance']),
+    startingBalance: String(row['starting_balance']),
+    latencyMs: Number(row['latency_ms']),
+    maxPriceImpactBps: Number(row['max_price_impact_bps']),
+    engineVersion: Number(row['engine_version']),
+  };
+}
+
 /** The trader's account for a season, created at the starting balance if new. */
 export async function ensureAccount(
   db: Client,

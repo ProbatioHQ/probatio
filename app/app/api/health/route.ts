@@ -8,6 +8,7 @@ import { driftStatus } from '@/lib/drift-watch';
 import { warmStats } from '@/lib/chart-warm';
 import { traderWarmStats } from '@/lib/trader-warm';
 import { houseTraderStats } from '@/lib/house-traders';
+import { duelSettlerStatus } from '@/lib/duel-settle';
 import { strategyRunnerStatus } from '@/lib/strategy-runner';
 import { markStats } from '@/lib/mark-prices';
 import { priceStreamStatus } from '@/lib/price-stream';
@@ -100,6 +101,14 @@ export async function GET(request: Request): Promise<Response> {
       house: houseTraderStats(),
       /* Strategies people wrote in the form, running on our clock. */
       strategies: strategyRunnerStatus(),
+      /*
+       * Duels scored after their window closed.
+       *
+       * `settled` climbing is the only proof this ran. A duel left live past its
+       * end is the failure that makes no noise: both traders stay marked as
+       * duelling, neither can start another, and no result is ever written.
+       */
+      duels: duelSettlerStatus(),
       /*
        * Prices kept on what people hold.
        *

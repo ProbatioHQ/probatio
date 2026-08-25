@@ -4911,6 +4911,21 @@ body:has(main.wide) .site-footer .shell {
   border: 1px solid transparent;
 }
 
+/*
+ * Shipped is the strongest state on this page and looks it.
+ *
+ * Filled rather than tinted, because it is the only status that is a claim
+ * about the present rather than an intention: every item in the phase is live
+ * and can be opened in another tab. A phase marked this way is inviting somebody
+ * to go and check, so it should not look like the same kind of label as "later".
+ */
+.phase-status.s-done {
+  color: #04120a;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
 .phase-status.s-now {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -10458,4 +10473,202 @@ body:has(#livestream) {
   text-transform: none;
   letter-spacing: 0;
   font-family: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+ * Duels
+ * -------------------------------------------------------------------------
+ * One trader against one. The whole picture is that there are exactly two of
+ * them and a line down the middle, so the score is said with layout rather than
+ * with the word "versus", which would be one more thing to read for nothing.
+ */
+.duels {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.duel-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: stretch;
+  margin-top: 18px;
+  /* The rule is the whole idea of the panel, so nothing may crowd it. */
+  column-gap: 14px;
+}
+
+.duel-side {
+  text-align: center;
+  padding: 8px 20px;
+}
+
+.duel-rule {
+  background: linear-gradient(180deg, transparent, var(--line) 18%, var(--line) 82%, transparent);
+}
+
+.duel-who {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 16px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.duel-bps {
+  margin-top: 10px;
+  /*
+   * Scaled to the frame rather than fixed.
+   *
+   * Half the frame is what one of these gets, and a duel is exactly the place a
+   * four-figure return turns up: somebody who caught a launch is at +1240.00%,
+   * which at a fixed forty-six pixels is wider than the column it sits in. The
+   * clamp keeps the number inside its half on a phone and full size on a desk,
+   * which is better than truncating the one figure the panel exists to show.
+   */
+  font-size: clamp(26px, 8.5vw, 46px);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+/* Nine characters or more: +1240.00% rather than +8.76%. See `sizeOf`. */
+.duel-bps.long {
+  font-size: clamp(20px, 6.1vw, 38px);
+  letter-spacing: -0.04em;
+}
+
+.duel-tag {
+  margin-top: 8px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.duel-note {
+  margin-top: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.duel-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.duel-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.duel-line {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  flex: 1 1 320px;
+}
+
+.duel-line b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.duel-acts {
+  display: flex;
+  gap: 16px;
+  flex: 0 0 auto;
+}
+
+.duel-seal {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+.duel-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.duel-form .field {
+  flex: 1 1 220px;
+}
+
+/* The window is one of three fixed choices, so it has no business growing to
+   match a field somebody types an address into. */
+.duel-form .field:nth-child(2) {
+  flex: 0 0 200px;
+}
+
+/* The explanation list under the form: a claim, then why it is made that way. */
+.plainlist {
+  margin: 14px 0 0;
+}
+
+.plainlist dt {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.plainlist dt:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.plainlist dd {
+  margin: 8px 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.plainlist dd:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .duel-side { padding: 8px 8px; }
+  .duel-who { font-size: 14px; }
+
+  /* The window is one of three words; on a narrow screen it takes the row. */
+  .duel-form .field:nth-child(2) { flex: 1 1 100%; }
+}
+
+/*
+ * Touch targets.
+ *
+ * These are `.linklike`, which is the house style for an inline action and is
+ * right: a duel is accepted from a sentence, not from a row of buttons. What a
+ * link cannot do is be nine pixels tall on a phone, so on a coarse pointer the
+ * hit area grows without the thing itself growing a box. Gated on the pointer
+ * rather than on width, so a narrow desktop window keeps the compact form.
+ */
+@media (pointer: coarse) {
+  .duel-acts .linklike,
+  .duel-form .linklike {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .duel-acts {
+    gap: 24px;
+  }
 }

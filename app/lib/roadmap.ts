@@ -17,13 +17,23 @@ export interface Item {
 
 export interface Phase {
   readonly tag: string;
-  readonly status: 'now' | 'next' | 'later' | 'exploring';
+  readonly status: 'done' | 'now' | 'next' | 'later' | 'exploring';
   readonly name: string;
   readonly summary: string;
   readonly items: readonly Item[];
 }
 
 export const STATUS_LABEL: Record<Phase['status'], string> = {
+  /*
+   * `done` is a stronger claim than any other status here, and the only one
+   * that can be checked by a stranger: every item in the phase is live on the
+   * site right now. It is deliberately separate from `now`, which means "ships
+   * with the site" and was the wrong word for work finished two months after
+   * launch. A phase may only be marked done when the last of its items is,
+   * because a roadmap that rounds four-fifths up to finished is the dishonesty
+   * the rest of this project exists to avoid.
+   */
+  done: 'shipped',
   now: 'at launch',
   next: 'next',
   later: 'later',
@@ -33,14 +43,14 @@ export const STATUS_LABEL: Record<Phase['status'], string> = {
 export const PHASES: readonly Phase[] = [
   {
     tag: '01',
-    status: 'next',
+    status: 'done',
     name: 'A competitive arena',
-    summary: 'Solo practice is the start. This turns a private simulator into somewhere you compete and get watched.',
+    summary: 'Solo practice was the start. All four of these are live: you can be duelled, ranked against a program, and watched while it happens.',
     items: [
       {
         title: 'Head to head duels',
         detail:
-          'One against one, the same tokens over the same window, both records sealed. Put a stake on it and the winner takes the pot.',
+          'Built. One against one over a window you both agreed to, scored off the account you already entered the season with, and both results sealed. There is no duel balance and no second entry: the trades inside the window are ordinary season trades that count toward the leaderboard exactly as they would have.',
       },
       {
         title: 'Automated strategies that get ranked',
@@ -50,12 +60,12 @@ export const PHASES: readonly Phase[] = [
       {
         title: 'Backtesting on real history',
         detail:
-          'Replay a token through the exact reserves it actually traded against and see how a strategy would have done, before you risk a season on it.',
+          'Built. Replay a token through the exact reserves it actually traded against and see what your exits would have fetched, priced at a real sell rather than at the chart, before you risk a season on it.',
       },
       {
         title: 'Live spectating and a following',
         detail:
-          'Watch a top trader fill in real time, and let a record people trust gather an audience the way a real one does.',
+          'Built. Watch a trader fill in real time on the terminal, follow the ones worth following, and read a record that was sealed as it was made.',
       },
     ],
   },

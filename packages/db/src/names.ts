@@ -148,6 +148,26 @@ export async function nameRecord(db: Client, userPubkey: string): Promise<Displa
   return result.rows[0] ? toName(result.rows[0] as unknown as Record<string, unknown>) : null;
 }
 
+/**
+ * The wallet currently holding a name.
+ *
+ * Looked up by the folded key rather than the name as typed, which is the whole
+ * point: the key is what the unique index is on, so it is the only spelling
+ * where "one name, one holder" is true. Matching on `name` would let somebody
+ * challenging `Wagie` miss the person who claimed `wagie`.
+ *
+ * Only a name held now. A cleared row keeps its key reserved so nobody can take
+ * a moderated name, but it does not point at its old holder any more, and
+ * resolving to them would send a challenge to whoever used to be called that.
+ */
+export async function pubkeyForName(db: Client, nameKey: string): Promise<string | null> {
+  const result = await db.execute({
+    sql: 'SELECT user_pubkey FROM display_names WHERE name_key = ? AND cleared_at IS NULL',
+    args: [nameKey],
+  });
+  return result.rows[0] ? String(result.rows[0]['user_pubkey']) : null;
+}
+
 /** Every name a wallet has held, newest first. */
 export async function nameHistory(db: Client, userPubkey: string): Promise<DisplayName[]> {
   const result = await db.execute({

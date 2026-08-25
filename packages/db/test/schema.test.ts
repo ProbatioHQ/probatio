@@ -145,6 +145,7 @@ describe('migrations', () => {
       '042_strategies.sql',
       '043_launch_bundles.sql',
       '044_social_handles.sql',
+      '045_duels.sql',
     ]);
   });
 
