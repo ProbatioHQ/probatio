@@ -1,14 +1,14 @@
 {
-  "at": 1787644948,
+  "at": 1787655883,
   "checks": 4,
-  "inspected": 2063,
+  "inspected": 2103,
   "errors": 0,
-  "warnings": 79,
+  "warnings": 80,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 864,
+      "inspected": 887,
       "findings": [
         {
           "severity": "warning",
@@ -255,7 +255,7 @@
     {
       "id": "css-vars",
       "title": "Custom properties that resolve to nothing",
-      "inspected": 1105,
+      "inspected": 1121,
       "findings": []
     },
     {
@@ -267,7 +267,7 @@
     {
       "id": "env-docs",
       "title": "Settings the notes explain",
-      "inspected": 43,
+      "inspected": 44,
       "findings": [
         {
           "severity": "warning",
@@ -278,7 +278,7 @@
         {
           "severity": "warning",
           "file": "app/app/api/health/route.ts",
-          "line": 47,
+          "line": 48,
           "detail": "RAILWAY_GIT_COMMIT_SHA is read by the code and documented nowhere"
         },
         {
@@ -320,7 +320,7 @@
         {
           "severity": "warning",
           "file": "app/instrumentation.ts",
-          "line": 160,
+          "line": 170,
           "detail": "PROBATIO_DISABLE_DRIFT is read by the code and documented nowhere"
         },
         {
@@ -346,6 +346,12 @@
           "file": "app/lib/chart-warm.ts",
           "line": 87,
           "detail": "PROBATIO_WARM_INTERVAL_MS is read by the code and documented nowhere"
+        },
+        {
+          "severity": "warning",
+          "file": "app/lib/duel-settle.ts",
+          "line": 32,
+          "detail": "PROBATIO_DISABLE_DUELS is read by the code and documented nowhere"
         },
         {
           "severity": "warning",
