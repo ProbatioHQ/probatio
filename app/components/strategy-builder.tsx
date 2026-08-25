@@ -36,7 +36,7 @@ interface Rules {
     minHolders?: number | string;
     maxSocialReuse?: number | string;
   };
-  size: { stakeLamports: string; maxOpenPositions: number | string };
+  size: { stakeLamports: string; minStakeLamports?: string; maxOpenPositions: number | string };
   exit: {
     takeProfitBps?: number | string;
     stopLossBps?: number | string;
@@ -147,6 +147,7 @@ const BLANK = {
   minHolders: '',
   maxReuse: '',
   stake: '0.25',
+  minStake: '',
   maxOpen: '3',
   takeProfit: '120',
   stopLoss: '40',
@@ -206,6 +207,7 @@ export function StrategyBuilder() {
         minHolders: String(rules.entry.minHolders ?? ''),
         maxReuse: String(rules.entry.maxSocialReuse ?? ''),
         stake: toSol(rules.size.stakeLamports),
+        minStake: rules.size.minStakeLamports ? toSol(rules.size.minStakeLamports) : '',
         maxOpen: String(rules.size.maxOpenPositions),
         takeProfit: toPercent(rules.exit.takeProfitBps),
         stopLoss: toPercent(rules.exit.stopLossBps),
@@ -260,7 +262,11 @@ export function StrategyBuilder() {
 
     return {
       entry,
-      size: { stakeLamports: toLamports(form.stake), maxOpenPositions: Number(form.maxOpen) },
+      size: {
+        stakeLamports: toLamports(form.stake),
+        ...(form.minStake.trim() === '' ? {} : { minStakeLamports: toLamports(form.minStake) }),
+        maxOpenPositions: Number(form.maxOpen),
+      },
       exit,
     };
   }
@@ -515,14 +521,39 @@ export function StrategyBuilder() {
         <h3 className="strategy-section">Size</h3>
         <div className="strategy-grid">
           <label className="field">
-            <span>Per position (SOL)</span>
+            <span>Per position, at most (SOL)</span>
             <input inputMode="decimal" value={form.stake} onChange={(e) => set('stake', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Per position, at least (SOL)</span>
+            <input
+              inputMode="decimal"
+              value={form.minStake}
+              onChange={(e) => set('minStake', e.target.value)}
+              placeholder="same every time"
+            />
           </label>
           <label className="field">
             <span>Open at once, at most</span>
             <input inputMode="numeric" value={form.maxOpen} onChange={(e) => set('maxOpen', e.target.value)} />
           </label>
         </div>
+        <p className="dim panel-note">
+          Leave the second box empty and every entry is the same size, which is how this worked
+          before. Fill it in and the position lands between the two according to how comfortably
+          the token cleared your conditions: everything passed by a mile gets the top of the
+          range, something that scraped past the last condition gets the bottom. Only the numeric
+          conditions count toward that, because there is no such thing as clearing &ldquo;names an
+          X account&rdquo; by a mile.
+        </p>
+        <p className="dim panel-note">
+          A bigger position is also capped at two percent of what the pool actually holds, and
+          that cap can only ever pull it down toward your floor. Exits here are priced out of real
+          reserves and a take profit fires exactly when a position is largest against its pool,
+          which is the moment leaving costs the most, so betting more on conviction without that
+          cap would turn your best entries into your worst exits. A pool whose depth is not known
+          here is sized at the floor rather than guessed at.
+        </p>
 
         <h3 className="strategy-section">Leave when</h3>
         <div className="strategy-grid">
@@ -584,7 +615,9 @@ export function StrategyBuilder() {
           Replays your take profit, stop loss and timeout over one token’s actual recorded swaps,
           priced at what a real sell would have fetched out of the reserves at each moment rather
           than at the chart. It answers what your exits would have done, not which tokens the entry
-          conditions would have found: a replay is of a token you have already picked.
+          conditions would have found: a replay is of a token you have already picked. It is run at
+          the largest position you allow, since a replay has no conditions to score and so no
+          conviction to size by.
         </p>
 
         <div className="strategy-actions">

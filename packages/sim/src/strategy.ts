@@ -66,6 +66,28 @@ export const MAX_STAKE_LAMPORTS = 10_000_000_000n;
 
 export const MAX_OPEN_POSITIONS = 10;
 
+/**
+ * The most of a pool's real SOL a single position may become, in basis points.
+ *
+ * This is the guard that makes conviction sizing safe rather than a way to lose
+ * more money confidently, and it is worth being precise about why. Exits here
+ * are priced out of real reserves, and a take profit fires exactly when a
+ * position is large against its pool, which is the moment leaving costs the
+ * most. So a feature that raises the stake when a strategy is sure would, left
+ * alone, turn its best-scoring entries into its worst-filling exits.
+ *
+ * Capping against the account balance would not help: the balance says nothing
+ * about what the market on the other side can absorb. The cap is against the
+ * pool, because the pool is the thing that has to give the money back.
+ *
+ * Two percent, because selling a position worth 2% of a pool's real SOL moves
+ * it by roughly that much on the way out, which is a cost a take profit can
+ * absorb. It is deliberately far tighter than the season's price impact
+ * ceiling: that ceiling exists to refuse a ruinous fill, and this exists to
+ * stop a strategy walking toward one.
+ */
+export const DEPTH_CAP_BPS = 200;
+
 export type Venue = 'any' | 'curve' | 'graduated';
 
 export interface EntryRules {
@@ -157,7 +179,17 @@ export interface EntryRules {
 }
 
 export interface SizeRules {
+  /** The most a single position may commit. */
   readonly stakeLamports: bigint;
+  /**
+   * The least, when sizing by conviction.
+   *
+   * Absent means every entry is the same size, which is how this worked before
+   * and remains the default. Present turns `stakeLamports` into a ceiling and
+   * this into a floor, with the actual position landing between them according
+   * to how comfortably the token cleared the conditions.
+   */
+  readonly minStakeLamports?: bigint;
   readonly maxOpenPositions: number;
 }
 
@@ -466,6 +498,162 @@ export function matchesEntry(entry: EntryRules, candidate: Candidate): EntryVerd
  * would read the chain for every candidate on every pass, which is the cost
  * this whole loop is arranged to avoid.
  */
+/* -------------------------------------------------------------------------
+ * Sizing by conviction
+ * ---------------------------------------------------------------------- */
+
+/**
+ * How comfortably a candidate cleared one condition, from 0 to 1.
+ *
+ * Nought means it only just got through and one means it cleared by a mile.
+ * Expressed as a share of the limit rather than as an absolute distance,
+ * because the limits are in different units: three launches, fifty holders and
+ * twenty percent bundled cannot be compared in their own terms, and averaging
+ * them raw would let whichever condition happened to use the biggest numbers
+ * decide the whole score.
+ *
+ * WHY THE DENOMINATOR IS THE MAGNITUDE
+ *
+ * Because a limit can be negative. "Moved at least -20%" is an ordinary rule
+ * and means the token has not dumped more than a fifth. Dividing by the limit
+ * itself flips the sign of the whole calculation there, and an earlier version
+ * of this shortcut it by treating any limit at or below nought as automatically
+ * cleared in full. That handed a perfect score to a token sitting exactly on
+ * the floor, which had cleared it by nothing at all, and dragged every average
+ * containing such a condition to the top of the range. Confidence sizing giving
+ * maximum conviction to something nobody cleared is precisely the failure this
+ * feature must not have.
+ *
+ * A limit of exactly nought has no magnitude to be a share of, and there is no
+ * such thing as clearing "at most 0% bundled" by a mile: it is met or it is
+ * not. Null, and skipped, rather than a number nobody can defend.
+ */
+function ceilingMargin(value: number, limit: number): number | null {
+  if (limit === 0) return null;
+  return Math.max(0, Math.min(1, (limit - value) / Math.abs(limit)));
+}
+
+function floorMargin(value: number, limit: number): number | null {
+  if (limit === 0) return null;
+  return Math.max(0, Math.min(1, (value - limit) / Math.abs(limit)));
+}
+
+export interface Sizing {
+  /** What to actually buy. */
+  readonly lamports: bigint;
+  /**
+   * How comfortably it cleared, from 0 to 1, or null when nothing was scorable.
+   *
+   * Null is not zero. A strategy whose only conditions are yes-or-no ones has
+   * nothing to be more or less confident about, and reading that as no
+   * confidence would shrink every one of its entries to the floor for a reason
+   * that has nothing to do with the token.
+   */
+  readonly confidence: number | null;
+  /** Said plainly, because it lands in the event log the owner reads. */
+  readonly why: string;
+}
+
+/**
+ * What to stake on a candidate that has already passed.
+ *
+ * Every entry condition is a gate, so before this a token that cleared all
+ * seven comfortably and one that scraped past the last of them produced an
+ * identical bet. This scores the margin on each condition that has a margin,
+ * averages them, and lands the position between the trader's floor and their
+ * ceiling accordingly.
+ *
+ * Only the numeric conditions score. "Names an X account" is true or false and
+ * has no such thing as clearing it by a mile, so the yes-or-no conditions stay
+ * pure gates and contribute nothing either way.
+ *
+ * WHAT STOPS THIS BEING A WAY TO LOSE MORE, CONFIDENTLY
+ *
+ * The result is capped against the pool's own depth, never against the balance.
+ * See `DEPTH_CAP_BPS`: a take profit fires when a position is largest against
+ * its pool, which is when leaving costs the most, so raising the stake on
+ * conviction without that cap would make the best-scoring entries the
+ * worst-filling exits.
+ *
+ * A pool whose depth is not known cannot be capped, and an uncapped raise is
+ * exactly the thing the cap exists to prevent, so it stays at the floor. That
+ * is the same rule the conditions themselves follow: something that cannot be
+ * checked has not been satisfied.
+ */
+export function sizeFor(size: SizeRules, entry: EntryRules, candidate: Candidate): Sizing {
+  const full = size.stakeLamports;
+  const floor = size.minStakeLamports;
+
+  if (floor === undefined || floor >= full) {
+    return { lamports: full, confidence: null, why: 'every position is the same size' };
+  }
+
+  const margins: number[] = [];
+  const push = (value: number | null | undefined, limit: number | undefined, kind: 'floor' | 'ceiling') => {
+    if (limit === undefined || value === null || value === undefined) return;
+    const margin = kind === 'ceiling' ? ceilingMargin(value, limit) : floorMargin(value, limit);
+    if (margin !== null) margins.push(margin);
+  };
+
+  push(candidate.ageSeconds, entry.maxAgeSeconds, 'ceiling');
+  push(candidate.ageSeconds, entry.minAgeSeconds, 'floor');
+  if (candidate.liquidityLamports !== null && entry.minLiquidityLamports !== undefined) {
+    push(Number(candidate.liquidityLamports), Number(entry.minLiquidityLamports), 'floor');
+  }
+  if (candidate.marketCapLamports !== null) {
+    if (entry.maxMarketCapLamports !== undefined) {
+      push(Number(candidate.marketCapLamports), Number(entry.maxMarketCapLamports), 'ceiling');
+    }
+    if (entry.minMarketCapLamports !== undefined) {
+      push(Number(candidate.marketCapLamports), Number(entry.minMarketCapLamports), 'floor');
+    }
+  }
+  push(candidate.changeBps, entry.maxChangeBps, 'ceiling');
+  push(candidate.changeBps, entry.minChangeBps, 'floor');
+  push(candidate.creatorLaunches, entry.maxCreatorLaunches, 'ceiling');
+  push(candidate.creatorHoldingBps, entry.maxCreatorHoldingBps, 'ceiling');
+  push(candidate.bundledBps, entry.maxBundleBps, 'ceiling');
+  push(candidate.holders, entry.minHolders, 'floor');
+  push(candidate.socialReuse, entry.maxSocialReuse, 'ceiling');
+
+  if (margins.length === 0) {
+    return {
+      lamports: full,
+      confidence: null,
+      why: 'no condition here has a margin to score, so it is sized in full',
+    };
+  }
+
+  const confidence = margins.reduce((a, b) => a + b, 0) / margins.length;
+  const scaled = floor + BigInt(Math.round(Number(full - floor) * confidence));
+
+  /*
+   * The depth cap, which may only ever pull the size down toward the floor and
+   * never below it. Below the floor is the trader's own decision to make, and
+   * the engine's price impact ceiling is still there to refuse a bad fill.
+   */
+  if (candidate.liquidityLamports === null) {
+    return {
+      lamports: floor,
+      confidence,
+      why: `cleared by ${(confidence * 100).toFixed(0)}%, but this pool's depth is not known here, so it is sized at the floor`,
+    };
+  }
+
+  const cap = (candidate.liquidityLamports * BigInt(DEPTH_CAP_BPS)) / 10_000n;
+  const ceiling = cap > floor ? cap : floor;
+  const lamports = scaled < ceiling ? scaled : ceiling;
+
+  return {
+    lamports,
+    confidence,
+    why:
+      lamports < scaled
+        ? `cleared by ${(confidence * 100).toFixed(0)}%, held to ${(Number(lamports) / 1e9).toFixed(3)} SOL by the pool's depth`
+        : `cleared by ${(confidence * 100).toFixed(0)}%`,
+  };
+}
+
 export function needsCreatorHolding(entry: EntryRules): boolean {
   return entry.maxCreatorHoldingBps !== undefined;
 }
@@ -646,10 +834,30 @@ export function parseStrategyRules(input: unknown): StrategyRules {
     stakeLamports: lamports(
       sizeSource['stakeLamports'], 'the position size', MIN_STAKE_LAMPORTS, MAX_STAKE_LAMPORTS,
     ),
+    ...(sizeSource['minStakeLamports'] === undefined || sizeSource['minStakeLamports'] === null || sizeSource['minStakeLamports'] === ''
+      ? {}
+      : {
+          minStakeLamports: lamports(
+            sizeSource['minStakeLamports'],
+            'the smallest position',
+            MIN_STAKE_LAMPORTS,
+            MAX_STAKE_LAMPORTS,
+          ),
+        }),
     maxOpenPositions: integer(
       sizeSource['maxOpenPositions'], 'the number of open positions', 1, MAX_OPEN_POSITIONS,
     ),
   };
+
+  /*
+   * A floor above the ceiling is not a range, and silently swapping them would
+   * be deciding for somebody what they meant. Refused, with the numbers in it.
+   */
+  if (size.minStakeLamports !== undefined && size.minStakeLamports >= size.stakeLamports) {
+    throw new StrategyRulesError(
+      `the smallest position (${sol(size.minStakeLamports)}) must be under the largest (${sol(size.stakeLamports)})`,
+    );
+  }
 
   const exit: { -readonly [K in keyof ExitRules]: ExitRules[K] } = {};
   if (present(exitSource, 'takeProfitBps')) {
@@ -702,6 +910,9 @@ export function serializeStrategyRules(rules: StrategyRules): string {
     },
     size: {
       stakeLamports: rules.size.stakeLamports.toString(),
+      ...(rules.size.minStakeLamports === undefined
+        ? {}
+        : { minStakeLamports: rules.size.minStakeLamports.toString() }),
       maxOpenPositions: rules.size.maxOpenPositions,
     },
     exit: rules.exit,

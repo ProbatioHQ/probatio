@@ -43,6 +43,7 @@ import {
   needsHolders,
   quoteSell,
   readStoredRules,
+  sizeFor,
   type Candidate,
   type StrategyRules,
 } from '@probatio/sim';
@@ -706,13 +707,23 @@ async function runOne(client: Client, strategy: StrategyRow, now: number): Promi
   const openNow = await openPositions(client, afterExits.id);
   if (openNow.length >= rules.size.maxOpenPositions) return;
 
+  /*
+   * Against the smallest a position can be, not the largest.
+   *
+   * With conviction sizing the stake is a range, and the balance only has to
+   * cover the bottom of it. Checking the ceiling here would stand a strategy
+   * down for the rest of the season the moment its balance dipped under the
+   * largest bet it is allowed to make, while every bet it actually wanted to
+   * place was affordable.
+   */
   const balance = BigInt(afterExits.solBalance);
-  if (balance < rules.size.stakeLamports) {
+  const least = rules.size.minStakeLamports ?? rules.size.stakeLamports;
+  if (balance < least) {
     await recordStrategyEvent(client, strategy.id, {
       at: now,
       kind: 'skipped',
       mint: null,
-      detail: `balance is ${(Number(balance) / 1e9).toFixed(3)} SOL and a position is ${(Number(rules.size.stakeLamports) / 1e9).toFixed(3)} SOL`,
+      detail: `balance is ${(Number(balance) / 1e9).toFixed(3)} SOL and a position is at least ${(Number(least) / 1e9).toFixed(3)} SOL`,
     });
     return;
   }
@@ -780,14 +791,36 @@ async function runOne(client: Client, strategy: StrategyRow, now: number): Promi
     // Checked before the chain is read, so a refusal costs nothing.
     if (await isSuspended(client, candidate.mint)) continue;
 
+    /*
+     * Sized against the same candidate the conditions were judged on, so the
+     * margins scored here are the ones that were actually cleared, including
+     * the chain reads filled in above.
+     */
+    const sizing = sizeFor(rules.size, rules.entry, checked);
+
+    /*
+     * One read, used for both the affordability check and the order.
+     *
+     * Read here rather than once for the whole pass, because several entries in
+     * one pass spend the balance down and `recordTrade` writes conditionally on
+     * the exact balance it was quoted against. Reading twice in a row would be
+     * two queries for one answer, so the row that answers "can it afford this"
+     * is the same row the order is placed with.
+     *
+     * A position it can no longer afford ends the pass rather than being bought
+     * smaller: a size nobody chose is not a rule anybody wrote.
+     */
+    const funds = await freshAccount();
+    if (BigInt(funds.solBalance) < sizing.lamports) break;
+
     const outcome = await executeTrade({
       client,
-      account: await freshAccount(),
+      account: funds,
       seasonId: strategy.seasonId,
       userPubkey: strategy.userPubkey,
       mint: candidate.mint,
       side: 'buy',
-      size: rules.size.stakeLamports,
+      size: sizing.lamports,
       market: { atClick: market, atFill: market },
       source: 'form',
       now: Date.now(),
@@ -801,7 +834,10 @@ async function runOne(client: Client, strategy: StrategyRow, now: number): Promi
         at: Date.now(),
         kind: 'entered',
         mint: candidate.mint,
-        detail: `bought ${(Number(rules.size.stakeLamports) / 1e9).toFixed(3)} SOL at ${outcome.fill.filled.priceImpactBps} bps of impact`,
+        detail:
+          sizing.confidence === null
+            ? `bought ${(Number(sizing.lamports) / 1e9).toFixed(3)} SOL at ${outcome.fill.filled.priceImpactBps} bps of impact`
+            : `bought ${(Number(sizing.lamports) / 1e9).toFixed(3)} SOL at ${outcome.fill.filled.priceImpactBps} bps of impact, ${sizing.why}`,
       });
     } else {
       await recordStrategyEvent(client, strategy.id, {

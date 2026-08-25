@@ -7,6 +7,9 @@ import {
   needsHolders,
   needsCreatorHolding,
   parseStrategyRules,
+  RULES_VERSION,
+  sizeFor,
+  DEPTH_CAP_BPS,
   readStoredRules,
   serializeStrategyRules,
   type Candidate,
@@ -414,6 +417,191 @@ describe('storing rules', () => {
     // Written straight past the validator, the way a bad migration would.
     expect(() =>
       readStoredRules('{"entry":{},"size":{"stakeLamports":"1","maxOpenPositions":1},"exit":{}}', 1),
+    ).toThrow(StrategyRulesError);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * Sizing by conviction
+ * ------------------------------------------------------------------------ */
+
+describe('what to stake on something that passed', () => {
+  const FULL = 1_000_000_000n; // 1 SOL
+  const FLOOR = 200_000_000n; // 0.2 SOL
+  const ranged = { stakeLamports: FULL, minStakeLamports: FLOOR, maxOpenPositions: 3 };
+  const flat = { stakeLamports: FULL, maxOpenPositions: 3 };
+
+  /* Deep enough that the cap is never the binding constraint unless a test
+     means it to be: two percent of 500 SOL is 10 SOL, well over FULL. */
+  const deep = { liquidityLamports: 500_000_000_000n };
+
+  it('sizes every entry the same when no floor is set', () => {
+    const out = sizeFor(flat, { maxAgeSeconds: 900 }, candidate({ ageSeconds: 10, ...deep }));
+    expect(out.lamports).toBe(FULL);
+    expect(out.confidence).toBeNull();
+  });
+
+  /*
+   * The whole point of the feature. Before this, both of these produced the
+   * same bet, because the size was one number and a condition was a gate.
+   */
+  it('bets more on something that cleared by a mile than on something that scraped past', () => {
+    const entry = { maxAgeSeconds: 1_000 };
+    const easy = sizeFor(ranged, entry, candidate({ ageSeconds: 10, ...deep }));
+    const scraped = sizeFor(ranged, entry, candidate({ ageSeconds: 995, ...deep }));
+
+    expect(easy.lamports).toBeGreaterThan(scraped.lamports);
+    expect(easy.confidence!).toBeGreaterThan(0.9);
+    expect(scraped.confidence!).toBeLessThan(0.1);
+  });
+
+  it('never goes under the floor or over the ceiling', () => {
+    const entry = { maxAgeSeconds: 1_000 };
+    for (const age of [0, 1, 500, 999, 1_000]) {
+      const out = sizeFor(ranged, entry, candidate({ ageSeconds: age, ...deep }));
+      expect(out.lamports).toBeGreaterThanOrEqual(FLOOR);
+      expect(out.lamports).toBeLessThanOrEqual(FULL);
+    }
+  });
+
+  it('averages the conditions rather than letting the biggest numbers decide', () => {
+    /*
+     * Age is in seconds and market cap is in lamports. Scored raw, the market
+     * cap would swamp everything else purely because its numbers are larger.
+     */
+    const entry = { maxAgeSeconds: 1_000, maxMarketCapLamports: 1_000_000_000_000n };
+    const half = sizeFor(
+      ranged,
+      entry,
+      candidate({ ageSeconds: 500, marketCapLamports: 500_000_000_000n, ...deep }),
+    );
+    expect(half.confidence!).toBeCloseTo(0.5, 2);
+  });
+
+  it('ignores the yes-or-no conditions, which have no margin', () => {
+    // There is no such thing as clearing "names an X account" by a mile.
+    const only = sizeFor(
+      ranged,
+      { requireTwitter: true, venue: 'curve' },
+      candidate({ hasTwitter: true, ...deep }),
+    );
+    expect(only.confidence).toBeNull();
+    expect(only.lamports).toBe(FULL);
+  });
+
+  /*
+   * The guard that makes this safe rather than a way to lose more money
+   * confidently. A take profit fires when a position is largest against its
+   * pool, which is when leaving costs the most, so conviction must not be
+   * allowed to walk a strategy into a size the pool cannot give back.
+   */
+  it('caps a confident bet against the pool, not against the balance', () => {
+    const thin = candidate({ ageSeconds: 1, liquidityLamports: 10_000_000_000n }); // 10 SOL
+    const out = sizeFor(ranged, { maxAgeSeconds: 1_000 }, thin);
+
+    // Two percent of ten SOL is 0.2 SOL, which is under what full conviction
+    // would otherwise have staked.
+    expect(out.confidence!).toBeGreaterThan(0.9);
+    expect(out.lamports).toBe((10_000_000_000n * BigInt(DEPTH_CAP_BPS)) / 10_000n);
+    expect(out.lamports).toBeLessThan(FULL);
+    expect(out.why).toContain("pool's depth");
+  });
+
+  it('lets the cap pull down to the floor but never through it', () => {
+    // A pool so thin that two percent of it is less than the trader's own
+    // floor. Their floor is their decision; the engine's impact ceiling is what
+    // refuses a genuinely ruinous fill.
+    const dust = candidate({ ageSeconds: 1, liquidityLamports: 1_000_000_000n }); // 1 SOL
+    const out = sizeFor(ranged, { maxAgeSeconds: 1_000 }, dust);
+    expect(out.lamports).toBe(FLOOR);
+  });
+
+  it('stays at the floor when the pool depth is not known', () => {
+    // Board candidates carry no SOL-denominated depth. An uncapped raise is
+    // exactly what the cap exists to prevent, so it does not raise.
+    const unknown = candidate({ ageSeconds: 1, liquidityLamports: null });
+    const out = sizeFor(ranged, { maxAgeSeconds: 1_000 }, unknown);
+    expect(out.lamports).toBe(FLOOR);
+    expect(out.confidence!).toBeGreaterThan(0.9);
+    expect(out.why).toContain('not known here');
+  });
+
+  /*
+   * The bug this pass found, and the one that would have quietly ruined the
+   * feature. "Moved at least -20%" is an ordinary rule meaning the token has
+   * not dumped more than a fifth, and dividing by a negative limit flips the
+   * whole calculation. The first version shortcut that by treating any limit at
+   * or below nought as cleared in full, which handed maximum conviction to a
+   * token sitting exactly on the floor and dragged every average containing
+   * such a condition to the top of the range.
+   */
+  it('scores a negative floor by how far past it the token actually got', () => {
+    const entry = { minChangeBps: -2_000 };
+    const barely = sizeFor(ranged, entry, candidate({ changeBps: -2_000, ...deep }));
+    const comfortably = sizeFor(ranged, entry, candidate({ changeBps: 5_000, ...deep }));
+    expect(barely.confidence!).toBeLessThan(0.1);
+    expect(comfortably.confidence!).toBeGreaterThan(barely.confidence!);
+    expect(barely.lamports).toBeLessThan(comfortably.lamports);
+  });
+
+  it('scores a negative ceiling the same way', () => {
+    const entry = { maxChangeBps: -500 };
+    const barely = sizeFor(ranged, entry, candidate({ changeBps: -500, ...deep }));
+    const comfortably = sizeFor(ranged, entry, candidate({ changeBps: -9_000, ...deep }));
+    expect(barely.confidence!).toBeLessThan(0.1);
+    expect(comfortably.confidence!).toBeGreaterThan(0.9);
+  });
+
+  it('does not score a limit of nought, which has no margin to clear', () => {
+    // "At most 0% bundled" is met or it is not. There is no clearing it well,
+    // and nought has no magnitude to be a share of.
+    const out = sizeFor(ranged, { maxBundleBps: 0 }, candidate({ bundledBps: 0, ...deep }));
+    expect(out.confidence).toBeNull();
+    expect(out.lamports).toBe(FULL);
+  });
+
+  it('still scores the other conditions when one of them is unscorable', () => {
+    const out = sizeFor(
+      ranged,
+      { maxBundleBps: 0, maxAgeSeconds: 1_000 },
+      candidate({ bundledBps: 0, ageSeconds: 500, ...deep }),
+    );
+    expect(out.confidence).toBeCloseTo(0.5, 2);
+  });
+
+  it('treats a floor at or above the ceiling as no range at all', () => {
+    const same = sizeFor(
+      { stakeLamports: FULL, minStakeLamports: FULL, maxOpenPositions: 3 },
+      { maxAgeSeconds: 1_000 },
+      candidate({ ageSeconds: 1, ...deep }),
+    );
+    expect(same.lamports).toBe(FULL);
+    expect(same.confidence).toBeNull();
+  });
+});
+
+describe('the smallest position, as written down', () => {
+  it('round-trips through the stored shape', () => {
+    const parsed = parseStrategyRules(
+      rules({ size: { stakeLamports: '1000000000', minStakeLamports: '200000000', maxOpenPositions: 3 } }),
+    );
+    expect(parsed.size.minStakeLamports).toBe(200_000_000n);
+    const back = readStoredRules(serializeStrategyRules(parsed), RULES_VERSION);
+    expect(back.size.minStakeLamports).toBe(200_000_000n);
+  });
+
+  it('is absent when it was left empty, rather than stored as nought', () => {
+    const parsed = parseStrategyRules(rules());
+    expect(parsed.size.minStakeLamports).toBeUndefined();
+    expect(serializeStrategyRules(parsed)).not.toContain('minStakeLamports');
+  });
+
+  it('refuses a floor that is not under the ceiling', () => {
+    // Swapping them silently would be deciding for somebody what they meant.
+    expect(() =>
+      parseStrategyRules(
+        rules({ size: { stakeLamports: '200000000', minStakeLamports: '500000000', maxOpenPositions: 3 } }),
+      ),
     ).toThrow(StrategyRulesError);
   });
 });
