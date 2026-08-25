@@ -1,14 +1,14 @@
 {
-  "at": 1787655883,
+  "at": 1787687096,
   "checks": 4,
-  "inspected": 2103,
+  "inspected": 2105,
   "errors": 0,
   "warnings": 80,
   "results": [
     {
       "id": "dead-exports",
       "title": "Exports nothing calls",
-      "inspected": 887,
+      "inspected": 889,
       "findings": [
         {
           "severity": "warning",
@@ -428,13 +428,13 @@
         {
           "severity": "warning",
           "file": "app/lib/strategy-runner.ts",
-          "line": 94,
+          "line": 95,
           "detail": "PROBATIO_DISABLE_STRATEGIES is read by the code and documented nowhere"
         },
         {
           "severity": "warning",
           "file": "app/lib/strategy-runner.ts",
-          "line": 104,
+          "line": 105,
           "detail": "PROBATIO_STRATEGY_INTERVAL_MS is read by the code and documented nowhere"
         },
         {
